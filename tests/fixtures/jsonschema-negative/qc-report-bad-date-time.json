@@ -1,0 +1,14 @@
+{
+  "schema_kind": "qc-report",
+  "base": "qc-report.json",
+  "description": "QC report timestamps must be valid date-time strings.",
+  "set": [
+    {
+      "path": [
+        "reviewed_at"
+      ],
+      "value": "not-a-date"
+    }
+  ],
+  "expected_error": "is not a 'date-time'"
+}

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Clean-Room Evidence Ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ledger_id",
+    "task_id",
+    "domain",
+    "entries"
+  ],
+  "properties": {
+    "ledger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "const": "contaminated"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "source_unit_ref",
+          "evidence_type",
+          "description",
+          "evidence_location_ref",
+          "retained_in_contaminated_domain"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_unit_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_type": {
+            "enum": [
+              "source-observation",
+              "public-doc",
+              "runtime-observation",
+              "tool-output",
+              "manual-note"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_location_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_hash": {
+            "type": "string"
+          },
+          "sensitivity": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "retained_in_contaminated_domain": {
+            "const": true
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "clean-room-skill",
+  "description": "Spec-first clean-room workflow for authorized source analysis without replacement code.",
+  "owner": {
+    "name": "whit3rabbit"
+  },
+  "plugins": [
+    {
+      "name": "clean-room",
+      "source": "./",
+      "description": "Spec-first clean-room workflow for authorized source analysis without replacement code.",
+      "version": "0.1.0",
+      "author": {
+        "name": "whit3rabbit"
+      },
+      "category": "development"
+    }
+  ]
+}

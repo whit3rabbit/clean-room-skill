@@ -1,0 +1,624 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Clean-Room Task Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "target_identifier",
+    "authorization",
+    "source_acquisition_basis",
+    "source_scope",
+    "clean_scope",
+    "trust_boundary",
+    "format_selection",
+    "agent_pipeline",
+    "required_profiles",
+    "artifact_paths",
+    "handoff_policy",
+    "tool_policy",
+    "model_policy",
+    "retention_policy",
+    "roles",
+    "units",
+    "expected_artifacts",
+    "audit_log_refs"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_identifier": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requester",
+        "scope_statement",
+        "allowed_actions",
+        "prohibited_actions"
+      ],
+      "properties": {
+        "requester": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope_statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "prohibited_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_handling": {
+          "type": "string"
+        }
+      }
+    },
+    "source_acquisition_basis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "license_contract_notes": {
+      "type": "string"
+    },
+    "source_index_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "started_at",
+        "restart_reason"
+      ],
+      "properties": {
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "previous_generation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "restart_reason": {
+          "enum": [
+            "user-requested",
+            "contamination",
+            "scope-change",
+            "invalid-state"
+          ]
+        }
+      }
+    },
+    "source_scope": {
+      "$ref": "#/$defs/workspace_scope"
+    },
+    "clean_scope": {
+      "$ref": "#/$defs/workspace_scope"
+    },
+    "trust_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contaminated_domain",
+        "clean_domain",
+        "separation_controls"
+      ],
+      "properties": {
+        "contaminated_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clean_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "separation_controls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "format_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "selection_basis",
+        "target_profile",
+        "native_artifacts",
+        "formatting_rules"
+      ],
+      "properties": {
+        "mode": {
+          "const": "canonical-plus-target"
+        },
+        "selection_basis": {
+          "const": "user-choice"
+        },
+        "target_profile": {
+          "enum": [
+            "openspec-delta",
+            "gsd-planning-package",
+            "speckit-feature-folder",
+            "kiro-spec-folder"
+          ]
+        },
+        "native_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "formatting_rules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "agent_pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_0",
+        "agent_1",
+        "agent_2",
+        "agent_3",
+        "handoff_rules"
+      ],
+      "properties": {
+        "agent_0": {
+          "$ref": "#/$defs/agent_0_stage"
+        },
+        "agent_1": {
+          "$ref": "#/$defs/agent_1_stage"
+        },
+        "agent_2": {
+          "$ref": "#/$defs/agent_2_stage"
+        },
+        "agent_3": {
+          "$ref": "#/$defs/agent_3_stage"
+        },
+        "handoff_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowed_inputs",
+            "allowed_outputs",
+            "blocked_material",
+            "report_back_to"
+          ],
+          "properties": {
+            "allowed_inputs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "allowed_outputs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "blocked_material": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "report_back_to": {
+              "const": "agent_0"
+            }
+          }
+        }
+      }
+    },
+    "controller_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "stop_conditions"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "attended",
+            "unattended"
+          ]
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_units_per_iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "stop_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "authorization-missing",
+              "scope-change",
+              "contamination-suspected",
+              "schema-validation-failed",
+              "leakage-scan-failed",
+              "unit-blocked",
+              "coverage-complete",
+              "iteration-limit-reached"
+            ]
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "unattended"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "max_iterations"
+            ]
+          }
+        }
+      ]
+    },
+    "required_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "profile_id",
+          "workspace_id"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/$defs/role"
+          },
+          "profile_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "artifact_paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contaminated_artifacts",
+        "contaminated_artifact_roots",
+        "clean_artifacts",
+        "quarantine"
+      ],
+      "properties": {
+        "contaminated_artifacts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contaminated_artifact_roots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "clean_artifacts": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quarantine": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "handoff_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_artifacts",
+        "blocked_material",
+        "one_way_handoff"
+      ],
+      "properties": {
+        "allowed_artifacts": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "task-manifest",
+              "behavior-spec",
+              "handoff-package",
+              "skeleton-manifest",
+              "qc-report",
+              "coverage-ledger-summary",
+              "open-questions",
+              "test-plan",
+              "abstract-delta-ticket"
+            ]
+          }
+        },
+        "blocked_material": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "one_way_handoff": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "tool_policy": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "model_policy": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "retention_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "trust_domain",
+          "allowed_access"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/$defs/role"
+          },
+          "trust_domain": {
+            "enum": [
+              "contaminated",
+              "clean"
+            ]
+          },
+          "allowed_access": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_id",
+          "description",
+          "status"
+        ],
+        "properties": {
+          "unit_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "in-progress",
+              "complete",
+              "out-of-scope",
+              "blocked"
+            ]
+          },
+          "source_index_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expected_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "audit_log_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "role": {
+      "enum": [
+        "contaminated-manager-verifier",
+        "contaminated-source-analyst",
+        "clean-architect",
+        "clean-qa-editor"
+      ]
+    },
+    "agent_0_stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "responsibility",
+        "trust_domain"
+      ],
+      "properties": {
+        "role": {
+          "const": "contaminated-manager-verifier"
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_domain": {
+          "const": "contaminated"
+        }
+      }
+    },
+    "agent_1_stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "responsibility",
+        "trust_domain"
+      ],
+      "properties": {
+        "role": {
+          "const": "contaminated-source-analyst"
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_domain": {
+          "const": "contaminated"
+        }
+      }
+    },
+    "agent_2_stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "responsibility",
+        "trust_domain"
+      ],
+      "properties": {
+        "role": {
+          "const": "clean-architect"
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_domain": {
+          "const": "clean"
+        }
+      }
+    },
+    "agent_3_stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "responsibility",
+        "trust_domain"
+      ],
+      "properties": {
+        "role": {
+          "const": "clean-qa-editor"
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_domain": {
+          "const": "clean"
+        }
+      }
+    },
+    "workspace_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace_id",
+        "description",
+        "path_policy"
+      ],
+      "properties": {
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

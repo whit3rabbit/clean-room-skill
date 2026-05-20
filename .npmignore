@@ -1,0 +1,10 @@
+.DS_Store
+._*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.syntext/
+node_modules/
+tests/
+clean-room-patches/
+*.tgz

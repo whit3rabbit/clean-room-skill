@@ -1,0 +1,14 @@
+{
+  "schema_kind": "behavior-spec",
+  "base": "behavior-spec.json",
+  "description": "Behavior specs must reject ad hoc source path fields.",
+  "set": [
+    {
+      "path": [
+        "source_path"
+      ],
+      "value": "private/source/module.py"
+    }
+  ],
+  "expected_error": "Additional properties are not allowed"
+}

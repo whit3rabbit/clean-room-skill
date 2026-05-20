@@ -1,0 +1,20 @@
+{
+  "name": "clean-room",
+  "version": "0.1.0",
+  "description": "Spec-first clean-room workflow for authorized source analysis without replacement code.",
+  "author": {
+    "name": "whit3rabbit"
+  },
+  "homepage": "https://github.com/whit3rabbit/clean-room-skill",
+  "repository": "https://github.com/whit3rabbit/clean-room-skill",
+  "license": "MIT",
+  "keywords": [
+    "clean-room",
+    "specification",
+    "reverse-engineering",
+    "compliance"
+  ],
+  "skills": "./skills/",
+  "agents": "./agents/",
+  "hooks": "./hooks/hooks.json"
+}

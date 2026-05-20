@@ -1,0 +1,16 @@
+{
+  "schema_kind": "handoff-package",
+  "base": "handoff-package.json",
+  "description": "Handoff package artifact hashes must be full SHA-256 hex strings.",
+  "set": [
+    {
+      "path": [
+        "artifacts",
+        0,
+        "sha256"
+      ],
+      "value": "not-a-sha"
+    }
+  ],
+  "expected_error": "does not match"
+}

@@ -1,0 +1,15 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Unattended controller mode must set an iteration cap.",
+  "set": [
+    {
+      "path": [
+        "controller_policy",
+        "mode"
+      ],
+      "value": "unattended"
+    }
+  ],
+  "expected_error": "'max_iterations' is a required property"
+}

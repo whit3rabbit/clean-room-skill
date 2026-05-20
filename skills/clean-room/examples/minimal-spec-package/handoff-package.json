@@ -1,0 +1,26 @@
+{
+  "package_id": "handoff-example",
+  "task_id": "task-example",
+  "from_domain": "contaminated",
+  "to_domain": "clean",
+  "created_by_role": "contaminated-source-analyst",
+  "artifacts": [
+    {
+      "artifact_id": "spec-example-flow",
+      "artifact_type": "behavior-spec",
+      "path": "clean-artifacts/behavior-spec.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "excluded_material": [
+    "source_excerpt",
+    "raw_diff",
+    "private_identifier",
+    "source_shaped_pseudocode"
+  ],
+  "leakage_review": {
+    "status": "passed",
+    "reviewer_role": "contaminated-source-analyst",
+    "notes": "Example package contains only schema-shaped data."
+  }
+}

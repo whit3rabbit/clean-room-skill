@@ -1,0 +1,11 @@
+{
+  "schema_kind": "behavior-spec",
+  "base": "behavior-spec.json",
+  "description": "Behavior specs must include a summary.",
+  "remove": [
+    [
+      "summary"
+    ]
+  ],
+  "expected_error": "'summary' is a required property"
+}

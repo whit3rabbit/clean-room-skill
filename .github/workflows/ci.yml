@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node-version }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 22.x
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python test dependencies
+        run: python3 -m pip install "jsonschema[format]>=4.18,<5"
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check bin/install.js
+          node --check lib/fs-utils.cjs
+          node --check lib/hooks.cjs
+
+      - name: Run installer tests
+        run: npm test
+
+      - name: Validate JSON metadata
+        run: |
+          python3 -m json.tool package.json >/dev/null
+          python3 -m json.tool plugin.json >/dev/null
+          python3 -m json.tool .codex-plugin/plugin.json >/dev/null
+          python3 -m json.tool .claude-plugin/plugin.json >/dev/null
+          python3 -m json.tool hooks/hooks.json >/dev/null
+
+      - name: Compile Python hooks and scripts
+        run: python3 -m py_compile hooks/*.py skills/clean-room/scripts/*.py
+
+      - name: Smoke test source index CLI
+        run: python3 skills/clean-room/scripts/build_source_index.py --help >/dev/null
+
+      - name: Validate example schemas
+        run: |
+          for f in skills/clean-room/examples/minimal-spec-package/*.json; do
+            printf '{"tool_input":{"file_path":"%s"}}' "$PWD/$f" \
+              | CLEAN_ROOM_SCHEMA_DIR="$PWD/skills/clean-room/assets" \
+                python3 hooks/validate-json-schema.py
+          done
+
+      - name: Run full JSON Schema validation
+        run: python3 tests/validate_jsonschema.py
+
+      - name: Run example leakage checks
+        run: |
+          for f in skills/clean-room/examples/minimal-spec-package/*.json; do
+            if [ "$(basename "$f")" = source-index.json ]; then
+              continue
+            fi
+            printf '{"tool_input":{"file_path":"%s"}}' "$PWD/$f" \
+              | CLEAN_ROOM_CLEAN_ROOTS="$PWD/skills/clean-room/examples/minimal-spec-package" \
+                python3 hooks/check-artifact-leakage.py
+          done
+
+      - name: Smoke test installer dry run
+        run: node bin/install.js --dry-run --all --global
+
+      - name: Check package contents
+        run: npm pack --dry-run

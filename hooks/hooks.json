@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Shell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/clean-room-hook.py --mode safe --check require-clean-room-env.py --check deny-clean-room-shell.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Glob|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/clean-room-hook.py --mode safe --check require-clean-room-env.py --check deny-clean-source-read.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/clean-room-hook.py --mode safe --check require-clean-room-env.py --check deny-contaminated-clean-write.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/clean-room-hook.py --mode safe --check require-clean-room-env.py --check check-artifact-leakage.py --check validate-json-schema.py --check validate-handoff-package.py"
+          }
+        ]
+      }
+    ]
+  }
+}

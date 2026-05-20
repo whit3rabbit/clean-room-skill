@@ -1,0 +1,15 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Run state restart reason must be one of the declared recovery reasons.",
+  "set": [
+    {
+      "path": [
+        "run_state",
+        "restart_reason"
+      ],
+      "value": "manual"
+    }
+  ],
+  "expected_error": "'manual' is not one of"
+}

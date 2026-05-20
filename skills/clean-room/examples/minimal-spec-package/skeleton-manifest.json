@@ -1,0 +1,45 @@
+{
+  "manifest_id": "skeleton-example",
+  "target_language": "unspecified",
+  "area_id_naming_policy": "Use neutral clean ids that do not mirror source layout.",
+  "target_constraints": [],
+  "areas": [
+    {
+      "area_id": "area-example-flow",
+      "purpose": "Own the example behavior.",
+      "spec_ids": [
+        "spec-example-flow"
+      ],
+      "public_contract_refs": [],
+      "target_constraints": [],
+      "dependency_constraints": [],
+      "test_obligations": [
+        "test-001"
+      ],
+      "open_decisions": []
+    }
+  ],
+  "public_contracts": [],
+  "dependency_constraints": [],
+  "implementation_forbidden_material": [
+    "source_excerpt",
+    "raw_diff",
+    "private_identifier",
+    "source_shaped_pseudocode"
+  ],
+  "test_mapping": [
+    {
+      "test_id": "test-001",
+      "spec_ids": [
+        "spec-example-flow"
+      ],
+      "scenario_refs": [
+        "test-001"
+      ]
+    }
+  ],
+  "test_obligations": [
+    "test-001"
+  ],
+  "open_decisions": []
+}

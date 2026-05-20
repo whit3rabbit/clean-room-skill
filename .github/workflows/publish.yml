@@ -1,0 +1,82 @@
+name: Publish
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python test dependencies
+        run: python3 -m pip install "jsonschema[format]>=4.18,<5"
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Verify release tag matches package version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "package.json version $version does not match release tag $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check bin/install.js
+          node --check lib/fs-utils.cjs
+          node --check lib/hooks.cjs
+
+      - name: Run installer tests
+        run: npm test
+
+      - name: Validate JSON metadata
+        run: |
+          python3 -m json.tool package.json >/dev/null
+          python3 -m json.tool plugin.json >/dev/null
+          python3 -m json.tool .codex-plugin/plugin.json >/dev/null
+          python3 -m json.tool .claude-plugin/plugin.json >/dev/null
+          python3 -m json.tool hooks/hooks.json >/dev/null
+
+      - name: Compile Python hooks and scripts
+        run: python3 -m py_compile hooks/*.py skills/clean-room/scripts/*.py
+
+      - name: Run full JSON Schema validation
+        run: python3 tests/validate_jsonschema.py
+
+      - name: Smoke test installer dry run
+        run: node bin/install.js --dry-run --all --global
+
+      - name: Check package contents
+        run: npm pack --dry-run
+
+      - name: Publish package
+        run: npm publish --provenance
