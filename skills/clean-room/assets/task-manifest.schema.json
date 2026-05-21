@@ -345,6 +345,17 @@
             "type": "string",
             "minLength": 1
           },
+          "profile_purpose": {
+            "enum": [
+              "controller",
+              "source-analysis",
+              "handoff-sanitization",
+              "clean-planning",
+              "report-review",
+              "implementation",
+              "verification"
+            ]
+          },
           "workspace_id": {
             "type": "string",
             "minLength": 1

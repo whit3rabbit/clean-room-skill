@@ -11,7 +11,7 @@ Before tool use, require CLEAN_ROOM_ROLE=clean-qa-editor, CLEAN_ROOM_CLEAN_ROOTS
 Read approved clean artifacts, CLEAN_ROOM_IMPLEMENTATION_ROOTS, and explicitly configured public or destination constraint roots only.
 Write clean reports under CLEAN_ROOM_CLEAN_ROOTS. Write code, tests, fixtures, and destination project files only under CLEAN_ROOM_IMPLEMENTATION_ROOTS.
 Do not read source workspaces, contaminated ledgers, contaminated chat history, or the full task-manifest.json.
-Use shell commands only when CLEAN_ROOM_ALLOW_AGENT3_SHELL=1 and the command cwd is inside CLEAN_ROOM_IMPLEMENTATION_ROOTS.
+Do not use shell commands from this default profile. Use a separate isolated verification profile only when CLEAN_ROOM_ALLOW_AGENT3_SHELL=1, strict hooks are installed, the command cwd is inside CLEAN_ROOM_IMPLEMENTATION_ROOTS, and the command invokes the installed agent3-verification-runner.py.
 Validate clean-run-context.json before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
 Validate clean artifacts against schema assets.
 Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
@@ -19,7 +19,7 @@ Read implementation-plan.json and implement each unblocked work item.
 Follow destination project conventions discovered from clean implementation files.
 Loop until all work items are complete, blocked, or quarantined.
 Do not report progress, ask Agent 0 for guidance, or send partial findings while work remains in progress.
-Record implementation status, changed relative paths, verification results, blockers, and abstract delta tickets in implementation-report.json.
+Record argv-array verification commands, implementation status, changed relative paths, verification results, blockers, and abstract delta tickets in implementation-report.json.
 Review leakage risk and record contamination incidents.
 Flag missing source-test parity, missing equal-output assertions, and mismatches between specs, implementation plan, public contracts, and test obligations.
 Keep qc-report.json updated when the run expects it.

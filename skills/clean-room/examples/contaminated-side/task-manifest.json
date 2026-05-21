@@ -144,7 +144,7 @@
     },
     "agent_3": {
       "role": "clean-qa-editor",
-      "responsibility": "Implement the clean plan in the clean implementation root, run bounded verification, and emit one terminal report for Agent 0.",
+      "responsibility": "Implement the clean plan in the clean implementation root, record verification status, and emit one terminal report for Agent 0.",
       "trust_domain": "clean"
     },
     "handoff_rules": {
@@ -180,31 +180,37 @@
     {
       "role": "contaminated-manager-verifier",
       "profile_id": "contaminated-manager-profile",
+      "profile_purpose": "controller",
       "workspace_id": "source-workspace"
     },
     {
       "role": "contaminated-source-analyst",
       "profile_id": "contaminated-analyst-profile",
+      "profile_purpose": "source-analysis",
       "workspace_id": "source-workspace"
     },
     {
       "role": "contaminated-handoff-sanitizer",
       "profile_id": "contaminated-sanitizer-profile",
+      "profile_purpose": "handoff-sanitization",
       "workspace_id": "contaminated-artifact-workspace"
     },
     {
       "role": "clean-architect",
       "profile_id": "clean-architect-profile",
+      "profile_purpose": "clean-planning",
       "workspace_id": "clean-workspace"
     },
     {
       "role": "clean-qa-editor",
       "profile_id": "clean-qa-profile",
+      "profile_purpose": "report-review",
       "workspace_id": "clean-workspace"
     },
     {
       "role": "clean-qa-editor",
       "profile_id": "clean-qa-implementation-profile",
+      "profile_purpose": "implementation",
       "workspace_id": "implementation-workspace"
     }
   ],

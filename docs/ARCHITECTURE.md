@@ -36,7 +36,7 @@ The initialization wizard and `require-clean-room-env.py` audit clean, implement
 To assist in logical unit decomposition, the workflow supports an optional preflight indexing stage using `build_source_index.py` and `clean_room_tool_manager.py`.
 
 *   **Execution Boundary**: This tooling runs exclusively in the contaminated domain before clean-room role sessions are initialized.
-*   **Tool Trust Policy**: By default, tool discovery operates in `stat-only` mode and does not execute third-party binaries. It will only query version strings when explicitly invoked with `--probe-tools`. Project-local directories (such as `.bin` or `node_modules/.bin`) are ignored unless the environment variable `RE_SKILLS_TRUST_PROJECT_TOOLS=1` or the flag `--allow-working-project-tools` is supplied.
+*   **Tool Trust Policy**: By default, tool discovery operates in `stat-only` mode and does not execute third-party binaries. It queries version strings only when explicitly invoked with `--probe-tools`. Tools discovered under `/opt/homebrew` or `/usr/local` remain stat-only unless `--allow-user-toolchain-probes` is also supplied. Project-local directories (such as `.bin` or `node_modules/.bin`) are ignored unless the environment variable `RE_SKILLS_TRUST_PROJECT_TOOLS=1` or the flag `--allow-working-project-tools` is supplied.
 
 ---
 
@@ -69,7 +69,7 @@ flowchart LR
     implroots["Clean implementation roots<br/>CLEAN_ROOM_IMPLEMENTATION_ROOTS"]
     publicrefs["Allowed public refs<br/>CLEAN_ROOM_ALLOWED_READ_ROOTS"]
     architect["Agent 2: clean-architect<br/>Plan implementation from clean specs and foundation"]
-    qa["Agent 3: clean-qa-editor<br/>Implement, verify, terminal report"]
+    qa["Agent 3: clean-qa-editor<br/>Implement, record verification, terminal report"]
     outputs["Clean artifacts<br/>implementation-plan.json<br/>qc-report.json<br/>test plan notes"]
     imploutputs["Implementation outputs<br/>code and tests<br/>implementation-report.json"]
   end
@@ -115,7 +115,7 @@ flowchart LR
   denywrite -. Agent 2 writes clean artifacts only; Agent 3 writes implementation roots .-> cleanroots
   denywrite -. Agent 3 writes code and tests only here .-> implroots
   denyshell -. no shell-style tools in role sessions .-> manager
-  denyshell -. no shell for Agent 2; bounded verification shell for Agent 3 .-> architect
+  denyshell -. no shell for Agent 2; explicit Agent 3 verification runner only .-> architect
   scan -. post-write checks .-> outputs
   scan -. Agent 1.5 staged-output checks .-> staged
 
@@ -175,7 +175,7 @@ The architecture delegates work across five distinct custom role agents to enfor
     *   Accepts Agent 0 input only as schema-valid durable sanitized artifacts.
     *   Reads the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
     *   Merges approved handoff artifacts into the clean workspace.
-    *   Writes `implementation-plan.json` with relative destination paths, tests, constraints, risks, and verification commands.
+    *   Writes `implementation-plan.json` with relative destination paths, tests, constraints, risks, and argv-array verification commands.
     *   Keeps `skeleton-manifest.json` valid when the target profile expects it.
 
 ### [Agent 3: Clean Implementer Verifier](../agents/clean-qa-editor.md)
@@ -185,7 +185,7 @@ The architecture delegates work across five distinct custom role agents to enfor
     *   Starts from the clean domain and validates `clean-run-context.json`.
     *   Reads `implementation-plan.json` and implements unblocked work items.
     *   Writes code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
-    *   Runs bounded verification only with `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd under implementation roots.
+    *   Runs bounded verification only through the installed Agent 3 verification runner, with `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, strict hooks, and cwd under implementation roots.
     *   Writes `implementation-report.json` and maintains `qc-report.json`.
     *   Does not report progress or ask Agent 0 for guidance during implementation.
     *   Emits one terminal report for Agent 0 only when the assigned plan or task is complete, blocked, or quarantined.
@@ -210,13 +210,14 @@ Note: Even though clean and source-denied roles (such as Agent 1.5, 2, and 3) ar
 
 ## Guardrails and Hooks
 
-The architecture relies on agent/tool hook scaffolding located in `hooks/` to enforce boundary rules dynamically during agent sessions. Use strict hooks for dedicated Codex or Claude clean-room homes; safe hooks are compatibility-only until `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present.
+The architecture relies on agent/tool hook scaffolding located in `hooks/` to enforce boundary rules dynamically during agent sessions. Use installer-generated Codex or Claude hook configs with absolute wrapper paths. Static cwd-relative plugin hook declarations are not treated as an enforcement boundary. Use strict hooks for dedicated Codex or Claude clean-room homes; safe hooks are compatibility-only until `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present.
 
-Matcher coverage depends on the host runtime emitting hook events for the tool invocation. Hosts that do not emit a pre/post tool event for a file, terminal, or resource tool are not protected by adding that tool name to `hooks.json`.
+Matcher coverage depends on the host runtime emitting hook events for the tool invocation. Hosts that do not emit a pre/post tool event for a file, terminal, or resource tool are not protected by adding that tool name to the generated hook config. Run `clean-room-skill doctor --runtime codex --hooks=strict` or the Claude equivalent after install.
 
 *   [clean-room-hook.py](../hooks/clean-room-hook.py): The main safe/strict dispatch wrapper for the policy checks.
+*   [agent3-verification-runner.py](../hooks/agent3-verification-runner.py): Runs Agent 3 argv-array verification commands with `shell=False`, a small allowlist, sanitized env, bounded output, timeout, and root traversal checks.
 *   [require-clean-room-env.py](../hooks/require-clean-room-env.py): Fails closed if the required role and root environment variables are missing, if trust-domain roots overlap, or if clean, implementation, or contaminated artifact root names appear source-derived.
-*   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions except explicitly allowed Agent 3 verification commands under implementation roots.
+*   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions except installed Agent 3 verification-runner invocations under implementation roots.
 *   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles and Agent 1.5 cannot read source roots or unapproved paths; clean roles may read implementation roots, and Agent 1.5 is denied clean roots, implementation roots, and direct `source-index.json` reads.
 *   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots. Agent 2 writes clean artifacts only, Agent 3 writes implementation files and clean reports, and contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 *   [check-artifact-leakage.py](../hooks/check-artifact-leakage.py): Scans clean artifacts and Agent 1.5 staged contaminated artifacts for high-risk leakage markers, source-like identifiers, and private identifier denylist terms. The private identifier denylist (loaded via `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST`) is subject to hard limits to protect hook execution performance: a maximum of 1,000,000 bytes per file, 20,000 total terms, and 512 characters per individual term.

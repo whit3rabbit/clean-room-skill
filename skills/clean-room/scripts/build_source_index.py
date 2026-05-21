@@ -59,6 +59,11 @@ def parse_args() -> argparse.Namespace:
         help="Execute optional helper tools with version commands in dependency_report. Default is stat-only.",
     )
     parser.add_argument(
+        "--allow-user-toolchain-probes",
+        action="store_true",
+        help="With --probe-tools, execute version commands for tools found under /opt/homebrew or /usr/local.",
+    )
+    parser.add_argument(
         "--allow-working-project-tools",
         action="store_true",
         help="Allow dependency detection to consider .local/bin, .bin, node_modules/.bin, and npm prefix/global tools.",
@@ -131,7 +136,11 @@ def main() -> int:
         "dependency_report": (
             None
             if args.skip_tool_detection
-            else clean_room_tooling.dependency_report(args.allow_working_project_tools, args.probe_tools)
+            else clean_room_tooling.dependency_report(
+                args.allow_working_project_tools,
+                args.probe_tools,
+                args.allow_user_toolchain_probes,
+            )
         ),
         "source_roots": roots,
         "files": files,

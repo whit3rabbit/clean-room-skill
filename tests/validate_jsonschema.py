@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import importlib.util
 import json
 import sys
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -22,9 +23,11 @@ SCHEMA_DIR = ROOT / "skills" / "clean-room" / "assets"
 EXAMPLE_DIR = ROOT / "skills" / "clean-room" / "examples" / "minimal-spec-package"
 EXAMPLE_DIRS = [
     EXAMPLE_DIR,
+    ROOT / "skills" / "clean-room" / "examples" / "contaminated-side",
     ROOT / "skills" / "clean-room" / "examples" / "valid-handoff-package",
 ]
 NEGATIVE_DIR = ROOT / "tests" / "fixtures" / "jsonschema-negative"
+PARITY_DIR = ROOT / "tests" / "fixtures" / "schema-parity"
 SCHEMA_BY_ARTIFACT = {
     "init-config": "init-config.schema.json",
     "clean-run-context": "clean-run-context.schema.json",
@@ -46,10 +49,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--examples", action="store_true", help="Validate bundled positive examples")
     parser.add_argument("--negative", action="store_true", help="Validate negative fixtures fail")
+    parser.add_argument("--parity", action="store_true", help="Compare lightweight hook validation with jsonschema")
     args = parser.parse_args()
-    if not args.examples and not args.negative:
+    if not args.examples and not args.negative and not args.parity:
         args.examples = True
         args.negative = True
+        args.parity = True
     return args
 
 
@@ -146,9 +151,17 @@ def bundled_example_name(value: Any) -> str:
     return value
 
 
+def bundled_example_path(name: str) -> Path:
+    for example_dir in EXAMPLE_DIRS:
+        candidate = example_dir / name
+        if candidate.is_file():
+            return candidate
+    raise ValueError(f"negative fixture base does not match a bundled example JSON file: {name}")
+
+
 def negative_instance(fixture: dict[str, Any]) -> Any:
     base_name = bundled_example_name(fixture.get("base"))
-    instance = copy.deepcopy(load_json(EXAMPLE_DIR / base_name))
+    instance = copy.deepcopy(load_json(bundled_example_path(base_name)))
     for path in fixture.get("remove", []):
         path_remove(instance, path)
     for patch in fixture.get("set", []):
@@ -187,6 +200,60 @@ def validate_negative_fixtures() -> int:
     return 0
 
 
+def lightweight_validate_value():
+    hooks_dir = ROOT / "hooks"
+    if str(hooks_dir) not in sys.path:
+        sys.path.insert(0, str(hooks_dir))
+    module_path = hooks_dir / "validate-json-schema.py"
+    spec = importlib.util.spec_from_file_location("clean_room_validate_json_schema", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load lightweight validator from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.validate_value
+
+
+def validate_parity_fixtures() -> int:
+    failures: list[str] = []
+    fixture_paths = sorted(PARITY_DIR.glob("*.json"))
+    if not fixture_paths:
+        print(f"no schema parity fixtures found under {PARITY_DIR.relative_to(ROOT)}", file=sys.stderr)
+        return 1
+    validate_value = lightweight_validate_value()
+    for path in fixture_paths:
+        fixture = load_json(path)
+        schema = fixture.get("schema")
+        cases = fixture.get("cases")
+        if not isinstance(schema, dict) or not isinstance(cases, list):
+            failures.append(f"{path.relative_to(ROOT)} must set schema object and cases array")
+            continue
+        try:
+            jsonschema.Draft202012Validator.check_schema(schema)
+        except jsonschema.SchemaError as exc:
+            failures.append(f"{path.relative_to(ROOT)} has invalid schema: {exc.message}")
+            continue
+        full_validator = jsonschema.Draft202012Validator(schema, format_checker=jsonschema.FormatChecker())
+        for case in cases:
+            if not isinstance(case, dict):
+                failures.append(f"{path.relative_to(ROOT)} has non-object case")
+                continue
+            name = case.get("name", "<unnamed>")
+            expected = case.get("valid")
+            instance = case.get("instance")
+            full_valid = not list(full_validator.iter_errors(instance))
+            light_valid = not validate_value(instance, schema, schema)
+            if full_valid != expected:
+                failures.append(f"{path.relative_to(ROOT)} {name}: fixture expected does not match jsonschema")
+            if light_valid != full_valid:
+                failures.append(
+                    f"{path.relative_to(ROOT)} {name}: lightweight={light_valid} jsonschema={full_valid}"
+                )
+    if failures:
+        print("\n".join(failures), file=sys.stderr)
+        return 1
+    return 0
+
+
 def main() -> int:
     args = parse_args()
     require_format_assertions()
@@ -195,6 +262,8 @@ def main() -> int:
         status |= validate_examples()
     if args.negative:
         status |= validate_negative_fixtures()
+    if args.parity:
+        status |= validate_parity_fixtures()
     return status
 
 

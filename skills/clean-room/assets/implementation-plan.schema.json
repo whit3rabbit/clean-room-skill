@@ -195,8 +195,12 @@
       ],
       "properties": {
         "command": {
-          "type": "string",
-          "minLength": 1
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "cwd": {
           "$ref": "#/$defs/implementation_root_ref"

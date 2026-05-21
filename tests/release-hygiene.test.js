@@ -5,20 +5,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { describe, test } = require('node:test');
 const { spawnSync } = require('node:child_process');
+const { TextDecoder } = require('node:util');
 
 const ROOT = path.resolve(__dirname, '..');
-const TEXT_EXTENSIONS = new Set([
-  '.cjs',
-  '.js',
-  '.json',
-  '.md',
-  '.py',
-  '.sh',
-  '.svg',
-  '.toml',
-  '.txt',
-  '.yml',
-]);
 const BLOCKED_PATTERNS = [
   { name: 'macOS file URL', pattern: /file:\/\/\/Users\// },
   { name: 'macOS user path', pattern: /\/Users\/[A-Za-z0-9._-]+/ },
@@ -44,8 +33,13 @@ function packagedFiles() {
   return packages[0].files.map((file) => file.path);
 }
 
-function isTextFile(filePath) {
-  return TEXT_EXTENSIONS.has(path.extname(filePath));
+function readUtf8IfText(filePath) {
+  const data = fs.readFileSync(path.join(ROOT, filePath));
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(data);
+  } catch {
+    return null;
+  }
 }
 
 describe('release hygiene', () => {
@@ -56,8 +50,8 @@ describe('release hygiene', () => {
   test('packaged text does not include local paths, secrets, or stale citation tokens', () => {
     const offenders = [];
     for (const filePath of packagedFiles()) {
-      if (!isTextFile(filePath)) continue;
-      const content = fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+      const content = readUtf8IfText(filePath);
+      if (content === null) continue;
       for (const { name, pattern } of BLOCKED_PATTERNS) {
         if (pattern.test(content)) {
           offenders.push(`${filePath}: ${name}`);

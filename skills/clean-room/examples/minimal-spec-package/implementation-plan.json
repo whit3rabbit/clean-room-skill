@@ -36,7 +36,10 @@
       "risks": [],
       "verification_commands": [
         {
-          "command": "npm test",
+          "command": [
+            "npm",
+            "test"
+          ],
           "cwd": "CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]",
           "purpose": "Run destination project tests."
         }
@@ -48,7 +51,10 @@
   ],
   "verification_strategy": [
     {
-      "command": "npm test",
+      "command": [
+        "npm",
+        "test"
+      ],
       "cwd": "CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]",
       "purpose": "Verify the clean implementation."
     }

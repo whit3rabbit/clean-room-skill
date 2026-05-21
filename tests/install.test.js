@@ -6,6 +6,17 @@ const path = require('node:path');
 const { describe, test } = require('node:test');
 const { spawnSync } = require('node:child_process');
 const {
+  applyInstall,
+  applyUninstall,
+  planInstall,
+  planUninstall,
+} = require('../lib/install-plan.cjs');
+const {
+  atomicWriteFileNoOverwrite,
+  listFiles,
+  sha256Bytes,
+} = require('../lib/fs-utils.cjs');
+const {
   assertManagedHookDetails,
   HOOK,
   hookTable,
@@ -60,6 +71,31 @@ function symlinkDirOrSkip(t, target, linkPath) {
     }
     throw err;
   }
+}
+
+function writeRenameFailurePreload(root, basename, failOn = 1) {
+  const preload = path.join(root, `fail-${basename}.cjs`);
+  fs.writeFileSync(preload, `
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const realRenameSync = fs.renameSync;
+let seen = 0;
+
+fs.renameSync = function renameSyncWithInjectedFailure(source, destination) {
+  if (path.basename(String(destination)) === ${JSON.stringify(basename)}) {
+    seen += 1;
+    if (seen === ${Number(failOn)}) {
+      const err = new Error('injected rename failure for ' + destination);
+      err.code = 'EACCES';
+      throw err;
+    }
+  }
+  return realRenameSync.apply(this, arguments);
+};
+`);
+  return preload;
 }
 
 describe('clean-room-skill installer', () => {
@@ -210,7 +246,9 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(codexHome, 'agents', 'clean-architect.toml')));
     assert.ok(fs.existsSync(path.join(codexHome, 'agents', 'contaminated-handoff-sanitizer.toml')));
     assert.ok(fs.existsSync(path.join(codexHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
+    assert.ok(fs.existsSync(path.join(codexHome, 'hooks', 'clean-room', 'agent3-verification-runner.py')));
     assert.ok(fs.existsSync(path.join(codexHome, 'clean-room-install-manifest.json')));
+    assert.equal(readJson(path.join(codexHome, 'clean-room-install-manifest.json')).phase, 'complete');
 
     const hooksJson = readJson(path.join(codexHome, 'hooks.json'));
     assert.equal(
@@ -249,8 +287,15 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(claudeHome, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(claudeHome, 'skills', 'init', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(claudeHome, 'agents', 'clean-architect.md')));
+    assert.ok(fs.existsSync(path.join(claudeHome, 'agents', 'clean-implementer-verifier-shell.md')));
+    const defaultAgent = fs.readFileSync(path.join(claudeHome, 'agents', 'clean-qa-editor.md'), 'utf8');
+    const shellAgent = fs.readFileSync(path.join(claudeHome, 'agents', 'clean-implementer-verifier-shell.md'), 'utf8');
+    assert.match(defaultAgent, /tools: Read, Write, Edit, Glob\n/);
+    assert.doesNotMatch(defaultAgent, /tools: .*Bash/);
+    assert.match(shellAgent, /tools: Read, Write, Edit, Glob, Bash/);
     assert.ok(fs.existsSync(path.join(claudeHome, 'agents', 'contaminated-handoff-sanitizer.md')));
     assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
+    assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'agent3-verification-runner.py')));
 
     const settings = readJson(path.join(claudeHome, 'settings.json'));
     assert.equal(
@@ -268,16 +313,11 @@ describe('clean-room-skill installer', () => {
     assert.match(postWriteHookCommand(settings), /--check validate-handoff-package\.py/);
   });
 
-  test('bundled plugin hooks cover supported shell and read aliases', () => {
-    const hooksJson = readJson(path.join(ROOT, 'hooks', 'hooks.json'));
-    assert.deepEqual(managedHookMatchers(hooksJson, 'PreToolUse'), [
-      'Bash|Shell|PowerShell|Monitor|exec_command|shell_command|write_stdin',
-      'Read|Glob|Grep|LS|LSP|NotebookRead|view_image|list_dir|ListMcpResourcesTool|ReadMcpResourceTool|ListMcpResourceTemplatesTool|list_mcp_resources|list_mcp_resource_templates|read_mcp_resource',
-      'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
-    ]);
-    assert.deepEqual(managedHookMatchers(hooksJson, 'PostToolUse'), [
-      'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
-    ]);
+  test('runtime plugin manifests do not declare cwd-fragile static hooks', () => {
+    assert.equal(readJson(path.join(ROOT, 'plugin.json')).hooks, undefined);
+    assert.equal(readJson(path.join(ROOT, '.codex-plugin', 'plugin.json')).hooks, undefined);
+    assert.equal(readJson(path.join(ROOT, '.claude-plugin', 'plugin.json')).hooks, undefined);
+    assert.equal(fs.existsSync(path.join(ROOT, 'hooks', 'hooks.json')), false);
   });
 
   test('installs Antigravity as a CLI plugin without enabling hooks', () => {
@@ -373,7 +413,46 @@ describe('clean-room-skill installer', () => {
       CODEX_HOME: codexHome,
     });
     assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /hook registration: would update/);
+    assert.match(result.stdout, /python3 required when applying/);
     assert.equal(fs.existsSync(codexHome), false);
+  });
+
+  test('dry run does not require python3 for hook-capable runtimes', () => {
+    const root = tempDir('clean-room-dry-run-no-python');
+    const binDir = path.join(root, 'bin');
+    const codexHome = path.join(root, 'codex');
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.symlinkSync(process.execPath, path.join(binDir, 'node'));
+
+    const result = runInstall(['--codex', '--global', '--dry-run', '--yes'], {
+      CODEX_HOME: codexHome,
+      PATH: binDir,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /hook registration: would update/);
+    assert.equal(fs.existsSync(codexHome), false);
+  });
+
+  test('atomicWriteFileNoOverwrite preserves existing files', () => {
+    const root = tempDir('clean-room-no-overwrite');
+    const target = path.join(root, 'nested', 'file.txt');
+
+    atomicWriteFileNoOverwrite(target, 'first\n', 'utf8');
+
+    assert.throws(() => atomicWriteFileNoOverwrite(target, 'second\n', 'utf8'), /file already exists/);
+    assert.equal(fs.readFileSync(target, 'utf8'), 'first\n');
+  });
+
+  test('listFiles enforces explicit traversal bounds', () => {
+    const root = tempDir('clean-room-list-files-bounds');
+    fs.mkdirSync(path.join(root, 'a', 'b'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'a', 'b', 'one.txt'), 'one\n');
+    fs.writeFileSync(path.join(root, 'two.txt'), 'two\n');
+
+    assert.throws(() => listFiles(root, { maxDepth: 1 }), /max depth 1/);
+    assert.throws(() => listFiles(root, { maxFiles: 1 }), /max files 1/);
   });
 
   test('generates command wrappers for command-only runtimes', () => {
@@ -452,6 +531,103 @@ describe('clean-room-skill installer', () => {
     assert.match(hook.stderr, /environment check failed/);
   });
 
+  test('doctor validates generated Codex and Claude hook configs', () => {
+    const root = tempDir('clean-room-doctor');
+    const codexHome = path.join(root, 'codex');
+    const claudeHome = path.join(root, 'claude');
+    let result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+    result = runInstall(['doctor', '--runtime', 'codex', '--hooks=safe', '--config-dir', codexHome]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /clean-room doctor passed for codex/);
+
+    result = runInstall(['--claude', '--global', '--hooks=strict', '--yes'], { CLAUDE_CONFIG_DIR: claudeHome });
+    assert.equal(result.status, 0, result.stderr);
+    result = runInstall(['doctor', '--runtime=claude', '--hooks=strict', '--config-dir', claudeHome]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /clean-room doctor passed for claude/);
+  });
+
+  test('doctor includes spawn diagnostics when a hook command fails', () => {
+    const codexHome = tempDir('clean-room-doctor-diagnostics');
+    let result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+
+    const configPath = path.join(codexHome, 'hooks.json');
+    const config = readJson(configPath);
+    let changed = false;
+    for (const entries of Object.values(hookTable(config))) {
+      if (changed || !Array.isArray(entries)) continue;
+      for (const entry of entries) {
+        if (changed) break;
+        for (const hook of entry.hooks || []) {
+          if (typeof hook.command === 'string' && hook.command.includes('clean-room-hook.py')) {
+            hook.command = hook.command.replace(/^'[^']*'/, "'/no/such/python'");
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+    assert.equal(changed, true);
+    fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+    result = runInstall(['doctor', '--runtime', 'codex', '--hooks=safe', '--config-dir', codexHome]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /safe hook did not no-op without clean-room env/);
+    assert.match(result.stderr, /status=/);
+    assert.match(result.stderr, /stderr=/);
+  });
+
+  test('install records partial state when hook config write fails after files are copied', () => {
+    const root = tempDir('clean-room-hook-config-failure');
+    const codexHome = path.join(root, 'codex');
+    const preload = writeRenameFailurePreload(root, 'hooks.json');
+
+    let result = runInstall(['--codex', '--global', '--yes'], {
+      CODEX_HOME: codexHome,
+      NODE_OPTIONS: `--require=${preload}`,
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /partial install state/);
+    assert.match(result.stderr, /managed files were written/);
+    assert.match(result.stderr, /hook config write failed/);
+    assert.match(result.stderr, /install manifest records the failed hook registration/);
+    assert.ok(fs.existsSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md')));
+
+    const manifestPath = path.join(codexHome, 'clean-room-install-manifest.json');
+    const manifest = readJson(manifestPath);
+    assert.equal(manifest.hook_registration.status, 'failed');
+
+    result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(managedHookCount(readJson(path.join(codexHome, 'hooks.json'))), 4);
+    assert.equal(readJson(manifestPath).hook_registration, undefined);
+  });
+
+  test('install reports recoverable partial state when manifest write fails', () => {
+    const root = tempDir('clean-room-manifest-failure');
+    const codexHome = path.join(root, 'codex');
+    const preload = writeRenameFailurePreload(root, 'clean-room-install-manifest.json', 2);
+
+    let result = runInstall(['--codex', '--global', '--yes'], {
+      CODEX_HOME: codexHome,
+      NODE_OPTIONS: `--require=${preload}`,
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /partial install state/);
+    assert.match(result.stderr, /managed files were written/);
+    assert.match(result.stderr, /hook config was updated/);
+    assert.match(result.stderr, /install manifest was not completed/);
+    assert.ok(fs.existsSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md')));
+    assert.equal(managedHookCount(readJson(path.join(codexHome, 'hooks.json'))), 4);
+    assert.equal(readJson(path.join(codexHome, 'clean-room-install-manifest.json')).phase, 'installing');
+
+    result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(fs.existsSync(path.join(codexHome, 'clean-room-install-manifest.json')));
+  });
+
   test('reinstall is idempotent for managed hooks', () => {
     const codexHome = tempDir('clean-room-idempotent');
     let result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
@@ -479,6 +655,47 @@ describe('clean-room-skill installer', () => {
       fs.readFileSync(path.join(patchesDir, backups[0], 'skills', 'clean-room', 'SKILL.md'), 'utf8'),
       '# local edit\n'
     );
+  });
+
+  test('applyInstall backs up a managed file changed after planning', () => {
+    const targetRoot = tempDir('clean-room-apply-install-race');
+    const relPath = 'skills/clean-room/SKILL.md';
+    const fullPath = path.join(targetRoot, relPath);
+    const oldBytes = Buffer.from('# old\n');
+    const newBytes = Buffer.from('# new\n');
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, oldBytes);
+
+    const desired = new Map([[relPath, newBytes]]);
+    const manifest = { files: { [relPath]: { sha256: sha256Bytes(oldBytes) } } };
+    const plan = planInstall(targetRoot, desired, manifest);
+    assert.deepEqual(plan.backups, []);
+
+    fs.writeFileSync(fullPath, '# late edit\n');
+    const result = applyInstall(targetRoot, desired, manifest, plan, { dryRun: false, hookMode: 'safe' });
+
+    assert.equal(fs.readFileSync(fullPath, 'utf8'), '# new\n');
+    assert.equal(fs.readFileSync(path.join(result.backupRoot, relPath), 'utf8'), '# late edit\n');
+  });
+
+  test('applyUninstall backs up a managed file changed after planning', () => {
+    const targetRoot = tempDir('clean-room-apply-uninstall-race');
+    const relPath = 'skills/clean-room/SKILL.md';
+    const fullPath = path.join(targetRoot, relPath);
+    const oldBytes = Buffer.from('# old\n');
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, oldBytes);
+    fs.writeFileSync(path.join(targetRoot, 'clean-room-install-manifest.json'), '{}\n');
+
+    const manifest = { files: { [relPath]: { sha256: sha256Bytes(oldBytes) } } };
+    const plan = planUninstall(targetRoot, manifest);
+    assert.deepEqual(plan.backups, []);
+
+    fs.writeFileSync(fullPath, '# late edit before uninstall\n');
+    const result = applyUninstall(targetRoot, plan, false);
+
+    assert.equal(fs.existsSync(fullPath), false);
+    assert.equal(fs.readFileSync(path.join(result.backupRoot, relPath), 'utf8'), '# late edit before uninstall\n');
   });
 
   test('non-interactive install aborts on unknown conflicts', () => {
@@ -664,6 +881,46 @@ describe('clean-room-skill installer', () => {
     assert.equal(
       hookTable(hooksJson).PreToolUse.some((entry) =>
         (entry.hooks || []).some((hook) => hook.command === 'echo keep-me')
+      ),
+      true
+    );
+  });
+
+  test('source index records an aggregate skip after max files is reached', () => {
+    const root = tempDir('clean-room-source-index-limit');
+    const sourceRoot = path.join(root, 'source');
+    const artifactRoot = path.join(root, 'artifacts');
+    const outputPath = path.join(artifactRoot, 'source-index.json');
+    fs.mkdirSync(path.join(sourceRoot, 'subdir'), { recursive: true });
+    fs.mkdirSync(artifactRoot, { recursive: true });
+    fs.writeFileSync(path.join(sourceRoot, 'a.js'), 'export const a = 1;\n');
+    fs.writeFileSync(path.join(sourceRoot, 'b.js'), 'export const b = 2;\n');
+    fs.writeFileSync(path.join(sourceRoot, 'subdir', 'c.js'), 'export const c = 3;\n');
+
+    const result = spawnSync('python3', [
+      path.join(ROOT, 'skills', 'clean-room', 'scripts', 'build_source_index.py'),
+      '--source-root',
+      sourceRoot,
+      '--output',
+      outputPath,
+      '--contaminated-artifact-root',
+      artifactRoot,
+      '--task-id',
+      'task-limit',
+      '--max-files',
+      '1',
+      '--skip-tool-detection',
+    ], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const index = readJson(outputPath);
+    assert.equal(index.files.length, 1);
+    assert.equal(
+      index.skipped_entries.some((entry) =>
+        entry.reason === 'remaining-files-skipped-after-limit:file-count-limit'
       ),
       true
     );

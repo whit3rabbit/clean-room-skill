@@ -31,8 +31,8 @@ Use these roles conceptually. If the host supports subagents, map each role to a
 - Agent 0 / contaminated manager/verifier: consumes the contaminated source index, decomposes the source scope into logical batches, tracks coverage, assigns source-reading work, and checks final clean artifacts and terminal implementation reports against source behavior, discovered source tests, equal-output requirements, and public contract compatibility. It may read source but must influence Agent 2 and Agent 3 only through durable sanitized artifacts, never direct chat, coaching, or in-progress feedback.
 - Agent 1 / contaminated source analyst/spec writer: reads source in a read-only manner and writes neutral draft tasks and behavioral specs. It treats discovered source tests as behavioral evidence and converts them into clean `test_scenarios` for the same observable outputs. It must avoid code, copied comments, distinctive identifiers unless public API compatibility requires them, source test names or fixture structure, and source-shaped pseudocode. It does not approve its own drafts for handoff.
 - Agent 1.5 / contaminated handoff sanitizer: works in a fresh source-denied contaminated context, reads only Agent 0's neutral brief plus assigned draft artifacts, scrubs identifying material, and approves or quarantines handoff candidates.
-- Agent 2 / clean architect/planner: starts from the clean workspace, reads `clean-run-context.json`, approved clean handoff artifacts, and the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`; then writes `implementation-plan.json` with relative destination paths, tests, constraints, risks, and verification commands. It writes no code.
-- Agent 3 / clean implementer/verifier: starts in the clean domain, reads `implementation-plan.json` and clean artifacts, writes code and tests only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, writes reports under `CLEAN_ROOM_CLEAN_ROOTS`, runs bounded verification when explicitly allowed, and emits exactly one terminal report for Agent 0 only after the assigned plan or task is complete, blocked, or quarantined.
+- Agent 2 / clean architect/planner: starts from the clean workspace, reads `clean-run-context.json`, approved clean handoff artifacts, and the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`; then writes `implementation-plan.json` with relative destination paths, tests, constraints, risks, and argv-array verification commands. It writes no code.
+- Agent 3 / clean implementer/verifier: starts in the clean domain, reads `implementation-plan.json` and clean artifacts, writes code and tests only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, writes reports under `CLEAN_ROOM_CLEAN_ROOTS`, records verification status, and emits exactly one terminal report for Agent 0 only after the assigned plan or task is complete, blocked, or quarantined. Run verification only through the installed Agent 3 verification runner.
 
 ## Workflow
 
@@ -46,7 +46,7 @@ Optional AST/indexing helpers are detected before the controller loop through `s
 
 Controller mode defaults to `attended` when `task-manifest.json` has no `controller_policy`. In `attended` mode, agent zero pauses for human review at scope gate, handoff, QC deltas, blocked units, and final coverage. In `unattended` mode, agent zero may run a bounded controller loop: reload durable artifacts for each iteration, select at most one pending or gap unit, start each role from fresh context with the required environment block, validate before advancing, and stop on any configured safety or ambiguity condition.
 
-Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, or Agent 2 role sessions. Agent 3 may use shell-style tools only when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and the command cwd is under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Use `--hooks=strict` for dedicated Codex or Claude clean-room homes so hooks fail closed if required environment is missing or shell tools are invoked outside the allowed Agent 3 verification boundary. Safe hook installs are compatibility-only until `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present.
+Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the default Agent 3 role session. Agent 3 terminal verification may use shell-style tools only when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, the command cwd is under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and the command invokes the installed `agent3-verification-runner.py`. Use `--hooks=strict` for dedicated Codex or Claude clean-room homes so hooks fail closed if required environment is missing or shell tools are invoked outside the allowed Agent 3 verification boundary. Safe hook installs are compatibility-only until `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present.
 
 ## Recovery Entry Points
 
@@ -123,7 +123,7 @@ Use `hooks/` as optional guardrail and audit scaffolding. Configure the host wit
 - `CLEAN_ROOM_IMPLEMENTATION_ROOTS`
 - `CLEAN_ROOM_ALLOWED_READ_ROOTS`
 - `CLEAN_ROOM_SCHEMA_DIR`
-- Optional `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` to allow Agent 3 verification commands only from implementation roots.
+- Optional `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` to allow isolated Agent 3 terminal verification through the installed verification runner only from implementation roots.
 - Optional `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST` for hook-only scanning of private source identifiers.
 
 For clean roles, read access is deny-by-default: allow only `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and explicit public or destination constraint roots in `CLEAN_ROOM_ALLOWED_READ_ROOTS`. Agent 1.5 is source-denied: allow only assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and explicit public or destination constraint roots. Write access is also deny-by-default: Agent 2 writes only clean artifacts, Agent 3 writes clean reports under `CLEAN_ROOM_CLEAN_ROOTS` and implementation files under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and contaminated roles write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`. Mark every behavioral claim as `observed`, `derived`, `inferred`, `unknown`, or `error`.
@@ -137,7 +137,7 @@ Allowed clean-side artifact content:
 - Inputs, outputs, state transitions, invariants, errors, timing expectations, and test scenarios.
 - Source-test-derived scenarios that validate equal output for public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
 - Abstract implementation constraints such as "must preserve stable sort order" or "must reject malformed input before persistence."
-- Clean implementation plans and reports with relative destination paths, work items, verification commands, changed path summaries, and abstract blockers.
+- Clean implementation plans and reports with relative destination paths, work items, argv-array verification commands, changed path summaries, and abstract blockers.
 
 Blocked clean-side content:
 
@@ -156,7 +156,7 @@ Finish the clean implementation loop when:
 - `clean-run-context.json` exists for Agent 2 and Agent 3, records artifact-only coordination, and does not contain source roots, contaminated roots, source index refs, ledger paths, or the full task manifest.
 - Every in-scope unit has a behavior spec or an explicit out-of-scope record.
 - Source tests discovered in scope are represented as clean, leakage-safe `test_scenarios` or explicit coverage gaps.
-- `implementation-plan.json` maps clean specs to relative destination paths, tests, constraints, risks, and verification commands.
+- `implementation-plan.json` maps clean specs to relative destination paths, tests, constraints, risks, and argv-array verification commands.
 - Agent 3 has written implementation code only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 - `implementation-report.json` records changed paths, verification results, completed and blocked work items, final implementation status, terminal Agent 0 reporting state, and abstract delta tickets.
 - `skeleton-manifest.json` remains valid when the selected target profile expects it.

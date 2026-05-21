@@ -7,7 +7,15 @@ import os
 import sys
 from pathlib import Path
 
-from clean_room_paths import candidate_paths, env_roots, load_payload, path_is_under, should_fail_closed_for_write
+from clean_room_paths import (
+    candidate_paths,
+    describe_path,
+    env_roots,
+    load_payload,
+    path_is_under,
+    redact_text,
+    should_fail_closed_for_write,
+)
 
 
 CONTAMINATED_ROLES = {
@@ -29,14 +37,14 @@ def main() -> int:
     payload, payload_error = load_payload()
     if payload_error:
         print(
-            f"clean-room policy denied role {role} write: {payload_error}",
+            f"clean-room policy denied role {role} write: {redact_text(payload_error)}",
             file=sys.stderr,
         )
         return 1
     paths, path_errors = candidate_paths(payload)
     if path_errors:
         for error in path_errors:
-            print(f"clean-room policy denied role {role} write: {error}", file=sys.stderr)
+            print(f"clean-room policy denied role {role} write: {redact_text(error)}", file=sys.stderr)
         return 1
     if not paths:
         if not should_fail_closed_for_write(payload):
@@ -57,7 +65,7 @@ def main() -> int:
         for path in paths:
             if any(is_under(path, root) for root in source_roots):
                 print(
-                    f"clean-room policy denied clean role {role} writing source path {path}",
+                    f"clean-room policy denied clean role {role} writing {describe_path(path)}",
                     file=sys.stderr,
                 )
                 return 1
@@ -65,19 +73,19 @@ def main() -> int:
                 is_under(path, root) for root in clean_roots + implementation_roots
             ):
                 print(
-                    f"clean-room policy denied clean role {role} writing read-only allowed-read path {path}",
+                    f"clean-room policy denied clean role {role} writing read-only {describe_path(path)}",
                     file=sys.stderr,
                 )
                 return 1
             if not clean_roots:
                 print(
-                    f"clean-room policy denied clean role {role} writing {path}: no clean write roots configured",
+                    f"clean-room policy denied clean role {role} writing {describe_path(path)}: no clean write roots configured",
                     file=sys.stderr,
                 )
                 return 1
             if role == "clean-architect" and any(is_under(path, root) for root in implementation_roots):
                 print(
-                    f"clean-room policy denied Agent 2 writing implementation path {path}",
+                    f"clean-room policy denied Agent 2 writing {describe_path(path)}",
                     file=sys.stderr,
                 )
                 return 1
@@ -85,7 +93,7 @@ def main() -> int:
                 continue
             if not any(is_under(path, root) for root in clean_roots):
                 print(
-                    f"clean-room policy denied clean role {role} writing outside clean roots: {path}",
+                    f"clean-room policy denied clean role {role} writing outside clean roots: {describe_path(path)}",
                     file=sys.stderr,
                 )
                 return 1
@@ -94,31 +102,31 @@ def main() -> int:
     for path in paths:
         if any(is_under(path, root) for root in clean_roots):
             print(
-                f"clean-room policy denied contaminated role {role} writing clean path {path}",
+                f"clean-room policy denied contaminated role {role} writing {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1
         if any(is_under(path, root) for root in implementation_roots):
             print(
-                f"clean-room policy denied contaminated role {role} writing implementation path {path}",
+                f"clean-room policy denied contaminated role {role} writing {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1
         if any(is_under(path, root) for root in source_roots):
             print(
-                f"clean-room policy denied contaminated role {role} writing source path {path}",
+                f"clean-room policy denied contaminated role {role} writing {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1
         if not contaminated_artifact_roots:
             print(
-                f"clean-room policy denied contaminated role {role} writing {path}: no contaminated artifact roots configured",
+                f"clean-room policy denied contaminated role {role} writing {describe_path(path)}: no contaminated artifact roots configured",
                 file=sys.stderr,
             )
             return 1
         if not any(is_under(path, root) for root in contaminated_artifact_roots):
             print(
-                f"clean-room policy denied contaminated role {role} writing outside contaminated artifact roots: {path}",
+                f"clean-room policy denied contaminated role {role} writing outside contaminated artifact roots: {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1

@@ -116,6 +116,14 @@ def normalized_relative(path: Path) -> str:
     return path.as_posix()
 
 
+def stat_snapshot(stat: os.stat_result) -> tuple[int | None, int, int]:
+    return (
+        getattr(stat, "st_ino", None),
+        stat.st_size,
+        getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000)),
+    )
+
+
 def build_file_segments(
     file_record: dict[str, Any],
     text: str,
@@ -187,8 +195,49 @@ def collect_files(
 
     for root in roots:
         root_path = Path(root["path"])
-        for current_dir, dirnames, filenames in os.walk(root_path):
+        limit_stop_recorded = False
+
+        def limit_reached_reason() -> str | None:
+            if len(files) >= args.max_files:
+                return "file-count-limit"
+            if counters["total_bytes"] >= args.max_total_bytes:
+                return "total-byte-limit"
+            return None
+
+        def record_limit_stop(current: Path, reason: str) -> None:
+            nonlocal limit_stop_recorded
+            if limit_stop_recorded:
+                return
+            try:
+                rel_path = current.relative_to(root_path)
+                rel = normalized_relative(rel_path) if rel_path.as_posix() != "." else "."
+            except ValueError:
+                rel = normalized_relative(current)
+            add_skipped(skipped_entries, counters, rel, f"remaining-files-skipped-after-limit:{reason}", "directory")
+            limit_stop_recorded = True
+
+        def record_walk_error(exc: OSError) -> None:
+            raw_path = getattr(exc, "filename", None)
+            rel = "."
+            if raw_path:
+                candidate = Path(raw_path)
+                try:
+                    rel = normalized_relative(candidate.relative_to(root_path))
+                except ValueError:
+                    try:
+                        rel = normalized_relative(candidate.resolve().relative_to(root_path))
+                    except (OSError, ValueError):
+                        rel = candidate.name or "."
+            add_skipped(skipped_entries, counters, rel, f"walk-error:{exc.__class__.__name__}", "directory")
+
+        for current_dir, dirnames, filenames in os.walk(root_path, onerror=record_walk_error):
             current = Path(current_dir)
+            limit_reason = limit_reached_reason()
+            if limit_reason:
+                dirnames[:] = []
+                record_limit_stop(current, limit_reason)
+                break
+
             kept_dirs: list[str] = []
             for dirname in sorted(dirnames):
                 if dirname in ignore_dirs:
@@ -199,6 +248,12 @@ def collect_files(
             dirnames[:] = kept_dirs
 
             for filename in sorted(filenames):
+                limit_reason = limit_reached_reason()
+                if limit_reason:
+                    dirnames[:] = []
+                    record_limit_stop(current, limit_reason)
+                    break
+
                 source_path = current / filename
                 try:
                     resolved = source_path.resolve()
@@ -228,6 +283,20 @@ def collect_files(
                     data = source_path.read_bytes()
                 except OSError as exc:
                     add_skipped(skipped_entries, counters, rel, f"read-error:{exc.__class__.__name__}", "file")
+                    continue
+                try:
+                    post_read_stat = source_path.stat()
+                except OSError as exc:
+                    add_skipped(skipped_entries, counters, rel, f"post-read-stat-error:{exc.__class__.__name__}", "file")
+                    continue
+                if stat_snapshot(stat) != stat_snapshot(post_read_stat):
+                    add_skipped(skipped_entries, counters, rel, "changed-during-read", "file")
+                    continue
+                if len(data) > args.max_file_bytes:
+                    add_skipped(skipped_entries, counters, rel, "file-byte-limit-after-read", "file")
+                    continue
+                if counters["total_bytes"] + len(data) > args.max_total_bytes:
+                    add_skipped(skipped_entries, counters, rel, "total-byte-limit-after-read", "file")
                     continue
                 if b"\0" in data:
                     add_skipped(skipped_entries, counters, rel, "binary-file", "file")

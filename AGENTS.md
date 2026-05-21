@@ -102,7 +102,7 @@ Ask before changing:
 - [Agent 0: Contaminated Manager Verifier](agents/contaminated-manager-verifier.md): validates authorization, decomposes scope, tracks coverage, and sends only abstract delta tickets.
 - [Agent 1: Contaminated Source Analyst](agents/contaminated-source-analyst.md): reads authorized source and writes neutral behavior specs with ledger references.
 - [Agent 2: Clean Architect](agents/clean-architect.md): reads clean inputs, manages schema base, and builds `skeleton-manifest.json`.
-- [Agent 3: Clean QA Editor](agents/clean-qa-editor.md): checks schema, leakage, coverage gaps, and testability.
+- [Agent 3: Clean Implementer Verifier](agents/clean-qa-editor.md): implements the clean plan under implementation roots, records verification status, maintains QC, and emits one terminal report.
 - Leakage rules live in [skills/clean-room/references/LEAKAGE-RULES.md](skills/clean-room/references/LEAKAGE-RULES.md).
 
 ## Role Session Environment

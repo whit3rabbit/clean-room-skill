@@ -60,6 +60,8 @@ Capture:
 
 Use neutral ids such as `unit-auth-flow` or `unit-config-loading`. Avoid source path mirroring unless the path is already a public API or package name.
 
+When a role needs more than one runtime profile, keep the role name stable and set `profile_purpose` to distinguish the sessions. For example, Agent 3 may use `report-review` for clean artifact work and `implementation` for the clean implementation workspace.
+
 ## Initialization And Clean Context
 
 `init-config.json` records reusable controller-side preferences. It may contain source roots and contaminated-only rules, so keep it outside clean-role readable roots.
@@ -209,7 +211,7 @@ Map API, protocol, config, and data/schema compatibility into `public_contracts`
 - work items with relative target paths and test paths
 - local clean-project patterns and dependency constraints
 - public contract refs and spec ids
-- verification commands with cwd set to implementation root refs
+- argv-array verification commands with cwd set to implementation root refs
 - risks, acceptance criteria, and open decisions
 - forbidden implementation material
 
@@ -222,7 +224,7 @@ Use only relative destination paths. Do not include source roots, contaminated r
 - implementation status
 - completed and blocked work items
 - changed relative paths and file kinds
-- verification command results and concise output summaries
+- argv-array verification command results and concise output summaries
 - implementation or verification findings
 - Agent 0 reporting state, with interim updates disallowed
 - abstract delta tickets for Agent 0

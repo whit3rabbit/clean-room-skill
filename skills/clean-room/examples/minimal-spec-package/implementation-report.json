@@ -15,7 +15,10 @@
   "changed_paths": [],
   "verification_results": [
     {
-      "command": "npm test",
+      "command": [
+        "npm",
+        "test"
+      ],
       "cwd": "CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]",
       "status": "not-run",
       "output_summary": "Example report has not run verification."

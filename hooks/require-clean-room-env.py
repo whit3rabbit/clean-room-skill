@@ -8,7 +8,7 @@ import re
 import sys
 from pathlib import Path
 
-from clean_room_paths import paths_overlap
+from clean_room_paths import describe_path, paths_overlap, redact_text
 
 
 ROLES = {
@@ -83,10 +83,10 @@ def validate_roots(name: str, require_existing: bool = False) -> list[str]:
         try:
             path = Path(item).expanduser().resolve()
         except OSError as exc:
-            errors.append(f"{name} has invalid path {item!r}: {exc}")
+            errors.append(f"{name} has invalid path: {redact_text(exc)}")
             continue
         if require_existing and not path.exists():
-            errors.append(f"{name} path does not exist: {path}")
+            errors.append(f"{name} path does not exist: {describe_path(path)}")
     return errors
 
 
@@ -97,7 +97,7 @@ def resolved_roots(name: str) -> tuple[list[Path], list[str]]:
         try:
             roots.append(Path(item).expanduser().resolve())
         except OSError as exc:
-            errors.append(f"{name} has invalid path {item!r}: {exc}")
+            errors.append(f"{name} has invalid path: {redact_text(exc)}")
     return roots, errors
 
 
@@ -173,7 +173,7 @@ def reject_overlaps(left_name: str, right_name: str, message: str) -> list[str]:
     for left in left_roots:
         for right in right_roots:
             if paths_overlap(left, right):
-                errors.append(f"{message}: {left_name}={left} overlaps {right_name}={right}")
+                errors.append(f"{message}: {left_name} overlaps {right_name}")
     return errors
 
 
@@ -273,7 +273,7 @@ def main() -> int:
     if errors:
         print("clean-room environment check failed:", file=sys.stderr)
         for error in errors:
-            print(f"  {error}", file=sys.stderr)
+            print(f"  {redact_text(error)}", file=sys.stderr)
         return 1
     return 0
 

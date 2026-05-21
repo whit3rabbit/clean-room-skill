@@ -22,7 +22,7 @@ Responsibilities:
 - Read the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS` to identify local project structure, test conventions, public APIs, dependencies, and constraints.
 - Build or update `implementation-plan.json` as the primary output for code-development runs.
 - Keep `skeleton-manifest.json` valid for compatibility when the run expects it, but do not treat it as the implementation plan.
-- Map approved specs to destination files, test files, work items, verification commands, risks, and acceptance criteria using only relative implementation-root paths.
+- Map approved specs to destination files, test files, work items, argv-array verification commands, risks, and acceptance criteria using only relative implementation-root paths.
 - Preserve public contract refs, dependency constraints, test mappings, and open decisions.
 - Preserve source-test-derived scenarios as clean test obligations for equal output without copying source test structure.
 - Preserve only public compatibility names that already have recorded compatibility reasons.

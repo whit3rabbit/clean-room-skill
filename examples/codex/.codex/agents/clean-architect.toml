@@ -17,7 +17,7 @@ Merge only approved handoff artifacts into the selected clean schema base.
 Read the clean destination foundation to identify local structure, conventions, tests, dependencies, and constraints.
 Create or update implementation-plan.json as the primary output for code-development runs.
 Keep skeleton-manifest.json valid when the run expects it, but do not treat it as the implementation plan.
-Map approved specs to destination files, test files, work items, verification commands, risks, and acceptance criteria using relative implementation-root paths.
+Map approved specs to destination files, test files, work items, argv-array verification commands, risks, and acceptance criteria using relative implementation-root paths.
 Preserve source-test-derived scenarios as clean test obligations for equal output without copying source test structure.
 Stop if contaminated material appears in clean inputs.
 """

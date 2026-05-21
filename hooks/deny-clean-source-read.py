@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from clean_room_paths import env_roots, load_payload, path_is_under, payload_cwd, resolve_payload_path
+from clean_room_paths import describe_path, env_roots, load_payload, path_is_under, payload_cwd, redact_text, resolve_payload_path
 
 
 CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
@@ -94,7 +94,7 @@ def main() -> int:
     payload, payload_error = load_payload()
     if payload_error:
         print(
-            f"clean-room policy denied role {role} read: {payload_error}",
+            f"clean-room policy denied role {role} read: {redact_text(payload_error)}",
             file=sys.stderr,
         )
         return 1
@@ -120,31 +120,31 @@ def main() -> int:
     for path in paths:
         if any(is_under(path, root) for root in source_roots):
             print(
-                f"clean-room policy denied role {role} reading source path {path}",
+                f"clean-room policy denied role {role} reading {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1
         if role == SANITIZER_ROLE and any(is_under(path, root) for root in clean_roots):
             print(
-                f"clean-room policy denied role {role} reading clean path {path}",
+                f"clean-room policy denied role {role} reading {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1
         if role == SANITIZER_ROLE and path.name == "source-index.json":
             print(
-                f"clean-room policy denied role {role} reading source-index artifact {path}",
+                f"clean-room policy denied role {role} reading source-index artifact in {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1
         if not allowed_roots:
             print(
-                f"clean-room policy denied role {role} reading {path}: no allowed read roots configured",
+                f"clean-room policy denied role {role} reading {describe_path(path)}: no allowed read roots configured",
                 file=sys.stderr,
             )
             return 1
         if not any(is_under(path, root) for root in allowed_roots):
             print(
-                f"clean-room policy denied role {role} reading outside allowed roots: {path}",
+                f"clean-room policy denied role {role} reading outside allowed roots: {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1

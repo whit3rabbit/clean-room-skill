@@ -49,41 +49,8 @@ jobs:
             exit 1
           fi
 
-      - name: Check JavaScript syntax
-        run: |
-          node --check bin/install.js
-          node --check lib/fs-utils.cjs
-          node --check lib/hooks.cjs
-          node --check lib/runtime-layout.cjs
-
-      - name: Run installer tests
-        run: npm test
-
-      - name: Validate JSON metadata
-        run: |
-          python3 -m json.tool package.json >/dev/null
-          python3 -m json.tool plugin.json >/dev/null
-          python3 -m json.tool .codex-plugin/plugin.json >/dev/null
-          python3 -m json.tool .claude-plugin/plugin.json >/dev/null
-          python3 -m json.tool hooks/hooks.json >/dev/null
-
-      - name: Compile Python hooks and scripts
-        run: python3 -m compileall -q hooks skills/clean-room/scripts
-
-      - name: Run full JSON Schema validation
-        run: python3 tests/validate_jsonschema.py
-
-      - name: Validate handoff integrity fixture
-        run: |
-          printf '{"tool_input":{"file_path":"%s"}}' "$PWD/skills/clean-room/examples/valid-handoff-package/handoff-package.json" \
-            | CLEAN_ROOM_CLEAN_ROOTS="$PWD/skills/clean-room/examples/valid-handoff-package" \
-              python3 hooks/validate-handoff-package.py
-
-      - name: Smoke test installer dry run
-        run: node bin/install.js --dry-run --all --global
-
-      - name: Check package contents
-        run: npm pack --dry-run
+      - name: Run local release verifier
+        run: npm run verify
 
       - name: Publish package
         run: npm publish --provenance

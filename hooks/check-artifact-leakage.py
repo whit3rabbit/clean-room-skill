@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-from clean_room_paths import checked_write_paths, load_payload
+from clean_room_paths import checked_write_paths, describe_path, load_payload, redact_text, read_artifact_bytes, stat_artifact
 
 
 MAX_SCAN_BYTES = 1_000_000
@@ -175,10 +175,14 @@ def load_private_identifier_terms() -> tuple[list[str], list[str]]:
         try:
             data = path.read_bytes()
         except OSError as exc:
-            errors.append(f"could not read {PRIVATE_IDENTIFIER_DENYLIST_ENV} file {path}: {exc}")
+            errors.append(
+                f"could not read {PRIVATE_IDENTIFIER_DENYLIST_ENV} file {describe_path(path)}: {redact_text(exc)}"
+            )
             continue
         if len(data) > MAX_DENYLIST_BYTES:
-            errors.append(f"{PRIVATE_IDENTIFIER_DENYLIST_ENV} file {path} exceeds {MAX_DENYLIST_BYTES} bytes")
+            errors.append(
+                f"{PRIVATE_IDENTIFIER_DENYLIST_ENV} file {describe_path(path)} exceeds {MAX_DENYLIST_BYTES} bytes"
+            )
             continue
         raw_terms = data.decode("utf-8", errors="replace").splitlines()
         for raw_term in raw_terms:
@@ -364,29 +368,37 @@ def identifier_scan_texts(path: Path, text: str) -> tuple[list[str], list[str], 
 def main() -> int:
     payload, payload_error = load_payload()
     if payload_error:
-        print(f"clean-room leakage scan failed: {payload_error}", file=sys.stderr)
+        print(f"clean-room leakage scan failed: {redact_text(payload_error)}", file=sys.stderr)
         return 1
     paths, path_errors = checked_write_paths(payload, "clean-room leakage scan")
     if path_errors:
         for error in path_errors:
-            print(f"clean-room leakage scan failed: {error}", file=sys.stderr)
+            print(f"clean-room leakage scan failed: {redact_text(error)}", file=sys.stderr)
         return 1
     private_terms, load_errors = load_private_identifier_terms()
     if load_errors:
         for error in load_errors:
-            print(f"clean-room leakage scan failed: {error}", file=sys.stderr)
+            print(f"clean-room leakage scan failed: {redact_text(error)}", file=sys.stderr)
         return 1
     private_patterns = compile_private_identifier_terms(private_terms)
     for path in paths:
         if not is_scannable_artifact(path):
             continue
-        if path.stat().st_size > MAX_SCAN_BYTES:
+        stat, stat_error = stat_artifact(path, "artifact")
+        if stat_error:
+            print(f"clean-room leakage scan failed: {redact_text(stat_error)}", file=sys.stderr)
+            return 1
+        if stat.st_size > MAX_SCAN_BYTES:
             print(
-                f"clean-room leakage scan failed for {path}: artifact exceeds scan cap of {MAX_SCAN_BYTES} bytes",
+                f"clean-room leakage scan failed for {describe_path(path)}: "
+                f"artifact exceeds scan cap of {MAX_SCAN_BYTES} bytes",
                 file=sys.stderr,
             )
             return 1
-        data = path.read_bytes()
+        data, read_error = read_artifact_bytes(path, "artifact")
+        if read_error:
+            print(f"clean-room leakage scan failed: {redact_text(read_error)}", file=sys.stderr)
+            return 1
         text = data.decode("utf-8", errors="replace")
         findings = [name for name, pattern in BLOCKED_PATTERNS.items() if pattern.search(text)]
         full_scan_texts, light_scan_texts, denylist_scan_texts = identifier_scan_texts(path, text)
@@ -401,7 +413,7 @@ def main() -> int:
         findings.extend(scan_private_identifier_denylist(denylist_scan_texts, private_patterns))
         if findings:
             print(
-                f"clean-room leakage scan failed for {path}: {', '.join(sorted(set(findings)))}",
+                f"clean-room leakage scan failed for {describe_path(path)}: {', '.join(sorted(set(findings)))}",
                 file=sys.stderr,
             )
             return 1

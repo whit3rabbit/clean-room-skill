@@ -15,7 +15,6 @@
     "compliance"
   ],
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "Clean Room",
     "shortDescription": "Produce clean-room behavioral specs",

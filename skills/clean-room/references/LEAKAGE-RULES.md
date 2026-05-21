@@ -97,6 +97,6 @@ Use hook scripts as audit and guardrail support, not as the only boundary:
 - For Agent 1.5, `hooks/check-artifact-leakage.py` also scans staged contaminated artifacts before promotion to clean handoff.
 - `hooks/validate-json-schema.py`: checks JSON syntax and common bundled schema constraints, including the conditional and bounded fields used by these schemas. It is not a full JSON Schema 2020-12 validator.
 - `hooks/require-clean-room-env.py`: fails closed when the role, root, or schema environment block is missing.
-- `hooks/deny-clean-room-shell.py`: denies shell-style tools for clean-room role sessions except Agent 3 verification commands when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd is under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
+- `hooks/deny-clean-room-shell.py`: denies shell-style tools for clean-room role sessions except installed Agent 3 verification-runner invocations when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd is under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 
 Set `CLEAN_ROOM_ROLE`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, and `CLEAN_ROOM_SCHEMA_DIR` explicitly before running hooks. Set `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST` when the contaminated side has produced a private identifier list for hook-only scanning.

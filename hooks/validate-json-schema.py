@@ -11,7 +11,16 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
-from clean_room_paths import checked_write_paths, env_roots, load_payload, path_is_under, path_under_env
+from clean_room_paths import (
+    checked_write_paths,
+    describe_path,
+    env_roots,
+    load_payload,
+    path_is_under,
+    path_under_env,
+    redact_text,
+    read_artifact_text,
+)
 
 
 SCHEMA_BY_ARTIFACT = {
@@ -49,6 +58,8 @@ def schema_dir() -> Path:
 
 
 def artifact_kind(path: Path, data: dict) -> str | None:
+    # Intentionally conservative: name and field heuristics may reject unusual clean JSON,
+    # but ambiguous clean-root artifacts should fail closed unless explicitly allowlisted.
     name = path.name.removesuffix(".json")
     if name in SCHEMA_BY_ARTIFACT:
         return name
@@ -95,10 +106,13 @@ def auxiliary_json_allowed(path: Path) -> tuple[bool, list[str]]:
         try:
             allowed = Path(item).expanduser().resolve()
         except OSError as exc:
-            errors.append(f"{CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV} has invalid path {item!r}: {exc}")
+            errors.append(f"{CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV} has invalid path: {redact_text(exc)}")
             continue
         if not path_under_env(allowed, "CLEAN_ROOM_CLEAN_ROOTS"):
-            errors.append(f"{CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV} path is outside CLEAN_ROOM_CLEAN_ROOTS: {allowed}")
+            errors.append(
+                f"{CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV} path is outside CLEAN_ROOM_CLEAN_ROOTS: "
+                f"{describe_path(allowed)}"
+            )
             continue
         if path == allowed:
             return True, errors
@@ -386,25 +400,32 @@ def validate_value(value: Any, schema: dict, root_schema: dict, path: tuple[str 
 def main() -> int:
     payload, payload_error = load_payload()
     if payload_error:
-        print(f"clean-room schema check failed: {payload_error}", file=sys.stderr)
+        print(f"clean-room schema check failed: {redact_text(payload_error)}", file=sys.stderr)
         return 1
     paths, path_errors = checked_write_paths(payload, "clean-room schema check")
     if path_errors:
         for error in path_errors:
-            print(f"clean-room schema check failed: {error}", file=sys.stderr)
+            print(f"clean-room schema check failed: {redact_text(error)}", file=sys.stderr)
         return 1
     for path in paths:
         if path.suffix.lower() != ".json" or not path.is_file():
             continue
         in_clean_root = path_under_env(path, "CLEAN_ROOM_CLEAN_ROOTS")
+        text, read_error = read_artifact_text(path, "JSON artifact")
+        if read_error:
+            print(f"clean-room schema check failed: {redact_text(read_error)}", file=sys.stderr)
+            return 1
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(text)
         except json.JSONDecodeError as exc:
-            print(f"clean-room JSON parse failed for {path}: {exc}", file=sys.stderr)
+            print(f"clean-room JSON parse failed for {describe_path(path)}: {redact_text(exc)}", file=sys.stderr)
             return 1
         if not isinstance(data, dict):
             if in_clean_root:
-                print(f"clean-room schema check failed for {path}: clean JSON artifact must be an object", file=sys.stderr)
+                print(
+                    f"clean-room schema check failed for {describe_path(path)}: clean JSON artifact must be an object",
+                    file=sys.stderr,
+                )
                 return 1
             continue
         kind = artifact_kind(path, data)
@@ -412,28 +433,38 @@ def main() -> int:
             allowed, allowlist_errors = auxiliary_json_allowed(path)
             if allowlist_errors:
                 for error in allowlist_errors:
-                    print(f"clean-room schema check failed: {error}", file=sys.stderr)
+                    print(f"clean-room schema check failed: {redact_text(error)}", file=sys.stderr)
                 return 1
             if in_clean_root and not allowed:
-                print(f"clean-room schema check failed for {path}: unrecognized clean JSON artifact", file=sys.stderr)
+                print(
+                    f"clean-room schema check failed for {describe_path(path)}: unrecognized clean JSON artifact",
+                    file=sys.stderr,
+                )
                 return 1
             continue
         if in_clean_root and kind in {"source-index", "init-config"}:
-            print(f"clean-room schema check failed for {path}: {kind}.json is not a clean-role artifact", file=sys.stderr)
+            print(
+                f"clean-room schema check failed for {describe_path(path)}: {kind}.json is not a clean-role artifact",
+                file=sys.stderr,
+            )
             return 1
         schema_path = schema_dir() / SCHEMA_BY_ARTIFACT[kind]
+        schema_text, schema_read_error = read_artifact_text(schema_path, "schema artifact")
+        if schema_read_error:
+            print(f"clean-room schema load failed: {redact_text(schema_read_error)}", file=sys.stderr)
+            return 1
         try:
-            schema = json.loads(schema_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            print(f"clean-room schema load failed for {schema_path}: {exc}", file=sys.stderr)
+            schema = json.loads(schema_text)
+        except json.JSONDecodeError as exc:
+            print(f"clean-room schema load failed for {describe_path(schema_path)}: {redact_text(exc)}", file=sys.stderr)
             return 1
         errors = validate_value(data, schema, schema)
         if kind == "clean-run-context":
             extend_errors(errors, clean_context_path_errors(data))
         if errors:
-            print(f"clean-room schema check failed for {path}:", file=sys.stderr)
+            print(f"clean-room schema check failed for {describe_path(path)}:", file=sys.stderr)
             for error in errors[:MAX_REPORTED_ERRORS]:
-                print(f"  {error}", file=sys.stderr)
+                print(f"  {redact_text(error)}", file=sys.stderr)
             if len(errors) > MAX_REPORTED_ERRORS:
                 print(f"  ... validation stopped after {MAX_REPORTED_ERRORS} error(s)", file=sys.stderr)
             return 1

@@ -47,6 +47,7 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check bin/install.js
+          node --check lib/doctor.cjs
           node --check lib/fs-utils.cjs
           node --check lib/hooks.cjs
           node --check lib/runtime-layout.cjs
@@ -60,7 +61,6 @@ jobs:
           python3 -m json.tool plugin.json >/dev/null
           python3 -m json.tool .codex-plugin/plugin.json >/dev/null
           python3 -m json.tool .claude-plugin/plugin.json >/dev/null
-          python3 -m json.tool hooks/hooks.json >/dev/null
 
       - name: Compile Python hooks and scripts
         run: python3 -m compileall -q hooks skills/clean-room/scripts
@@ -70,10 +70,12 @@ jobs:
 
       - name: Validate example schemas
         run: |
-          for f in skills/clean-room/examples/minimal-spec-package/*.json; do
-            printf '{"tool_input":{"file_path":"%s"}}' "$PWD/$f" \
-              | CLEAN_ROOM_SCHEMA_DIR="$PWD/skills/clean-room/assets" \
-                python3 hooks/validate-json-schema.py
+          for dir in skills/clean-room/examples/minimal-spec-package skills/clean-room/examples/contaminated-side; do
+            for f in "$dir"/*.json; do
+              printf '{"tool_input":{"file_path":"%s"}}' "$PWD/$f" \
+                | CLEAN_ROOM_SCHEMA_DIR="$PWD/skills/clean-room/assets" \
+                  python3 hooks/validate-json-schema.py
+            done
           done
 
       - name: Run full JSON Schema validation
@@ -88,9 +90,6 @@ jobs:
       - name: Run example leakage checks
         run: |
           for f in skills/clean-room/examples/minimal-spec-package/*.json; do
-            if [ "$(basename "$f")" = source-index.json ]; then
-              continue
-            fi
             printf '{"tool_input":{"file_path":"%s"}}' "$PWD/$f" \
               | CLEAN_ROOM_CLEAN_ROOTS="$PWD/skills/clean-room/examples/minimal-spec-package" \
                 python3 hooks/check-artifact-leakage.py

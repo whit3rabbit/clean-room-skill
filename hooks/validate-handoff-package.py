@@ -9,7 +9,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from clean_room_paths import checked_write_paths, env_roots, load_payload, path_is_under
+from clean_room_paths import (
+    checked_write_paths,
+    describe_path,
+    env_roots,
+    load_payload,
+    path_is_under,
+    redact_text,
+    read_artifact_text,
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -38,14 +46,30 @@ def resolve_artifact_path(raw_path: str, clean_roots: list[Path]) -> tuple[Path 
     errors: list[str] = []
     path = Path(raw_path).expanduser()
     if path.is_absolute():
-        resolved = path.resolve()
+        try:
+            resolved = path.resolve()
+        except OSError as exc:
+            return None, [f"artifact path could not be resolved: {redact_text(exc)}"]
         if not any(path_is_under(resolved, root) for root in clean_roots):
-            errors.append(f"artifact path is outside CLEAN_ROOM_CLEAN_ROOTS: {resolved}")
+            errors.append(f"artifact path is outside CLEAN_ROOM_CLEAN_ROOTS: {describe_path(resolved)}")
         return resolved, errors
 
-    matches = [(root / path).resolve() for root in clean_roots if (root / path).is_file()]
+    matches: list[Path] = []
+    for root in clean_roots:
+        candidate = root / path
+        try:
+            is_file = candidate.is_file()
+        except OSError as exc:
+            errors.append(f"artifact path could not be checked: {redact_text(exc)}")
+            continue
+        if not is_file:
+            continue
+        try:
+            matches.append(candidate.resolve())
+        except OSError as exc:
+            errors.append(f"artifact path could not be resolved: {redact_text(exc)}")
     if len(matches) > 1:
-        errors.append(f"artifact path is ambiguous across clean roots: {raw_path}")
+        errors.append("artifact path is ambiguous across clean roots")
         return None, errors
     if matches:
         return matches[0], errors
@@ -76,38 +100,45 @@ def validate_artifact(
     if artifact_path is None:
         return errors
     if not any(path_is_under(artifact_path, root) for root in clean_roots):
-        errors.append(f"artifact path is outside CLEAN_ROOM_CLEAN_ROOTS: {artifact_path}")
+        errors.append(f"artifact path is outside CLEAN_ROOM_CLEAN_ROOTS: {describe_path(artifact_path)}")
     if any(path_is_under(artifact_path, root) for root in blocked_roots):
-        errors.append(f"artifact path points into a contaminated or source root: {artifact_path}")
+        errors.append(f"artifact path points into a contaminated or source root: {describe_path(artifact_path)}")
     if not artifact_path.is_file():
-        errors.append(f"referenced artifact does not exist: {artifact_path}")
+        errors.append(f"referenced artifact does not exist: {describe_path(artifact_path)}")
         return errors
 
     expected_sha = item.get("sha256")
     if not isinstance(expected_sha, str) or len(expected_sha) != 64:
-        errors.append(f"artifact sha256 must be a 64-character hex string: {raw_path}")
+        errors.append("artifact sha256 must be a 64-character hex string")
         return errors
-    actual_sha = sha256_file(artifact_path)
+    try:
+        actual_sha = sha256_file(artifact_path)
+    except OSError as exc:
+        errors.append(f"referenced artifact could not be hashed: {describe_path(artifact_path)}: {redact_text(exc)}")
+        return errors
     if actual_sha.lower() != expected_sha.lower():
-        errors.append(f"artifact sha256 mismatch for {artifact_path}")
+        errors.append(f"artifact sha256 mismatch for {describe_path(artifact_path)}")
     return errors
 
 
 def validate_handoff(path: Path) -> list[str]:
+    text, read_error = read_artifact_text(path, "handoff package")
+    if read_error:
+        return [read_error]
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(text)
     except json.JSONDecodeError as exc:
-        return [f"JSON parse failed for {path}: {exc}"]
+        return [f"JSON parse failed for {describe_path(path)}: {redact_text(exc)}"]
     if not is_handoff_package(path, data):
         return []
     if not isinstance(data, dict):
-        return [f"handoff package must be an object: {path}"]
+        return [f"handoff package must be an object: {describe_path(path)}"]
 
     clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
     blocked_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS") + env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
     artifacts = data.get("artifacts")
     if not isinstance(artifacts, list):
-        return [f"handoff package artifacts must be an array: {path}"]
+        return [f"handoff package artifacts must be an array: {describe_path(path)}"]
     errors: list[str] = []
     for item in artifacts:
         errors.extend(validate_artifact(item, clean_roots, blocked_roots))
@@ -117,21 +148,21 @@ def validate_handoff(path: Path) -> list[str]:
 def main() -> int:
     payload, payload_error = load_payload()
     if payload_error:
-        print(f"clean-room handoff integrity failed: {payload_error}", file=sys.stderr)
+        print(f"clean-room handoff integrity failed: {redact_text(payload_error)}", file=sys.stderr)
         return 1
     paths, path_errors = checked_write_paths(payload, "clean-room handoff integrity")
     if path_errors:
         for error in path_errors:
-            print(f"clean-room handoff integrity failed: {error}", file=sys.stderr)
+            print(f"clean-room handoff integrity failed: {redact_text(error)}", file=sys.stderr)
         return 1
     for path in paths:
         if path.suffix.lower() != ".json" or not path.is_file():
             continue
         errors = validate_handoff(path)
         if errors:
-            print(f"clean-room handoff integrity failed for {path}:", file=sys.stderr)
+            print(f"clean-room handoff integrity failed for {describe_path(path)}:", file=sys.stderr)
             for error in errors[:20]:
-                print(f"  {error}", file=sys.stderr)
+                print(f"  {redact_text(error)}", file=sys.stderr)
             if len(errors) > 20:
                 print(f"  ... {len(errors) - 20} more error(s)", file=sys.stderr)
             return 1

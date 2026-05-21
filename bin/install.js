@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline/promises');
 const { spawnSync } = require('node:child_process');
 
 const { runInit } = require('../lib/bootstrap.cjs');
+const { runDoctor } = require('../lib/doctor.cjs');
+const { assertManagedPath } = require('../lib/fs-utils.cjs');
 const {
   buildHookEntries,
   configPathForRuntime,
   mergeHookEntries,
   removeHookEntries,
-  writeHookConfig,
 } = require('../lib/hooks.cjs');
 const {
   RUNTIMES,
@@ -29,6 +31,57 @@ const {
 } = require('../lib/install-plan.cjs');
 
 const HOOK_MODES = new Set(['safe', 'copy-only', 'strict']);
+const INSTALL_LOCK_NAME = '.clean-room-install.lock';
+const INSTALL_LOCK_WAIT_MS = 30_000;
+const INSTALL_LOCK_POLL_MS = 100;
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function withTargetInstallLock(targetRoot, dryRun, fn) {
+  if (dryRun) {
+    return fn();
+  }
+
+  fs.mkdirSync(targetRoot, { recursive: true });
+  const lockPath = assertManagedPath(targetRoot, INSTALL_LOCK_NAME);
+  const deadline = Date.now() + INSTALL_LOCK_WAIT_MS;
+  let locked = false;
+
+  while (!locked) {
+    try {
+      fs.mkdirSync(lockPath);
+      try {
+        fs.writeFileSync(
+          path.join(lockPath, 'owner.json'),
+          `${JSON.stringify({ pid: process.pid, created_at: new Date().toISOString() }, null, 2)}\n`,
+          'utf8'
+        );
+      } catch (err) {
+        fs.rmSync(lockPath, { recursive: true, force: true });
+        throw err;
+      }
+      locked = true;
+    } catch (err) {
+      if (err?.code !== 'EEXIST') {
+        throw err;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(`install lock is held: ${lockPath}`);
+      }
+      await sleep(INSTALL_LOCK_POLL_MS);
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    fs.rmSync(lockPath, { recursive: true, force: true });
+  }
+}
 
 function parseArgs(argv) {
   const options = {
@@ -94,6 +147,7 @@ function printHelp() {
 
 Commands:
   init                Create clean-room bootstrap folders and repo guidance
+  doctor              Smoke test generated Codex or Claude hook registration
 
 Runtime:
   --codex              Install for Codex
@@ -209,7 +263,7 @@ function validateRuntimeOptions(options) {
   }
 }
 
-function prepareHookRegistration(layout, hookMode) {
+function prepareHookRegistration(layout, hookMode, options = {}) {
   if (hookMode === 'copy-only') {
     return { status: 'copy-only' };
   }
@@ -218,48 +272,148 @@ function prepareHookRegistration(layout, hookMode) {
   }
   const configPath = configPathForRuntime(layout.runtime, layout.targetRoot);
   if (!configPath) return { status: 'unsupported' };
+  if (options.dryRun) {
+    return { status: 'planned', configPath };
+  }
   const pythonPath = resolvePython3();
   const wrapperPath = path.join(layout.targetRoot, 'hooks', 'clean-room', 'clean-room-hook.py');
   const entries = buildHookEntries({ pythonPath, wrapperPath, mode: hookMode });
-  const config = mergeHookEntries(configPath, entries, { dryRun: true });
-  return { status: 'registered', configPath, config };
+  return { status: 'registered', configPath, entries };
+}
+
+function hookRegistrationFailureState(hookResult, err) {
+  return {
+    hook_registration: {
+      status: 'failed',
+      config_path: hookResult.configPath,
+      error: err.message,
+      recorded_at: new Date().toISOString(),
+    },
+  };
+}
+
+function partialInstallMessage(targetRoot, state, cause) {
+  const causeMessage = cause && cause.message ? cause.message : String(cause);
+  const parts = [
+    `partial install state for ${targetRoot}`,
+    state.files,
+    state.hooks,
+    state.manifest,
+    state.recovery,
+  ].filter(Boolean);
+  return `${parts.join('; ')}. Cause: ${causeMessage}`;
 }
 
 async function installRuntime(runtime, options) {
   const layout = resolveRuntimeLayout(runtime, options.scope, { configDir: options.configDir });
   const targetRoot = layout.targetRoot;
-  const manifest = readManifest(targetRoot);
-  const desired = buildDesiredFiles(layout, options.hookMode);
-  const plan = planInstall(targetRoot, desired, manifest);
-  const adoptedUnknowns = await confirmUnknownConflicts(plan.unknownConflicts, options);
+  await withTargetInstallLock(targetRoot, options.dryRun, async () => {
+    const manifest = readManifest(targetRoot);
+    const desired = buildDesiredFiles(layout, options.hookMode);
+    const plan = planInstall(targetRoot, desired, manifest);
+    const adoptedUnknowns = await confirmUnknownConflicts(plan.unknownConflicts, options);
 
-  console.log(`${options.dryRun ? 'Would install' : 'Installing'} ${runtime} to ${targetRoot}`);
-  console.log(`  files: ${plan.writes.length}`);
-  if (plan.removals.length) console.log(`  stale managed removals: ${plan.removals.length}`);
-  if (plan.backups.length || adoptedUnknowns) {
-    console.log(`  backups: ${plan.backups.length + (adoptedUnknowns ? plan.unknownConflicts.length : 0)}`);
-  }
-  if (options.dryRun && plan.unknownConflicts.length) {
-    console.log(`  unknown conflicts: ${plan.unknownConflicts.length}`);
-  }
-
-  const hookResult = prepareHookRegistration(layout, options.hookMode);
-  const result = applyInstall(targetRoot, desired, manifest, plan, options);
-  if (!options.dryRun && hookResult.status === 'registered') {
-    writeHookConfig(hookResult.configPath, hookResult.config);
-  }
-  if (hookResult.status === 'unsupported' && options.hookMode === 'safe') {
-    console.log('  hook registration unsupported for this runtime; copied hooks only');
-  }
-  if (options.hookMode === 'safe') {
-    console.log('  WARNING: safe hooks are installed but not enforcing until clean-room env vars, CLEAN_ROOM_HOOK_ENFORCE=1, or --hooks=strict are set');
-  }
-  if (result) {
-    writeInstallManifest(targetRoot, result.manifest, runtime, options.scope, options.hookMode, options.dryRun);
-    if (result.backupRoot) {
-      console.log(`  backed up modified files to ${result.backupRoot}`);
+    console.log(`${options.dryRun ? 'Would install' : 'Installing'} ${runtime} to ${targetRoot}`);
+    console.log(`  files: ${plan.writes.length}`);
+    if (plan.removals.length) console.log(`  stale managed removals: ${plan.removals.length}`);
+    if (plan.backups.length || adoptedUnknowns) {
+      console.log(`  backups: ${plan.backups.length + (adoptedUnknowns ? plan.unknownConflicts.length : 0)}`);
     }
-  }
+    if (options.dryRun && plan.unknownConflicts.length) {
+      console.log(`  unknown conflicts: ${plan.unknownConflicts.length}`);
+    }
+
+    const hookResult = prepareHookRegistration(layout, options.hookMode, { dryRun: options.dryRun });
+    // Install order is files, installing manifest, hook config, then complete manifest.
+    // The installing manifest gives repair/uninstall a durable handle if hook config write fails.
+    let result;
+    try {
+      result = applyInstall(targetRoot, desired, manifest, plan, options);
+    } catch (err) {
+      throw new Error(partialInstallMessage(targetRoot, {
+        files: 'managed files may be partially written',
+        hooks: 'hook config was not updated',
+        manifest: 'install manifest was not written',
+        recovery: 're-run the same install command after fixing the filesystem error',
+      }, err));
+    }
+    if (result) {
+      try {
+        writeInstallManifest(targetRoot, result.manifest, runtime, options.scope, options.hookMode, options.dryRun, {
+          phase: 'installing',
+        });
+      } catch (err) {
+        throw new Error(partialInstallMessage(targetRoot, {
+          files: 'managed files were written',
+          hooks: 'hook config was not updated',
+          manifest: 'install manifest was not written',
+          recovery: 're-run the same install command to repair manifest tracking before uninstalling',
+        }, err));
+      }
+    }
+
+    let hookConfigWritten = false;
+    if (!options.dryRun && hookResult.status === 'registered') {
+      try {
+        mergeHookEntries(hookResult.configPath, hookResult.entries);
+        hookConfigWritten = true;
+      } catch (err) {
+        let manifestStatus = 'install manifest records phase installing';
+        if (result) {
+          try {
+            writeInstallManifest(
+              targetRoot,
+              result.manifest,
+              runtime,
+              options.scope,
+              options.hookMode,
+              false,
+              {
+                phase: 'installing',
+                ...hookRegistrationFailureState(hookResult, err),
+              }
+            );
+            manifestStatus = 'install manifest records the failed hook registration';
+          } catch {
+            manifestStatus = 'install manifest could not record the failed hook registration';
+          }
+        }
+        throw new Error(partialInstallMessage(targetRoot, {
+          files: 'managed files were written',
+          hooks: 'hook config write failed',
+          manifest: manifestStatus,
+          recovery: 're-run the same install command to repair hook registration',
+        }, err));
+      }
+    }
+    if (hookResult.status === 'unsupported' && options.hookMode === 'safe') {
+      console.log('  hook registration unsupported for this runtime; copied hooks only');
+    }
+    if (hookResult.status === 'planned') {
+      console.log(`  hook registration: would update ${hookResult.configPath}`);
+      console.log('  hook registration: python3 required when applying the install');
+    }
+    if (options.hookMode === 'safe') {
+      console.log('  WARNING: safe hooks are installed but not enforcing until clean-room env vars, CLEAN_ROOM_HOOK_ENFORCE=1, or --hooks=strict are set');
+    }
+    if (result) {
+      try {
+        writeInstallManifest(targetRoot, result.manifest, runtime, options.scope, options.hookMode, options.dryRun, {
+          phase: 'complete',
+        });
+      } catch (err) {
+        throw new Error(partialInstallMessage(targetRoot, {
+          files: 'managed files were written',
+          hooks: hookConfigWritten ? 'hook config was updated' : 'hook config was not updated',
+          manifest: hookConfigWritten ? 'install manifest was not completed' : 'install manifest was not written',
+          recovery: 're-run the same install command to repair manifest tracking before uninstalling',
+        }, err));
+      }
+      if (result.backupRoot) {
+        console.log(`  backed up modified files to ${result.backupRoot}`);
+      }
+    }
+  });
 }
 
 function removeHookRegistrations(layout, dryRun) {
@@ -278,39 +432,50 @@ function desiredFilesForUninstall(layout, hookMode) {
   }
 }
 
-function uninstallRuntime(runtime, options) {
+async function uninstallRuntime(runtime, options) {
   const layout = resolveRuntimeLayout(runtime, options.scope, { configDir: options.configDir });
   const targetRoot = layout.targetRoot;
-  const manifest = readManifest(targetRoot);
-  console.log(`${options.dryRun ? 'Would uninstall' : 'Uninstalling'} ${runtime} from ${targetRoot}`);
-  if (!manifest) {
+  if (!options.dryRun && !fs.existsSync(targetRoot)) {
+    console.log(`Uninstalling ${runtime} from ${targetRoot}`);
     console.log('  no install manifest found');
-    removeHookRegistrations(layout, options.dryRun);
     return;
   }
-  const desired = desiredFilesForUninstall(layout, manifest.hooks_mode || options.hookMode);
-  const plan = planUninstall(targetRoot, manifest, desired);
-  console.log(`  managed removals: ${plan.removals.length}`);
-  if (plan.backups.length) {
-    console.log(`  backups: ${plan.backups.length}`);
-  }
-  if (plan.untracked.length) {
-    console.log(`  untracked package-path files left in place: ${plan.untracked.length}`);
-  }
+  await withTargetInstallLock(targetRoot, options.dryRun, async () => {
+    const manifest = readManifest(targetRoot);
+    console.log(`${options.dryRun ? 'Would uninstall' : 'Uninstalling'} ${runtime} from ${targetRoot}`);
+    if (!manifest) {
+      console.log('  no install manifest found');
+      removeHookRegistrations(layout, options.dryRun);
+      return;
+    }
+    const desired = desiredFilesForUninstall(layout, manifest.hooks_mode || options.hookMode);
+    const plan = planUninstall(targetRoot, manifest, desired);
+    console.log(`  managed removals: ${plan.removals.length}`);
+    if (plan.backups.length) {
+      console.log(`  backups: ${plan.backups.length}`);
+    }
+    if (plan.untracked.length) {
+      console.log(`  untracked package-path files left in place: ${plan.untracked.length}`);
+    }
 
-  const result = applyUninstall(targetRoot, plan, options.dryRun);
-  if (!options.dryRun) {
-    removeHookRegistrations(layout, false);
-  }
-  if (result?.backupRoot) {
-    console.log(`  backed up modified files to ${result.backupRoot}`);
-  }
+    const result = applyUninstall(targetRoot, plan, options.dryRun);
+    if (!options.dryRun) {
+      removeHookRegistrations(layout, false);
+    }
+    if (result?.backupRoot) {
+      console.log(`  backed up modified files to ${result.backupRoot}`);
+    }
+  });
 }
 
 async function main() {
   const argv = process.argv.slice(2);
   if (argv[0] === 'init') {
     runInit(argv.slice(1));
+    return;
+  }
+  if (argv[0] === 'doctor') {
+    runDoctor(argv.slice(1));
     return;
   }
   const options = await resolveInteractiveOptions(parseArgs(argv));
@@ -320,7 +485,7 @@ async function main() {
   validateRuntimeOptions(options);
   for (const runtime of options.runtimes) {
     if (options.uninstall) {
-      uninstallRuntime(runtime, options);
+      await uninstallRuntime(runtime, options);
     } else {
       await installRuntime(runtime, options);
     }

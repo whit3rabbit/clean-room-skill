@@ -1,0 +1,249 @@
+{
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "kind",
+      "mode",
+      "timestamp",
+      "count",
+      "tag",
+      "items",
+      "choice"
+    ],
+    "properties": {
+      "kind": {
+        "const": "parity"
+      },
+      "mode": {
+        "enum": [
+          "fast",
+          "slow"
+        ]
+      },
+      "timestamp": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "count": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 3
+      },
+      "tag": {
+        "type": "string",
+        "minLength": 2,
+        "pattern": "^[a-z]+$"
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 2,
+        "items": {
+          "$ref": "#/$defs/item"
+        }
+      },
+      "choice": {
+        "oneOf": [
+          {
+            "type": "string",
+            "pattern": "^s:"
+          },
+          {
+            "type": "integer",
+            "minimum": 10
+          }
+        ]
+      }
+    },
+    "$defs": {
+      "item": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "valid",
+      "valid": true,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 2,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "const",
+      "valid": false,
+      "instance": {
+        "kind": "wrong",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 2,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "enum",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "medium",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 2,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "format",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "not-a-date",
+        "count": 2,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "additionalProperties",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 2,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": "s:value",
+        "extra": true
+      }
+    },
+    {
+      "name": "minimum",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 0,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "maximum",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 4,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "pattern",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 2,
+        "tag": "Alpha1",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "nested-ref-array",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 2,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": ""
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "oneOf",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 2,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "one"
+          }
+        ],
+        "choice": 5
+      }
+    }
+  ]
+}

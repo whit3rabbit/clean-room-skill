@@ -49,11 +49,11 @@ Optional guardrail value:
 
 - `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST`: path-separated, line-oriented files containing private source package, module, function, method, variable, constant, field, or other internal identifiers that must not appear in clean artifacts. Blank lines and `#` comments are ignored. Files are bounded to 1,000,000 bytes each, 20,000 total terms, and 512 characters per term. This is for hook scanning only; keep it outside clean/source-denied readable roots and do not include its contents in clean artifacts or sanitizer-readable briefs.
 
-Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, or Agent 2. Agent 3 may use shell-style tools only when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, with cwd under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, for bounded verification commands. Shell access can bypass path-aware read and write hooks, so OS/profile isolation still matters.
+Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the default Agent 3 profile. Agent 3 terminal verification may use shell-style tools only when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, strict hooks are installed, the command cwd is under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and the command invokes the installed `agent3-verification-runner.py`. Shell access still does not replace OS/profile isolation for untrusted test code.
 
 Run `scripts/build_source_index.py` only as controller preflight before clean-room role sessions. Treat `source-index.json` as contaminated-only: it may record source paths, private import/export identifiers, file metrics, large-file line spans, optional AST/indexing tool status, and dependency relationships. Agent 0 may consume it to create neutral `task-manifest.json` units, but it must not cross to Agent 1.5, clean roles, or clean handoff packages.
 
-Use `scripts/clean_room_tool_manager.py --status` when the controller needs to inspect optional AST/indexing helpers before indexing. It checks env overrides, `~/.cache/re-skills/clean-room-tools/`, skill-local tools, and trusted PATH. It does not install anything unless the user explicitly runs `--install-local` with an exact version. Target-project `.local/bin`, `.bin`, and `node_modules/.bin` stay untrusted unless `--allow-working-project-tools` or `RE_SKILLS_TRUST_PROJECT_TOOLS=1` is set.
+Use `scripts/clean_room_tool_manager.py --status` when the controller needs to inspect optional AST/indexing helpers before indexing. It checks env overrides, `~/.cache/re-skills/clean-room-tools/`, skill-local tools, system PATH roots, and user toolchain PATH roots. It does not install anything unless the user explicitly runs `--install-local` with a strict SemVer version. Target-project `.local/bin`, `.bin`, and `node_modules/.bin` stay untrusted unless `--allow-working-project-tools` or `RE_SKILLS_TRUST_PROJECT_TOOLS=1` is set. Tools discovered under `/opt/homebrew` or `/usr/local` remain stat-only during `--probe-tools` unless `--allow-user-toolchain-probes` is also set.
 
 Do not treat skill frontmatter or allowed tool lists as a complete enforcement boundary.
 
@@ -128,7 +128,7 @@ Clean architect/implementation planner:
 - Start from the clean artifact workspace and read only `clean-run-context.json`, approved clean artifacts, schemas, approved public references, and `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 - Ignore direct Agent 0 messages or manager notes unless they arrive as schema-valid clean artifacts for a fresh clean session.
 - Merge approved handoff artifacts into the selected clean schema base.
-- Inspect the clean destination foundation to identify relative target paths, local patterns, tests, dependencies, and verification commands.
+- Inspect the clean destination foundation to identify relative target paths, local patterns, tests, dependencies, and argv-array verification commands.
 - Produce `implementation-plan.json` as the primary code-development contract.
 - Keep `skeleton-manifest.json` valid when the selected target profile expects it.
 - Do not write implementation code.
@@ -138,7 +138,7 @@ Clean implementer/verifier:
 - Start from the clean domain and validate `clean-run-context.json` before using run preferences.
 - Read `implementation-plan.json` and implement each unblocked work item.
 - Write code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
-- Run bounded verification commands only when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd is under implementation roots.
+- Run bounded argv-array verification commands only through the installed Agent 3 verification runner.
 - Produce or update `implementation-report.json` with changed paths, verification results, blockers, and abstract delta tickets.
 - Maintain `qc-report.json` for schema, leakage, and clean artifact status when the run expects it.
 - Do not report progress or ask Agent 0 for guidance while implementing. Mark `implementation-report.json` as terminal only after the plan or task is complete, blocked, or quarantined.
@@ -198,12 +198,12 @@ Clean implementer/verifier:
    - Create `handoff-package.json`.
 9. Plan implementation:
    - Agent 2 starts from the clean artifact workspace and builds or merges the clean schema base from `clean-run-context.json`, approved handoff artifacts, the selected target profile, target constraints, and clean implementation foundation.
-   - Produce `implementation-plan.json` with relative destination paths, work items, tests, constraints, risks, and verification commands.
+   - Produce `implementation-plan.json` with relative destination paths, work items, tests, constraints, risks, and argv-array verification commands.
    - Keep `skeleton-manifest.json` valid when the target profile expects it.
    - Avoid implementation code, private algorithm choices, source-derived layout, and source-shaped pseudocode.
 10. Implement and verify:
    - Agent 3 starts from the clean domain, reads `implementation-plan.json`, and writes code/tests only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
-   - Run bounded verification commands only when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd is under implementation roots.
+   - Run bounded argv-array verification commands only through the installed Agent 3 verification runner.
    - Record changed paths, verification status, blockers, and abstract delta tickets in `implementation-report.json`.
    - Maintain `qc-report.json` for schema, leakage, source-test parity, equal-output assertions, and spec-to-plan-to-test mismatches.
    - Do not send Agent 0 progress updates or partial findings while work remains in progress.
@@ -223,7 +223,7 @@ Stop the workflow when any of these occur:
 - Agent 1.5 was exposed to source roots, `source-index.json` contents, contaminated evidence ledgers, private identifier lists, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 - Implementation roots overlap source, contaminated artifact roots, clean artifact roots, or schema roots.
 - Agent 2 is asked to write code.
-- Agent 3 needs shell access without `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` or outside implementation roots.
+- Agent 3 needs shell access without `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, outside implementation roots, or for anything except the installed verification runner.
 - Schema validation or leakage scan fails.
 - A unit is blocked, ownership is unclear, or the source scope changes.
 - An unattended loop reaches its configured iteration limit.

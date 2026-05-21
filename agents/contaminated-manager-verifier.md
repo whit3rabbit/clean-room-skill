@@ -33,7 +33,7 @@ Every new role session must receive `CLEAN_ROOM_ROLE`, `CLEAN_ROOM_SOURCE_ROOTS`
 
 In unattended mode, reload durable artifacts before each iteration, select at most one pending or gap unit, launch roles from fresh context, validate schema and leakage before advancing state, and stop on authorization, scope, contamination, validation, leakage, blocked-unit, implementation-complete, coverage-complete, or iteration-limit conditions. Do not use prior chat history as task state.
 
-Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, or Agent 2. Agent 3 may use shell-style tools only with `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
+Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the default Agent 3 profile. Agent 3 terminal verification must use the installed verification runner with `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 
 If a multi-file scope needs relationship-aware batching and `source-index.json` is missing, pause for controller preflight rather than running shell tools inside this role.
 
