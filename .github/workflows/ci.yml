@@ -49,6 +49,7 @@ jobs:
           node --check bin/install.js
           node --check lib/fs-utils.cjs
           node --check lib/hooks.cjs
+          node --check lib/runtime-layout.cjs
 
       - name: Run installer tests
         run: npm test
@@ -77,6 +78,12 @@ jobs:
 
       - name: Run full JSON Schema validation
         run: python3 tests/validate_jsonschema.py
+
+      - name: Validate handoff integrity fixture
+        run: |
+          printf '{"tool_input":{"file_path":"%s"}}' "$PWD/skills/clean-room/examples/valid-handoff-package/handoff-package.json" \
+            | CLEAN_ROOM_CLEAN_ROOTS="$PWD/skills/clean-room/examples/valid-handoff-package" \
+              python3 hooks/validate-handoff-package.py
 
       - name: Run example leakage checks
         run: |

@@ -34,14 +34,15 @@ function mkdirs(...dirs) {
   }
 }
 
-function policyEnv(root) {
+function policyEnv(root, role) {
+  assert.equal(typeof role, 'string');
   const source = path.join(root, 'source');
   const contaminated = path.join(root, 'contaminated');
   const clean = path.join(root, 'clean');
   const allowed = path.join(root, 'allowed');
   mkdirs(source, contaminated, clean, allowed);
   return {
-    CLEAN_ROOM_ROLE: 'clean-architect',
+    CLEAN_ROOM_ROLE: role,
     CLEAN_ROOM_SOURCE_ROOTS: source,
     CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
     CLEAN_ROOM_CLEAN_ROOTS: clean,
@@ -108,9 +109,45 @@ describe('clean-room hook policy', () => {
     assert.match(result.stderr, /source roots and clean roots must be separate/);
   });
 
+  test('environment preflight rejects schema directory overlap with role roots', () => {
+    const root = tempDir('clean-room-schema-overlap');
+    const source = path.join(root, 'source');
+    const contaminated = path.join(root, 'contaminated');
+    const clean = path.join(root, 'clean');
+    const allowed = path.join(root, 'allowed');
+    const schemaDir = path.join(clean, 'schemas');
+    mkdirs(source, contaminated, schemaDir, allowed);
+
+    const result = spawnSync('python3', [path.join(HOOKS, 'require-clean-room-env.py')], {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        CLEAN_ROOM_ROLE: 'clean-architect',
+        CLEAN_ROOM_SOURCE_ROOTS: source,
+        CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
+        CLEAN_ROOM_CLEAN_ROOTS: clean,
+        CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
+        CLEAN_ROOM_SCHEMA_DIR: schemaDir,
+      },
+      encoding: 'utf8',
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /schema directory must be separate from clean roots/);
+  });
+
+  test('shell policy directly blocks clean-room role sessions', () => {
+    const root = tempDir('clean-room-shell-deny');
+    const env = policyEnv(root, 'clean-architect');
+
+    const result = runHook('deny-clean-room-shell.py', {}, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /denied shell tool use/);
+  });
+
   test('post-write schema hook handles supported payload path variants and fails closed on bad payloads', () => {
     const root = tempDir('clean-room-payloads');
-    const env = policyEnv(root);
+    const env = policyEnv(root, 'clean-architect');
     const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
     const behavior = copyExample('behavior-spec.json', clean);
     const report = copyExample('qc-report.json', clean);
@@ -136,9 +173,118 @@ describe('clean-room hook policy', () => {
     assert.match(result.stderr, /malformed hook JSON payload/);
   });
 
+  test('hook payload reader rejects oversized stdin', () => {
+    const root = tempDir('clean-room-large-payload');
+    const env = policyEnv(root, 'clean-architect');
+    const oversized = 'x'.repeat(10 * 1024 * 1024 + 1);
+
+    const result = runHook('validate-json-schema.py', oversized, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /hook payload exceeds 10485760 bytes/);
+  });
+
+  test('hook path extraction rejects excessive nesting', () => {
+    const root = tempDir('clean-room-deep-payload');
+    const env = policyEnv(root, 'clean-architect');
+    let nested = { file_path: path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'behavior-spec.json') };
+    for (let index = 0; index < 50; index += 1) {
+      nested = { outputs: [nested] };
+    }
+
+    const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: nested }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /path extraction exceeded depth/);
+  });
+
+  test('schema hook applies if then else branches', () => {
+    const root = tempDir('clean-room-if-then-else');
+    const env = policyEnv(root, 'clean-architect');
+    const schemaDir = path.join(root, 'schemas');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    fs.writeFileSync(path.join(schemaDir, 'task-manifest.schema.json'), JSON.stringify({
+      type: 'object',
+      additionalProperties: false,
+      required: ['mode'],
+      properties: {
+        mode: { enum: ['then', 'else'] },
+        then_value: { type: 'string' },
+        else_value: { type: 'string' },
+      },
+      if: {
+        properties: {
+          mode: { const: 'then' },
+        },
+        required: ['mode'],
+      },
+      then: {
+        required: ['then_value'],
+      },
+      else: {
+        required: ['else_value'],
+      },
+    }));
+    const artifact = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'task-manifest.json');
+    const schemaEnv = { ...env, CLEAN_ROOM_SCHEMA_DIR: schemaDir };
+
+    fs.writeFileSync(artifact, JSON.stringify({ mode: 'then', then_value: 'ok' }));
+    let result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
+    assert.equal(result.status, 0, result.stderr);
+
+    fs.writeFileSync(artifact, JSON.stringify({ mode: 'then' }));
+    result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /missing required field 'then_value'/);
+
+    fs.writeFileSync(artifact, JSON.stringify({ mode: 'else' }));
+    result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /missing required field 'else_value'/);
+  });
+
+  test('schema hook enforces anyOf and oneOf branches', () => {
+    const root = tempDir('clean-room-combinators');
+    const env = policyEnv(root, 'clean-architect');
+    const schemaDir = path.join(root, 'schemas');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    fs.writeFileSync(path.join(schemaDir, 'task-manifest.schema.json'), JSON.stringify({
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        any_value: {
+          anyOf: [
+            { type: 'string', minLength: 1 },
+            { type: 'integer', minimum: 1 },
+          ],
+        },
+        one_value: {
+          oneOf: [
+            { type: 'integer', minimum: 1 },
+            { type: 'number', minimum: 1 },
+          ],
+        },
+      },
+    }));
+    const artifact = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'task-manifest.json');
+    const schemaEnv = { ...env, CLEAN_ROOM_SCHEMA_DIR: schemaDir };
+
+    fs.writeFileSync(artifact, JSON.stringify({ any_value: 'ok', one_value: 1.5 }));
+    let result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
+    assert.equal(result.status, 0, result.stderr);
+
+    fs.writeFileSync(artifact, JSON.stringify({ any_value: false }));
+    result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /expected at least one matching anyOf schema/);
+
+    fs.writeFileSync(artifact, JSON.stringify({ one_value: 1 }));
+    result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /expected exactly one matching oneOf schema/);
+  });
+
   test('read policy resolves relative payload paths against tool cwd', () => {
     const root = tempDir('clean-room-read-cwd');
-    const env = policyEnv(root);
+    const env = policyEnv(root, 'clean-architect');
     const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
     const source = env.CLEAN_ROOM_SOURCE_ROOTS;
     copyExample('qc-report.json', clean);
@@ -163,11 +309,24 @@ describe('clean-room hook policy', () => {
     }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /reading source path/);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Glob',
+      tool_input: { cwd: clean, pattern: '*.json' },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { cwd: clean },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /read with no resolved path/);
   });
 
   test('write policy resolves relative payload paths against tool cwd', () => {
     const root = tempDir('clean-room-write-cwd');
-    const env = policyEnv(root);
+    const env = policyEnv(root, 'clean-architect');
     const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
     const source = env.CLEAN_ROOM_SOURCE_ROOTS;
     const contaminated = env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS;
@@ -206,11 +365,17 @@ describe('clean-room hook policy', () => {
     }, contaminatedEnv);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /writing clean path/);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'NotebookEdit',
+      tool_input: { content: 'no file path in this payload' },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
   });
 
   test('clean-root JSON artifacts must be recognized or explicitly allowlisted', () => {
     const root = tempDir('clean-room-unknown-json');
-    const env = policyEnv(root);
+    const env = policyEnv(root, 'clean-architect');
     const unknown = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'behavior_specs.json');
     fs.writeFileSync(unknown, JSON.stringify({ note: 'not a canonical artifact' }));
 
@@ -219,9 +384,23 @@ describe('clean-room hook policy', () => {
     assert.match(result.stderr, /unrecognized clean JSON artifact/);
   });
 
+  test('auxiliary JSON allowlist entries must stay under clean roots', () => {
+    const root = tempDir('clean-room-aux-allowlist');
+    const env = policyEnv(root, 'clean-architect');
+    const outside = path.join(root, 'outside.json');
+    fs.writeFileSync(outside, JSON.stringify({ note: 'outside clean root' }));
+
+    const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: outside } }, {
+      ...env,
+      CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST: outside,
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST path is outside CLEAN_ROOM_CLEAN_ROOTS/);
+  });
+
   test('source-index JSON is rejected under clean roots', () => {
     const root = tempDir('clean-room-source-index-clean');
-    const env = policyEnv(root);
+    const env = policyEnv(root, 'clean-architect');
     const sourceIndex = copyExample('source-index.json', env.CLEAN_ROOM_CLEAN_ROOTS);
 
     const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: sourceIndex } }, env);
@@ -231,7 +410,7 @@ describe('clean-room hook policy', () => {
 
   test('handoff integrity verifies referenced artifact path and sha256', () => {
     const root = tempDir('clean-room-handoff');
-    const env = policyEnv(root);
+    const env = policyEnv(root, 'clean-architect');
     const behavior = copyExample('behavior-spec.json', env.CLEAN_ROOM_CLEAN_ROOTS);
     const handoff = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'handoff-package.json');
     fs.writeFileSync(handoff, JSON.stringify({
@@ -265,6 +444,12 @@ describe('clean-room hook policy', () => {
     result = runHook('validate-handoff-package.py', { tool_name: 'Write', tool_input: { file_path: handoff } }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /sha256 mismatch/);
+
+    delete packageData.artifacts[0].sha256;
+    fs.writeFileSync(handoff, JSON.stringify(packageData));
+    result = runHook('validate-handoff-package.py', { tool_name: 'Write', tool_input: { file_path: handoff } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /artifact sha256 must be a 64-character hex string/);
   });
 
   test('source-index builder refuses output outside contaminated artifact roots', () => {
@@ -290,6 +475,71 @@ describe('clean-room hook policy', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /--output must be under a contaminated artifact root/);
     assert.equal(fs.existsSync(outside), false);
+  });
+
+  test('source-index resolves package-relative Python imports to the package base', () => {
+    const root = tempDir('clean-room-python-relative-import');
+    const source = path.join(root, 'source');
+    const packageDir = path.join(source, 'pkg');
+    const contaminated = path.join(root, 'contaminated');
+    mkdirs(packageDir, contaminated);
+    fs.writeFileSync(path.join(packageDir, '__init__.py'), '');
+    fs.writeFileSync(path.join(packageDir, 'foo.py'), '');
+    fs.writeFileSync(path.join(packageDir, 'bar.py'), '');
+    fs.writeFileSync(path.join(packageDir, 'main.py'), 'from . import foo, bar\n');
+    const output = path.join(contaminated, 'source-index.json');
+
+    const result = spawnSync('python3', [
+      SOURCE_INDEX,
+      '--source-root', source,
+      '--output', output,
+      '--task-id', 'task-test',
+      '--skip-tool-detection',
+    ], {
+      cwd: ROOT,
+      env: { ...process.env, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const index = JSON.parse(fs.readFileSync(output, 'utf8'));
+    const files = new Map(index.files.map((file) => [file.file_id, file.path]));
+    const relationship = index.relationships.find((item) => item.specifier === '.');
+    assert.equal(files.get(relationship.to_file_id), 'pkg/__init__.py');
+  });
+
+  test('source-index C# scanner ignores local constructor calls', () => {
+    const root = tempDir('clean-room-csharp-scanner');
+    const source = path.join(root, 'source');
+    const contaminated = path.join(root, 'contaminated');
+    mkdirs(source, contaminated);
+    fs.writeFileSync(path.join(source, 'Example.cs'), [
+      'class Example {',
+      '  void Helper() {',
+      '    new Foo();',
+      '  }',
+      '  public void RealMethod() {',
+      '  }',
+      '}',
+      '',
+    ].join('\n'));
+    const output = path.join(contaminated, 'source-index.json');
+
+    const result = spawnSync('python3', [
+      SOURCE_INDEX,
+      '--source-root', source,
+      '--output', output,
+      '--task-id', 'task-test',
+      '--skip-tool-detection',
+    ], {
+      cwd: ROOT,
+      env: { ...process.env, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const index = JSON.parse(fs.readFileSync(output, 'utf8'));
+    const names = index.files.flatMap((file) => file.exports.map((item) => item.name));
+    assert.equal(names.includes('RealMethod'), true);
+    assert.equal(names.includes('Foo'), false);
   });
 
   test('tool status and source-index dependency reports do not execute tools by default', () => {
@@ -327,7 +577,7 @@ describe('clean-room hook policy', () => {
 
   test('leakage scanner catches private denylist terms in path-like and free-text fields', () => {
     const root = tempDir('clean-room-leakage-keys');
-    const env = policyEnv(root);
+    const env = policyEnv(root, 'clean-architect');
     const denylist = path.join(root, 'private-identifiers.txt');
     fs.writeFileSync(denylist, 'private.module.secret\n');
 
@@ -353,11 +603,28 @@ describe('clean-room hook policy', () => {
 
   test('leakage scanner keeps path fields denylist-only to avoid path-shaped false positives', () => {
     const root = tempDir('clean-room-leakage-negative');
-    const env = policyEnv(root);
+    const env = policyEnv(root, 'clean-architect');
     const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'path-field.json');
     fs.writeFileSync(filePath, JSON.stringify({ path: 'specs/com.example.product/spec.md' }));
 
     const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
     assert.equal(result.status, 0, result.stderr);
+  });
+
+  test('leakage scanner uses only the leaf key for denylist-only string classification', () => {
+    const root = tempDir('clean-room-leakage-leaf-key');
+    const env = policyEnv(root, 'clean-architect');
+    const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'nested-artifact-summary.json');
+    fs.writeFileSync(filePath, JSON.stringify({
+      artifacts: [
+        {
+          summary: 'Call private.module.name.doThing() after setup.',
+        },
+      ],
+    }));
+
+    const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /package_or_module_identifier|source_like_call|source_like_scoped_identifier/);
   });
 });

@@ -26,6 +26,8 @@ SCHEMA_BY_ARTIFACT = {
     "contamination-incident": "contamination-incident.schema.json",
 }
 CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV = "CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST"
+MAX_REPORTED_ERRORS = 20
+MAX_VALIDATION_ERRORS = MAX_REPORTED_ERRORS + 1
 
 
 def schema_dir() -> Path:
@@ -75,6 +77,9 @@ def auxiliary_json_allowed(path: Path) -> tuple[bool, list[str]]:
             allowed = Path(item).expanduser().resolve()
         except OSError as exc:
             errors.append(f"{CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV} has invalid path {item!r}: {exc}")
+            continue
+        if not path_under_env(allowed, "CLEAN_ROOM_CLEAN_ROOTS"):
+            errors.append(f"{CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV} path is outside CLEAN_ROOM_CLEAN_ROOTS: {allowed}")
             continue
         if path == allowed:
             return True, errors
@@ -128,13 +133,57 @@ def valid_date_time(value: str) -> bool:
     return True
 
 
+def add_error(errors: list[str], message: str) -> None:
+    if len(errors) < MAX_VALIDATION_ERRORS:
+        errors.append(message)
+
+
+def extend_errors(errors: list[str], new_errors: list[str]) -> None:
+    remaining = MAX_VALIDATION_ERRORS - len(errors)
+    if remaining > 0:
+        errors.extend(new_errors[:remaining])
+
+
+def error_limit_reached(errors: list[str]) -> bool:
+    return len(errors) >= MAX_VALIDATION_ERRORS
+
+
+def validate_combinator(
+    value: Any,
+    schema: dict,
+    root_schema: dict,
+    path: tuple[str | int, ...],
+    keyword: str,
+    require_exactly_one: bool,
+) -> list[str]:
+    errors: list[str] = []
+    subschemas = schema.get(keyword)
+    if not isinstance(subschemas, list):
+        return errors
+    valid_count = 0
+    for index, subschema in enumerate(subschemas):
+        if not isinstance(subschema, dict):
+            add_error(errors, f"{path_label(path)}: {keyword}[{index}] is not a schema object")
+            continue
+        if not validate_value(value, subschema, root_schema, path):
+            valid_count += 1
+    if require_exactly_one:
+        if valid_count != 1:
+            add_error(errors, f"{path_label(path)}: expected exactly one matching oneOf schema")
+    elif valid_count == 0:
+        add_error(errors, f"{path_label(path)}: expected at least one matching anyOf schema")
+    return errors
+
+
 def validate_value(value: Any, schema: dict, root_schema: dict, path: tuple[str | int, ...] = ()) -> list[str]:
     errors: list[str] = []
     if "$ref" in schema:
         try:
-            errors.extend(validate_value(value, resolve_ref(root_schema, schema["$ref"]), root_schema, path))
+            extend_errors(errors, validate_value(value, resolve_ref(root_schema, schema["$ref"]), root_schema, path))
         except ValueError as exc:
-            errors.append(f"{path_label(path)}: {exc}")
+            add_error(errors, f"{path_label(path)}: {exc}")
+            return errors
+        if error_limit_reached(errors):
             return errors
         schema = {key: item for key, item in schema.items() if key != "$ref"}
         if not schema:
@@ -144,27 +193,41 @@ def validate_value(value: Any, schema: dict, root_schema: dict, path: tuple[str 
     if isinstance(all_of, list):
         for index, subschema in enumerate(all_of):
             if isinstance(subschema, dict):
-                errors.extend(validate_value(value, subschema, root_schema, path))
+                extend_errors(errors, validate_value(value, subschema, root_schema, path))
             else:
-                errors.append(f"{path_label(path)}: allOf[{index}] is not a schema object")
+                add_error(errors, f"{path_label(path)}: allOf[{index}] is not a schema object")
+            if error_limit_reached(errors):
+                return errors
+
+    extend_errors(errors, validate_combinator(value, schema, root_schema, path, "anyOf", False))
+    if error_limit_reached(errors):
+        return errors
+    extend_errors(errors, validate_combinator(value, schema, root_schema, path, "oneOf", True))
+    if error_limit_reached(errors):
+        return errors
 
     if_schema = schema.get("if")
-    if isinstance(if_schema, dict) and not validate_value(value, if_schema, root_schema, path):
-        then_schema = schema.get("then")
-        if isinstance(then_schema, dict):
-            errors.extend(validate_value(value, then_schema, root_schema, path))
+    if isinstance(if_schema, dict):
+        if_errors = validate_value(value, if_schema, root_schema, path)
+        branch_schema = schema.get("then") if not if_errors else schema.get("else")
+        if isinstance(branch_schema, dict):
+            extend_errors(errors, validate_value(value, branch_schema, root_schema, path))
+            if error_limit_reached(errors):
+                return errors
 
     if "const" in schema and value != schema["const"]:
-        errors.append(f"{path_label(path)}: expected const {schema['const']!r}")
+        add_error(errors, f"{path_label(path)}: expected const {schema['const']!r}")
     if "enum" in schema and value not in schema["enum"]:
-        errors.append(f"{path_label(path)}: expected one of {schema['enum']!r}")
+        add_error(errors, f"{path_label(path)}: expected one of {schema['enum']!r}")
+    if error_limit_reached(errors):
+        return errors
 
     expected_type = schema.get("type")
     if isinstance(expected_type, str) and not type_matches(value, expected_type):
-        errors.append(f"{path_label(path)}: expected {expected_type}")
+        add_error(errors, f"{path_label(path)}: expected {expected_type}")
         return errors
     if isinstance(expected_type, list) and not any(type_matches(value, item) for item in expected_type):
-        errors.append(f"{path_label(path)}: expected one of types {expected_type!r}")
+        add_error(errors, f"{path_label(path)}: expected one of types {expected_type!r}")
         return errors
 
     if isinstance(value, dict):
@@ -172,54 +235,68 @@ def validate_value(value: Any, schema: dict, root_schema: dict, path: tuple[str 
         if isinstance(required, list):
             for field in required:
                 if isinstance(field, str) and field not in value:
-                    errors.append(f"{path_label(path)}: missing required field {field!r}")
+                    add_error(errors, f"{path_label(path)}: missing required field {field!r}")
+                    if error_limit_reached(errors):
+                        return errors
 
         properties = schema.get("properties", {})
         if isinstance(properties, dict):
             for field, field_schema in properties.items():
                 if field in value and isinstance(field_schema, dict):
-                    errors.extend(validate_value(value[field], field_schema, root_schema, path + (field,)))
+                    extend_errors(errors, validate_value(value[field], field_schema, root_schema, path + (field,)))
+                    if error_limit_reached(errors):
+                        return errors
             if schema.get("additionalProperties") is False:
                 for field in sorted(set(value) - set(properties)):
-                    errors.append(f"{path_label(path + (field,))}: additional property is not allowed")
+                    add_error(errors, f"{path_label(path + (field,))}: additional property is not allowed")
+                    if error_limit_reached(errors):
+                        return errors
 
     if isinstance(value, list):
         min_items = schema.get("minItems")
         if isinstance(min_items, int) and len(value) < min_items:
-            errors.append(f"{path_label(path)}: fewer than minItems {min_items}")
+            add_error(errors, f"{path_label(path)}: fewer than minItems {min_items}")
         max_items = schema.get("maxItems")
         if isinstance(max_items, int) and len(value) > max_items:
-            errors.append(f"{path_label(path)}: more than maxItems {max_items}")
+            add_error(errors, f"{path_label(path)}: more than maxItems {max_items}")
+        if error_limit_reached(errors):
+            return errors
         if schema.get("uniqueItems") is True:
             seen: set[str] = set()
             for item in value:
                 marker = json.dumps(item, sort_keys=True, separators=(",", ":"))
                 if marker in seen:
-                    errors.append(f"{path_label(path)}: duplicate item violates uniqueItems")
+                    add_error(errors, f"{path_label(path)}: duplicate item violates uniqueItems")
                     break
                 seen.add(marker)
+            if error_limit_reached(errors):
+                return errors
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):
-                errors.extend(validate_value(item, item_schema, root_schema, path + (index,)))
+                extend_errors(errors, validate_value(item, item_schema, root_schema, path + (index,)))
+                if error_limit_reached(errors):
+                    return errors
 
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         minimum = schema.get("minimum")
         if isinstance(minimum, (int, float)) and value < minimum:
-            errors.append(f"{path_label(path)}: less than minimum {minimum}")
+            add_error(errors, f"{path_label(path)}: less than minimum {minimum}")
         maximum = schema.get("maximum")
         if isinstance(maximum, (int, float)) and value > maximum:
-            errors.append(f"{path_label(path)}: greater than maximum {maximum}")
+            add_error(errors, f"{path_label(path)}: greater than maximum {maximum}")
+        if error_limit_reached(errors):
+            return errors
 
     if isinstance(value, str):
         min_length = schema.get("minLength")
         if isinstance(min_length, int) and len(value) < min_length:
-            errors.append(f"{path_label(path)}: shorter than minLength {min_length}")
+            add_error(errors, f"{path_label(path)}: shorter than minLength {min_length}")
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and re.search(pattern, value) is None:
-            errors.append(f"{path_label(path)}: does not match pattern {pattern!r}")
+            add_error(errors, f"{path_label(path)}: does not match pattern {pattern!r}")
         if schema.get("format") == "date-time" and not valid_date_time(value):
-            errors.append(f"{path_label(path)}: invalid date-time")
+            add_error(errors, f"{path_label(path)}: invalid date-time")
 
     return errors
 
@@ -271,10 +348,10 @@ def main() -> int:
         errors = validate_value(data, schema, schema)
         if errors:
             print(f"clean-room schema check failed for {path}:", file=sys.stderr)
-            for error in errors[:20]:
+            for error in errors[:MAX_REPORTED_ERRORS]:
                 print(f"  {error}", file=sys.stderr)
-            if len(errors) > 20:
-                print(f"  ... {len(errors) - 20} more error(s)", file=sys.stderr)
+            if len(errors) > MAX_REPORTED_ERRORS:
+                print(f"  ... validation stopped after {MAX_REPORTED_ERRORS} error(s)", file=sys.stderr)
             return 1
     return 0
 

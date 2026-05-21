@@ -1,0 +1,11 @@
+{
+  "schema_kind": "evidence-ledger",
+  "base": "evidence-ledger.json",
+  "description": "Evidence ledgers must include entries.",
+  "remove": [
+    [
+      "entries"
+    ]
+  ],
+  "expected_error": "'entries' is a required property"
+}

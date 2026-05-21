@@ -68,9 +68,9 @@ Gather only the setup facts needed to decide whether the workflow may start:
 - Controller mode. If unspecified, use `attended`.
 - Run state. New runs use `generation: 1`, current `started_at`, and `restart_reason: user-requested`.
 
-Before indexing or artifact generation, confirm that source roots, contaminated artifact roots, and clean roots are separate paths. Stop if authorization is unclear, if the requested output includes replacement implementation code, or if clean and contaminated roots overlap.
+Before indexing or artifact generation, confirm that source roots, contaminated artifact roots, clean roots, and schema directory are separate paths. Stop if authorization is unclear, if the requested output includes replacement implementation code, or if clean and contaminated roots overlap.
 
-For `attended` mode, record a `controller_policy` that pauses for human review at scope gate, clean handoff, QC deltas, blocked units, and final coverage.
+For `attended` mode, record a `controller_policy` that pauses for human review at scope gate, clean handoff, QC deltas, blocked units, and final coverage. Include stop conditions for `authorization-missing`, `scope-change`, `contamination-suspected`, `schema-validation-failed`, `leakage-scan-failed`, `unit-blocked`, and `coverage-complete`; attended mode does not add an iteration-limit stop unless the user explicitly sets one.
 
 For `unattended` mode, require explicit authorization, separated roots, and finite bounds before work starts. Record `controller_policy.mode` as `unattended`, `max_units_per_iteration` as `1`, `max_iterations` as `10` unless the user supplied another finite value, and include these stop conditions: `authorization-missing`, `scope-change`, `contamination-suspected`, `schema-validation-failed`, `leakage-scan-failed`, `unit-blocked`, `coverage-complete`, and `iteration-limit-reached`.
 

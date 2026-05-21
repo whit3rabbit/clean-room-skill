@@ -12,6 +12,8 @@ from clean_room_paths import env_roots, load_payload, path_is_under, payload_cwd
 
 CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
 ADDITIONAL_CLEAN_READ_ROOTS = "CLEAN_ROOM_ALLOWED_READ_ROOTS"
+DIRECTORY_SCOPED_READ_TOOLS = {"glob", "grep"}
+PATH_REQUIRED_READ_TOOLS = {"read"}
 
 
 def append_path_value(paths: list[Path], value: str, base: Path) -> None:
@@ -35,8 +37,6 @@ def candidate_paths(payload: dict) -> list[Path]:
         value = tool_input.get(key) or payload.get(key)
         if isinstance(value, str):
             append_path_value(paths, value, base)
-    if isinstance(tool_input.get("cwd") or payload.get("cwd"), str):
-        paths.append(base)
     glob_value = tool_input.get("glob") or payload.get("glob")
     if isinstance(glob_value, str) and (glob_value.startswith(("/", "~")) or "/" in glob_value):
         append_path_value(paths, glob_value, base)
@@ -45,6 +45,8 @@ def candidate_paths(payload: dict) -> list[Path]:
         pattern_value.startswith(("/", "~")) or "/" in pattern_value
     ):
         append_path_value(paths, pattern_value, base)
+    if not paths and tool_name in DIRECTORY_SCOPED_READ_TOOLS:
+        paths.append(base)
     return paths
 
 
@@ -67,6 +69,9 @@ def main() -> int:
     allowed_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS") + env_roots(ADDITIONAL_CLEAN_READ_ROOTS)
     paths = candidate_paths(payload)
     if not paths:
+        tool = str(payload.get("tool_name") or payload.get("tool") or "").lower()
+        if tool and tool not in PATH_REQUIRED_READ_TOOLS:
+            return 0
         print(
             f"clean-room policy denied clean role {role} read with no resolved path",
             file=sys.stderr,

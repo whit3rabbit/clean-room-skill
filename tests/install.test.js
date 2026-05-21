@@ -2,72 +2,20 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
-const { afterEach, describe, test } = require('node:test');
+const { describe, test } = require('node:test');
 const { spawnSync } = require('node:child_process');
-
-const ROOT = path.resolve(__dirname, '..');
-const INSTALL = path.join(ROOT, 'bin', 'install.js');
-const HOOK = path.join(ROOT, 'hooks', 'clean-room-hook.py');
-const TMP_DIRS = [];
-
-function tempDir(name) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `${name}-`));
-  TMP_DIRS.push(dir);
-  return dir;
-}
-
-afterEach(() => {
-  while (TMP_DIRS.length > 0) {
-    fs.rmSync(TMP_DIRS.pop(), { recursive: true, force: true });
-  }
-});
-
-function runInstall(args, env = {}, cwd = ROOT) {
-  return spawnSync(process.execPath, [INSTALL, ...args], {
-    cwd,
-    env: { ...process.env, ...env },
-    encoding: 'utf8',
-  });
-}
-
-function readJson(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-}
-
-function hookTable(value) {
-  return value.hooks && typeof value.hooks === 'object' ? value.hooks : value;
-}
-
-function managedHookCount(value) {
-  const table = hookTable(value);
-  let count = 0;
-  for (const entries of Object.values(table)) {
-    if (!Array.isArray(entries)) continue;
-    for (const entry of entries) {
-      for (const hook of entry.hooks || []) {
-        if (typeof hook.command === 'string' && hook.command.includes('clean-room-hook.py')) {
-          count += 1;
-        }
-      }
-    }
-  }
-  return count;
-}
-
-function postWriteHookCommand(value) {
-  const entries = hookTable(value).PostToolUse || [];
-  for (const entry of entries) {
-    if (entry.matcher !== 'Write|Edit|MultiEdit') continue;
-    for (const hook of entry.hooks || []) {
-      if (typeof hook.command === 'string' && hook.command.includes('clean-room-hook.py')) {
-        return hook.command;
-      }
-    }
-  }
-  return null;
-}
+const {
+  assertManagedHookDetails,
+  HOOK,
+  hookTable,
+  managedHookCount,
+  postWriteHookCommand,
+  readJson,
+  ROOT,
+  runInstall,
+  tempDir,
+} = require('./helpers/install.cjs');
 
 describe('clean-room-skill installer', () => {
   test('installs Codex skills, agents, hooks, manifest, and preserves user hooks', () => {
@@ -97,7 +45,7 @@ describe('clean-room-skill installer', () => {
       ),
       true
     );
-    assert.equal(managedHookCount(hooksJson), 4);
+    assertManagedHookDetails(hooksJson);
     assert.match(postWriteHookCommand(hooksJson), /--check validate-handoff-package\.py/);
   });
 
@@ -127,7 +75,7 @@ describe('clean-room-skill installer', () => {
       ),
       true
     );
-    assert.equal(managedHookCount(settings), 4);
+    assertManagedHookDetails(settings);
     assert.match(postWriteHookCommand(settings), /--check validate-handoff-package\.py/);
   });
 
@@ -154,7 +102,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(cwd, '.agents', 'plugins', 'clean-room', 'skills', 'clean-room', 'SKILL.md')));
   });
 
-  test('installs all supported runtimes locally', () => {
+  test('installs all known runtime layouts locally', () => {
     const cwd = tempDir('clean-room-all-local');
     const result = runInstall(['--all', '--local', '--yes'], {}, cwd);
     assert.equal(result.status, 0, result.stderr);
@@ -165,7 +113,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(cwd, '.agents', 'plugins', 'clean-room', 'skills', 'clean-room', 'SKILL.md')));
   });
 
-  test('installs all documented runtimes', () => {
+  test('installs all documented runtime layouts', () => {
     const root = tempDir('clean-room-all');
     const codexHome = path.join(root, 'codex');
     const claudeHome = path.join(root, 'claude');
@@ -212,7 +160,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(augmentHome, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(traeHome, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(qwenHome, 'skills', 'clean-room', 'SKILL.md')));
-    assert.ok(fs.existsSync(path.join(hermesHome, 'skills', 'clean-room', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(hermesHome, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(codebuddyHome, 'skills', 'clean-room', 'SKILL.md')));
   });
 
@@ -329,6 +277,26 @@ describe('clean-room-skill installer', () => {
       ),
       true
     );
+  });
+
+  test('uninstall warns about untracked package-path files without deleting them', () => {
+    const cursorHome = tempDir('clean-room-uninstall-untracked');
+    let result = runInstall(['--cursor', '--global', '--yes'], { CURSOR_CONFIG_DIR: cursorHome });
+    assert.equal(result.status, 0, result.stderr);
+
+    const manifestPath = path.join(cursorHome, 'clean-room-install-manifest.json');
+    const manifest = readJson(manifestPath);
+    delete manifest.files['skills/attended/SKILL.md'];
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+    const untracked = path.join(cursorHome, 'skills', 'attended', 'SKILL.md');
+    assert.equal(fs.existsSync(untracked), true);
+    result = runInstall(['--cursor', '--global', '--yes', '--uninstall'], {
+      CURSOR_CONFIG_DIR: cursorHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /untracked package-path files left in place: 1/);
+    assert.equal(fs.existsSync(untracked), true);
   });
 
   test('uninstall backs up modified managed files before removal', () => {

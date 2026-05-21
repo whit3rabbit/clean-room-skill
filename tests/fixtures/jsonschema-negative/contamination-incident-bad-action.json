@@ -1,0 +1,14 @@
+{
+  "schema_kind": "contamination-incident",
+  "base": "contamination-incident.json",
+  "description": "Contamination incident actions must be one of the declared responses.",
+  "set": [
+    {
+      "path": [
+        "action"
+      ],
+      "value": "ignored"
+    }
+  ],
+  "expected_error": "'ignored' is not one of"
+}

@@ -160,6 +160,10 @@ def private_identifier_pattern(term: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![\w.]){escaped}(?![\w-]|\.[A-Za-z_])")
 
 
+def compile_private_identifier_terms(private_terms: list[str]) -> list[tuple[str, re.Pattern[str]]]:
+    return [(term, private_identifier_pattern(term)) for term in private_terms]
+
+
 def public_names(value: object, path: tuple[str | int, ...] = ()) -> set[str]:
     names: set[str] = set()
     if isinstance(value, dict):
@@ -212,12 +216,11 @@ def json_scan_strings(
             light_scan.extend(child_light)
             denylist_scan.extend(child_denylist)
     elif isinstance(value, str):
-        keys = {item for item in path if isinstance(item, str)}
         leaf_key = next((item for item in reversed(path) if isinstance(item, str)), None)
         if leaf_key in NEVER_SCAN_JSON_STRING_KEYS:
             return full_scan, light_scan, denylist_scan
         stripped = strip_allowed_text(value, allowed_names)
-        if keys & DENYLIST_ONLY_JSON_STRING_KEYS:
+        if leaf_key in DENYLIST_ONLY_JSON_STRING_KEYS:
             denylist_scan.append(stripped)
         elif leaf_key in SCAN_LIGHT_JSON_STRING_KEYS:
             light_scan.append(stripped)
@@ -226,11 +229,11 @@ def json_scan_strings(
     return full_scan, light_scan, denylist_scan
 
 
-def scan_private_identifier_denylist(texts: list[str], private_terms: list[str]) -> list[str]:
+def scan_private_identifier_denylist(texts: list[str], private_patterns: list[tuple[str, re.Pattern[str]]]) -> list[str]:
     findings: set[str] = set()
     for text in texts:
-        for term in private_terms:
-            if private_identifier_pattern(term).search(text):
+        for _term, pattern in private_patterns:
+            if pattern.search(text):
                 findings.add("private_identifier_denylist")
                 break
     return sorted(findings)
@@ -238,14 +241,14 @@ def scan_private_identifier_denylist(texts: list[str], private_terms: list[str])
 
 def scan_identifier_patterns(
     texts: list[str],
-    private_terms: list[str],
+    private_patterns: list[tuple[str, re.Pattern[str]]],
     skipped_patterns: set[str] | None = None,
 ) -> list[str]:
     findings: set[str] = set()
     skipped_patterns = skipped_patterns or set()
     for text in texts:
-        for term in private_terms:
-            if private_identifier_pattern(term).search(text):
+        for _term, pattern in private_patterns:
+            if pattern.search(text):
                 findings.add("private_identifier_denylist")
                 break
         for name, pattern in IDENTIFIER_PATTERNS.items():
@@ -282,6 +285,7 @@ def main() -> int:
         for error in load_errors:
             print(f"clean-room leakage scan failed: {error}", file=sys.stderr)
         return 1
+    private_patterns = compile_private_identifier_terms(private_terms)
     for path in paths:
         if not is_clean_artifact(path):
             continue
@@ -295,15 +299,15 @@ def main() -> int:
         text = data.decode("utf-8", errors="replace")
         findings = [name for name, pattern in BLOCKED_PATTERNS.items() if pattern.search(text)]
         full_scan_texts, light_scan_texts, denylist_scan_texts = identifier_scan_texts(path, text)
-        findings.extend(scan_identifier_patterns(full_scan_texts, private_terms))
+        findings.extend(scan_identifier_patterns(full_scan_texts, private_patterns))
         findings.extend(
             scan_identifier_patterns(
                 light_scan_texts,
-                private_terms,
+                private_patterns,
                 skipped_patterns={"source_like_call"},
             )
         )
-        findings.extend(scan_private_identifier_denylist(denylist_scan_texts, private_terms))
+        findings.extend(scan_private_identifier_denylist(denylist_scan_texts, private_patterns))
         if findings:
             print(
                 f"clean-room leakage scan failed for {path}: {', '.join(sorted(set(findings)))}",

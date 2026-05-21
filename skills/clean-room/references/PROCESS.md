@@ -147,7 +147,8 @@ Clean QA/spec editor:
    - Record unresolved questions instead of guessing.
 6. Handoff:
    - Move only clean-approved structured artifacts to the clean workspace.
-   - Include coverage summaries or abstract delta tickets, not raw contaminated ledgers.
+   - Include only allowed handoff artifact types: `task-manifest`, `behavior-spec`, `coverage-ledger-summary`, `open-questions`, `test-plan`, and `abstract-delta-ticket`.
+   - Use `coverage-ledger-summary` for neutral coverage status only; do not include raw contaminated ledgers.
    - Do not include `source-index.json`, source paths, import/export listings, or dependency graphs.
    - Do not include clean-produced skeleton manifests or QC reports in contaminated-to-clean handoff packages.
    - Preserve producer role and review status.

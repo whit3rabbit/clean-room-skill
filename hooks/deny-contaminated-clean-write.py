@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from clean_room_paths import candidate_paths, env_roots, load_payload, path_is_under
+from clean_room_paths import candidate_paths, env_roots, load_payload, path_is_under, should_fail_closed_for_write
 
 
 CONTAMINATED_ROLES = {"contaminated-manager-verifier", "contaminated-source-analyst"}
@@ -35,6 +35,8 @@ def main() -> int:
             print(f"clean-room policy denied role {role} write: {error}", file=sys.stderr)
         return 1
     if not paths:
+        if not should_fail_closed_for_write(payload):
+            return 0
         print(
             f"clean-room policy denied role {role} write with no resolved path",
             file=sys.stderr,

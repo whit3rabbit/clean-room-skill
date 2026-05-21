@@ -24,6 +24,8 @@ PATH_KEYS = {
     "output_path",
     "outputPath",
 }
+MAX_HOOK_PAYLOAD_BYTES = 10 * 1024 * 1024
+MAX_PATH_EXTRACTION_DEPTH = 40
 
 
 def path_is_under(path: Path, root: Path) -> bool:
@@ -74,7 +76,13 @@ def active_clean_room_role() -> str:
 
 
 def load_payload() -> tuple[dict[str, Any], str | None]:
-    raw = sys.stdin.read()
+    raw_bytes = sys.stdin.buffer.read(MAX_HOOK_PAYLOAD_BYTES + 1)
+    if len(raw_bytes) > MAX_HOOK_PAYLOAD_BYTES:
+        return {}, f"hook payload exceeds {MAX_HOOK_PAYLOAD_BYTES} bytes"
+    try:
+        raw = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return {}, f"malformed hook JSON payload: {exc}"
     if not raw.strip():
         return {}, None
     try:
@@ -101,17 +109,19 @@ def should_fail_closed_for_write(payload: dict[str, Any]) -> bool:
     return not name or name in WRITE_TOOL_NAMES
 
 
-def _path_values(value: Any) -> list[str]:
+def _path_values(value: Any, depth: int = 0) -> list[str]:
+    if depth > MAX_PATH_EXTRACTION_DEPTH:
+        raise ValueError(f"hook payload path extraction exceeded depth {MAX_PATH_EXTRACTION_DEPTH}")
     paths: list[str] = []
     if isinstance(value, dict):
         for key, item in value.items():
             if key in PATH_KEYS and isinstance(item, str):
                 paths.append(item)
             elif isinstance(item, (dict, list)):
-                paths.extend(_path_values(item))
+                paths.extend(_path_values(item, depth + 1))
     elif isinstance(value, list):
         for item in value:
-            paths.extend(_path_values(item))
+            paths.extend(_path_values(item, depth + 1))
     return paths
 
 
@@ -123,7 +133,11 @@ def candidate_paths(payload: dict[str, Any]) -> tuple[list[Path], list[str]]:
         base = payload_cwd(payload)
     except OSError as exc:
         return [], [f"invalid hook cwd: {exc}"]
-    for value in _path_values(payload):
+    try:
+        raw_paths = _path_values(payload)
+    except ValueError as exc:
+        return [], [str(exc)]
+    for value in raw_paths:
         try:
             path = resolve_payload_path(value, base)
         except OSError as exc:

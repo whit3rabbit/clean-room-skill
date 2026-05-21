@@ -115,6 +115,27 @@ def main() -> int:
             "allowed clean read roots must not expose source roots",
         )
     )
+    errors.extend(
+        reject_overlaps(
+            "CLEAN_ROOM_SCHEMA_DIR",
+            "CLEAN_ROOM_SOURCE_ROOTS",
+            "schema directory must be separate from source roots",
+        )
+    )
+    errors.extend(
+        reject_overlaps(
+            "CLEAN_ROOM_SCHEMA_DIR",
+            "CLEAN_ROOM_CLEAN_ROOTS",
+            "schema directory must be separate from clean roots",
+        )
+    )
+    errors.extend(
+        reject_overlaps(
+            "CLEAN_ROOM_SCHEMA_DIR",
+            "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS",
+            "schema directory must be separate from contaminated artifact roots",
+        )
+    )
     if errors:
         print("clean-room environment check failed:", file=sys.stderr)
         for error in errors:

@@ -1,43 +1,33 @@
 #!/usr/bin/env node
 'use strict';
 
-const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline/promises');
 const { spawnSync } = require('node:child_process');
 
 const {
-  atomicWriteFile,
-  fileHash,
-  listFiles,
-  readJsonFile,
-  removeEmptyParents,
-  resolveInside,
-  sha256Bytes,
-  writeJsonFile,
-} = require('../lib/fs-utils.cjs');
-const {
   buildHookEntries,
   configPathForRuntime,
   mergeHookEntries,
   removeHookEntries,
+  writeHookConfig,
 } = require('../lib/hooks.cjs');
 const {
   RUNTIMES,
   RUNTIME_FLAGS,
   resolveRuntimeLayout,
 } = require('../lib/runtime-layout.cjs');
+const { buildDesiredFiles } = require('../lib/install-artifacts.cjs');
+const {
+  applyInstall,
+  applyUninstall,
+  planInstall,
+  planUninstall,
+  readManifest,
+  writeInstallManifest,
+} = require('../lib/install-plan.cjs');
 
-const PACKAGE_ROOT = path.resolve(__dirname, '..');
-const MANIFEST_NAME = 'clean-room-install-manifest.json';
-const PATCHES_DIR_NAME = 'clean-room-patches';
-const IGNORE_NAMES = new Set(['.DS_Store', '__pycache__', 'node_modules', '.syntext']);
 const HOOK_MODES = new Set(['safe', 'copy-only', 'strict']);
-
-function packageVersion() {
-  const pkg = readJsonFile(path.join(PACKAGE_ROOT, 'package.json'), null);
-  return pkg && typeof pkg.version === 'string' ? pkg.version : '0.0.0';
-}
 
 function parseArgs(argv) {
   const options = {
@@ -115,7 +105,7 @@ Runtime:
   --qwen               Install for Qwen Code
   --hermes             Install for Hermes Agent
   --codebuddy          Install for CodeBuddy
-  --all                Install for all supported runtimes
+  --all                Install for all known runtime layouts
 
 Scope:
   --global             Install to the runtime user config
@@ -165,192 +155,6 @@ function resolveTargetRoot(runtime, scope, configDir) {
   return resolveRuntimeLayout(runtime, scope, { configDir }).targetRoot;
 }
 
-function sourceFile(relPath, hookMode) {
-  return fs.readFileSync(path.join(PACKAGE_ROOT, relPath));
-}
-
-function addFile(desired, sourceRel, destRel, hookMode) {
-  desired.set(destRel.replace(/\\/g, '/'), sourceFile(sourceRel, hookMode));
-}
-
-function addTree(desired, sourceRel, destRel, hookMode, options = {}) {
-  const sourceRoot = path.join(PACKAGE_ROOT, sourceRel);
-  for (const rel of listFiles(sourceRoot, { ignoreNames: IGNORE_NAMES })) {
-    if (options.filter && !options.filter(rel)) continue;
-    const sourcePath = `${sourceRel}/${rel}`.replace(/\\/g, '/');
-    const destPath = destRel ? `${destRel}/${rel}` : rel;
-    addFile(desired, sourcePath, destPath, hookMode);
-  }
-}
-
-function splitSkillFile(content) {
-  if (!content.startsWith('---\n')) {
-    return { frontmatter: '', body: content };
-  }
-  const end = content.indexOf('\n---\n', 4);
-  if (end === -1) {
-    return { frontmatter: '', body: content };
-  }
-  return {
-    frontmatter: content.slice(4, end),
-    body: content.slice(end + '\n---\n'.length),
-  };
-}
-
-function frontmatterValue(frontmatter, key) {
-  const match = frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
-  if (!match) return null;
-  return match[1].trim().replace(/^['"]|['"]$/g, '');
-}
-
-function yamlString(value) {
-  return JSON.stringify(String(value).replace(/\s+/g, ' ').trim());
-}
-
-function generateCommandWrapper(skillName) {
-  const skillPath = path.join(PACKAGE_ROOT, 'skills', skillName, 'SKILL.md');
-  const content = fs.readFileSync(skillPath, 'utf8');
-  const { frontmatter, body } = splitSkillFile(content);
-  const description = frontmatterValue(frontmatter, 'description') ||
-    `Run the ${skillName} clean-room workflow.`;
-  const argumentHint = frontmatterValue(frontmatter, 'argument-hint');
-  const lines = [
-    '---',
-    `description: ${yamlString(description)}`,
-  ];
-  if (argumentHint) {
-    lines.push(`argument-hint: ${yamlString(argumentHint)}`);
-  }
-  lines.push(
-    '---',
-    '',
-    `# ${skillName}`,
-    '',
-    `Run the bundled \`${skillName}\` clean-room workflow using the user's command arguments.`,
-    '',
-    body.trimStart()
-  );
-  return `${lines.join('\n').trimEnd()}\n`;
-}
-
-function generatePluginManifest() {
-  const source = readJsonFile(path.join(PACKAGE_ROOT, 'plugin.json'), {});
-  const manifest = {
-    name: 'clean-room',
-    version: packageVersion(),
-    description: 'Spec-first clean-room workflow for authorized source analysis without replacement code.',
-    ...source,
-    skills: './skills/',
-    agents: './agents/',
-  };
-  delete manifest.hooks;
-  return `${JSON.stringify(manifest, null, 2)}\n`;
-}
-
-function addCommandWrappers(desired, artifact) {
-  const skillsRoot = path.join(PACKAGE_ROOT, artifact.source);
-  const entries = fs.readdirSync(skillsRoot, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const skillPath = path.join(skillsRoot, entry.name, 'SKILL.md');
-    if (!fs.existsSync(skillPath)) continue;
-    const destName = `${artifact.commandPrefix || ''}${entry.name}.md`;
-    const destRel = `${artifact.destSubpath}/${destName}`.replace(/\\/g, '/');
-    desired.set(destRel, Buffer.from(generateCommandWrapper(entry.name), 'utf8'));
-  }
-}
-
-function addArtifact(desired, artifact, hookMode) {
-  if (artifact.kind === 'skills' || artifact.kind === 'agents') {
-    addTree(desired, artifact.source, artifact.destSubpath, hookMode);
-    return;
-  }
-  if (artifact.kind === 'hooks') {
-    addTree(desired, artifact.source, artifact.destSubpath, hookMode, {
-      filter: (rel) => rel.endsWith('.py'),
-    });
-    return;
-  }
-  if (artifact.kind === 'commands') {
-    addCommandWrappers(desired, artifact);
-    return;
-  }
-  if (artifact.kind === 'plugin-manifest') {
-    desired.set(artifact.destSubpath, Buffer.from(generatePluginManifest(), 'utf8'));
-    return;
-  }
-  throw new Error(`unsupported artifact kind: ${artifact.kind}`);
-}
-
-function layoutFromInput(runtimeOrLayout, scope, configDir) {
-  if (runtimeOrLayout && typeof runtimeOrLayout === 'object') {
-    return runtimeOrLayout;
-  }
-  return resolveRuntimeLayout(runtimeOrLayout, scope, { configDir });
-}
-
-function buildDesiredFiles(runtimeOrLayout, hookMode, scope = 'global', configDir = null) {
-  const layout = layoutFromInput(runtimeOrLayout, scope, configDir);
-  const desired = new Map();
-  for (const artifact of layout.artifacts) {
-    addArtifact(desired, artifact, hookMode);
-  }
-  return desired;
-}
-
-function readManifest(targetRoot) {
-  const manifestPath = path.join(targetRoot, MANIFEST_NAME);
-  if (!fs.existsSync(manifestPath)) return null;
-  const manifest = readJsonFile(manifestPath, null);
-  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
-    throw new Error(`${manifestPath} must contain a JSON object`);
-  }
-  return manifest;
-}
-
-function manifestHash(manifest, relPath) {
-  const entry = manifest?.files?.[relPath];
-  if (!entry) return null;
-  if (typeof entry === 'string') return entry;
-  if (entry && typeof entry.sha256 === 'string') return entry.sha256;
-  return null;
-}
-
-function planInstall(targetRoot, desired, manifest) {
-  const unknownConflicts = [];
-  const writes = [];
-  const removals = [];
-  const backups = [];
-
-  for (const [relPath, bytes] of desired) {
-    const fullPath = resolveInside(targetRoot, relPath);
-    const desiredHash = sha256Bytes(bytes);
-    const knownHash = manifestHash(manifest, relPath);
-    if (fs.existsSync(fullPath)) {
-      const currentHash = fileHash(fullPath);
-      if (knownHash && currentHash !== knownHash) {
-        backups.push(relPath);
-      } else if (!knownHash && currentHash !== desiredHash) {
-        unknownConflicts.push(relPath);
-      }
-    }
-    writes.push(relPath);
-  }
-
-  for (const relPath of Object.keys(manifest?.files || {})) {
-    if (desired.has(relPath)) continue;
-    const fullPath = resolveInside(targetRoot, relPath);
-    if (!fs.existsSync(fullPath)) continue;
-    const knownHash = manifestHash(manifest, relPath);
-    if (knownHash && fileHash(fullPath) !== knownHash) {
-      backups.push(relPath);
-    }
-    removals.push(relPath);
-  }
-
-  return { unknownConflicts, writes, removals, backups };
-}
-
 async function confirmUnknownConflicts(conflicts, options) {
   if (conflicts.length === 0) return false;
   if (options.dryRun) return false;
@@ -374,88 +178,6 @@ async function confirmUnknownConflicts(conflicts, options) {
   } finally {
     rl.close();
   }
-}
-
-function backupFile(targetRoot, relPath, backupRoot) {
-  const source = resolveInside(targetRoot, relPath);
-  const dest = resolveInside(backupRoot, relPath);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(source, dest);
-}
-
-function timestampForPath() {
-  return new Date().toISOString().replace(/[:.]/g, '-');
-}
-
-function createBackupWriter(targetRoot, dryRun) {
-  let backupRoot = null;
-  return {
-    backup(relPath) {
-      if (dryRun) return null;
-      if (!backupRoot) {
-        backupRoot = path.join(targetRoot, PATCHES_DIR_NAME, timestampForPath());
-      }
-      backupFile(targetRoot, relPath, backupRoot);
-      return backupRoot;
-    },
-    get root() {
-      return backupRoot;
-    },
-  };
-}
-
-function applyInstall(targetRoot, desired, manifest, plan, options) {
-  const backupWriter = createBackupWriter(targetRoot, options.dryRun);
-  if (options.dryRun) return null;
-  fs.mkdirSync(targetRoot, { recursive: true });
-
-  const backedUp = new Set();
-  for (const relPath of [...plan.backups, ...plan.unknownConflicts]) {
-    const fullPath = resolveInside(targetRoot, relPath);
-    if (fs.existsSync(fullPath) && !backedUp.has(relPath)) {
-      backupWriter.backup(relPath);
-      backedUp.add(relPath);
-    }
-  }
-
-  for (const relPath of plan.removals) {
-    const fullPath = resolveInside(targetRoot, relPath);
-    if (fs.existsSync(fullPath)) {
-      fs.rmSync(fullPath, { force: true });
-      removeEmptyParents(path.dirname(fullPath), targetRoot);
-    }
-  }
-
-  for (const [relPath, bytes] of desired) {
-    const fullPath = resolveInside(targetRoot, relPath);
-    atomicWriteFile(fullPath, bytes);
-  }
-
-  const nextManifest = {
-    schema: 1,
-    package: 'clean-room-skill',
-    version: packageVersion(),
-    runtime: manifest?.runtime || null,
-    scope: manifest?.scope || null,
-    hooks_mode: options.hookMode,
-    installed_at: new Date().toISOString(),
-    files: {},
-  };
-  for (const [relPath, bytes] of desired) {
-    nextManifest.files[relPath] = { sha256: sha256Bytes(bytes) };
-  }
-  return { backupRoot: backupWriter.root, manifest: nextManifest };
-}
-
-function writeInstallManifest(targetRoot, manifest, runtime, scope, hookMode, dryRun) {
-  if (dryRun) return;
-  const next = {
-    ...manifest,
-    runtime,
-    scope,
-    hooks_mode: hookMode,
-  };
-  writeJsonFile(path.join(targetRoot, MANIFEST_NAME), next);
 }
 
 function resolvePython3() {
@@ -482,7 +204,7 @@ function validateRuntimeOptions(options) {
   }
 }
 
-function configureHooks(layout, hookMode, dryRun) {
+function prepareHookRegistration(layout, hookMode) {
   if (hookMode === 'copy-only') {
     return { status: 'copy-only' };
   }
@@ -494,8 +216,8 @@ function configureHooks(layout, hookMode, dryRun) {
   const pythonPath = resolvePython3();
   const wrapperPath = path.join(layout.targetRoot, 'hooks', 'clean-room', 'clean-room-hook.py');
   const entries = buildHookEntries({ pythonPath, wrapperPath, mode: hookMode });
-  mergeHookEntries(configPath, entries, { dryRun });
-  return { status: 'registered' };
+  const config = mergeHookEntries(configPath, entries, { dryRun: true });
+  return { status: 'registered', configPath, config };
 }
 
 async function installRuntime(runtime, options) {
@@ -516,10 +238,10 @@ async function installRuntime(runtime, options) {
     console.log(`  unknown conflicts: ${plan.unknownConflicts.length}`);
   }
 
-  const hookResult = configureHooks(layout, options.hookMode, true);
+  const hookResult = prepareHookRegistration(layout, options.hookMode);
   const result = applyInstall(targetRoot, desired, manifest, plan, options);
-  if (!options.dryRun) {
-    configureHooks(layout, options.hookMode, false);
+  if (!options.dryRun && hookResult.status === 'registered') {
+    writeHookConfig(hookResult.configPath, hookResult.config);
   }
   if (hookResult.status === 'unsupported' && options.hookMode === 'safe') {
     console.log('  hook registration unsupported for this runtime; copied hooks only');
@@ -532,27 +254,20 @@ async function installRuntime(runtime, options) {
   }
 }
 
-function planUninstall(targetRoot, manifest) {
-  const files = Object.keys(manifest?.files || {});
-  const backups = [];
-  const removals = [];
-  for (const relPath of files) {
-    const fullPath = resolveInside(targetRoot, relPath);
-    if (!fs.existsSync(fullPath)) continue;
-    const knownHash = manifestHash(manifest, relPath);
-    if (knownHash && fileHash(fullPath) !== knownHash) {
-      backups.push(relPath);
-    }
-    removals.push(relPath);
-  }
-  return { backups, removals };
-}
-
 function removeHookRegistrations(layout, dryRun) {
   if (!layout.supportsHookRegistration) return null;
   const configPath = configPathForRuntime(layout.runtime, layout.targetRoot);
   if (!configPath) return null;
   return removeHookEntries(configPath, { dryRun });
+}
+
+function desiredFilesForUninstall(layout, hookMode) {
+  try {
+    return buildDesiredFiles(layout, hookMode);
+  } catch (err) {
+    console.log(`  untracked file scan skipped: ${err.message}`);
+    return new Map();
+  }
 }
 
 function uninstallRuntime(runtime, options) {
@@ -565,29 +280,22 @@ function uninstallRuntime(runtime, options) {
     removeHookRegistrations(layout, options.dryRun);
     return;
   }
-  const plan = planUninstall(targetRoot, manifest);
+  const desired = desiredFilesForUninstall(layout, manifest.hooks_mode || options.hookMode);
+  const plan = planUninstall(targetRoot, manifest, desired);
   console.log(`  managed removals: ${plan.removals.length}`);
   if (plan.backups.length) {
     console.log(`  backups: ${plan.backups.length}`);
   }
+  if (plan.untracked.length) {
+    console.log(`  untracked package-path files left in place: ${plan.untracked.length}`);
+  }
 
-  if (options.dryRun) return;
-  const backupWriter = createBackupWriter(targetRoot, false);
-  for (const relPath of plan.backups) {
-    backupWriter.backup(relPath);
+  const result = applyUninstall(targetRoot, plan, options.dryRun);
+  if (!options.dryRun) {
+    removeHookRegistrations(layout, false);
   }
-  for (const relPath of plan.removals) {
-    const fullPath = resolveInside(targetRoot, relPath);
-    if (fs.existsSync(fullPath)) {
-      fs.rmSync(fullPath, { force: true });
-      removeEmptyParents(path.dirname(fullPath), targetRoot);
-    }
-  }
-  removeHookRegistrations(layout, false);
-  fs.rmSync(path.join(targetRoot, MANIFEST_NAME), { force: true });
-  removeEmptyParents(targetRoot, path.dirname(targetRoot));
-  if (backupWriter.root) {
-    console.log(`  backed up modified files to ${backupWriter.root}`);
+  if (result?.backupRoot) {
+    console.log(`  backed up modified files to ${result.backupRoot}`);
   }
 }
 

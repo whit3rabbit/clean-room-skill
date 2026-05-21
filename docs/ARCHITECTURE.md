@@ -103,7 +103,7 @@ flowchart LR
 
 The architecture delegates work across four distinct custom role agents to enforce separation between source reading and specification authoring.
 
-### [Agent 0: Contaminated Manager Verifier](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/agents/contaminated-manager-verifier.md)
+### [Agent 0: Contaminated Manager Verifier](../agents/contaminated-manager-verifier.md)
 *   **Domain**: Contaminated (Source-readable)
 *   **Write Target**: Contaminated artifact workspace (`CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`)
 *   **Responsibilities**:
@@ -113,7 +113,7 @@ The architecture delegates work across four distinct custom role agents to enfor
     *   Performs final verification of clean specification coverage against the source scope.
     *   Sends only abstract delta tickets across the clean-room wall (no source leakage).
 
-### [Agent 1: Contaminated Source Analyst](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/agents/contaminated-source-analyst.md)
+### [Agent 1: Contaminated Source Analyst](../agents/contaminated-source-analyst.md)
 *   **Domain**: Contaminated (Source-readable, Read-only access to source)
 *   **Write Target**: Contaminated artifact workspace (`CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`)
 *   **Responsibilities**:
@@ -122,7 +122,7 @@ The architecture delegates work across four distinct custom role agents to enfor
     *   Generates evidence references pointing to contaminated ledgers instead of copying raw source code or comments.
     *   Initiates leakage self-review prior to clean handoff.
 
-### [Agent 2: Clean Architect](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/agents/clean-architect.md)
+### [Agent 2: Clean Architect](../agents/clean-architect.md)
 *   **Domain**: Clean (Source-denied, no access to source or contaminated chat histories)
 *   **Write Target**: Clean workspace (`CLEAN_ROOM_CLEAN_ROOTS`)
 *   **Responsibilities**:
@@ -131,12 +131,12 @@ The architecture delegates work across four distinct custom role agents to enfor
     *   Organizes behavioral specifications into a target-neutral `skeleton-manifest.json`.
     *   Records target-language constraints and public contract references.
 
-### [Agent 3: Clean QA Editor](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/agents/clean-qa-editor.md)
+### [Agent 3: Clean QA Editor](../agents/clean-qa-editor.md)
 *   **Domain**: Clean (Source-denied)
 *   **Write Target**: Clean workspace (`CLEAN_ROOM_CLEAN_ROOTS`)
 *   **Responsibilities**:
     *   Validates clean specification files against the schema directory (`CLEAN_ROOM_SCHEMA_DIR`).
-    *   Performs leakage reviews using guidelines in [LEAKAGE-RULES.md](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/skills/clean-room/references/LEAKAGE-RULES.md).
+    *   Performs leakage reviews using guidelines in [LEAKAGE-RULES.md](../skills/clean-room/references/LEAKAGE-RULES.md).
     *   Drafts the final `qc-report.json`.
     *   Communicates findings and coverage gaps back to Agent 0 using abstract delta tickets only.
 
@@ -159,17 +159,17 @@ Every clean-room role session requires a populated environment block before any 
 
 The architecture relies on Git hook scaffolding located in `hooks/` to enforce boundary rules dynamically during agent sessions:
 
-*   [clean-room-hook.py](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/hooks/clean-room-hook.py): The main safe/strict dispatch wrapper for the policy checks.
-*   [require-clean-room-env.py](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/hooks/require-clean-room-env.py): Fails closed if the required role and root environment variables are missing.
-*   [deny-clean-room-shell.py](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions to prevent command-based read/write bypasses.
-*   [deny-clean-source-read.py](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/hooks/deny-clean-source-read.py): Enforces that clean roles cannot read source roots and unapproved paths.
-*   [deny-contaminated-clean-write.py](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/hooks/deny-contaminated-clean-write.py): Enforces role write roots (Clean roles write only to `CLEAN_ROOM_CLEAN_ROOTS`; contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`).
-*   [check-artifact-leakage.py](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/hooks/check-artifact-leakage.py): Scans clean artifacts for high-risk leakage markers, source-like identifiers, and private identifier denylist terms.
-*   [validate-json-schema.py](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/hooks/validate-json-schema.py): Verifies JSON syntax and structural conformance against schemas under `CLEAN_ROOM_SCHEMA_DIR`.
-*   [validate-handoff-package.py](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/hooks/validate-handoff-package.py): Verifies that handoff packages stay within clean roots, do not reference contaminated paths or `source-index.json`, and match declared `sha256` checksums.
+*   [clean-room-hook.py](../hooks/clean-room-hook.py): The main safe/strict dispatch wrapper for the policy checks.
+*   [require-clean-room-env.py](../hooks/require-clean-room-env.py): Fails closed if the required role and root environment variables are missing.
+*   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions to prevent command-based read/write bypasses.
+*   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles cannot read source roots and unapproved paths.
+*   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots (Clean roles write only to `CLEAN_ROOM_CLEAN_ROOTS`; contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`).
+*   [check-artifact-leakage.py](../hooks/check-artifact-leakage.py): Scans clean artifacts for high-risk leakage markers, source-like identifiers, and private identifier denylist terms.
+*   [validate-json-schema.py](../hooks/validate-json-schema.py): Verifies JSON syntax and structural conformance against schemas under `CLEAN_ROOM_SCHEMA_DIR`.
+*   [validate-handoff-package.py](../hooks/validate-handoff-package.py): Verifies that handoff packages stay within clean roots, do not reference contaminated paths or `source-index.json`, and match declared `sha256` checksums.
 
 For detailed guidelines on the clean-room process, refer to:
-*   [PROCESS.md](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/skills/clean-room/references/PROCESS.md)
-*   [LEAKAGE-RULES.md](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/skills/clean-room/references/LEAKAGE-RULES.md)
-*   [SPEC-SCHEMA.md](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/skills/clean-room/references/SPEC-SCHEMA.md)
-*   [TARGET-LANGUAGE-GUIDE.md](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/skills/clean-room/references/TARGET-LANGUAGE-GUIDE.md)
+*   [PROCESS.md](../skills/clean-room/references/PROCESS.md)
+*   [LEAKAGE-RULES.md](../skills/clean-room/references/LEAKAGE-RULES.md)
+*   [SPEC-SCHEMA.md](../skills/clean-room/references/SPEC-SCHEMA.md)
+*   [TARGET-LANGUAGE-GUIDE.md](../skills/clean-room/references/TARGET-LANGUAGE-GUIDE.md)

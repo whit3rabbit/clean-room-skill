@@ -54,7 +54,12 @@ npx clean-room-skill@latest --cursor --global --yes
 npx clean-room-skill@latest --all --global --yes
 ```
 
-Supported runtime roots:
+Runtime support tiers:
+
+- Verified: Codex and Claude Code. These installs have tested skill, agent, hook registration, and hook payload behavior.
+- Layout-only / experimental: Antigravity, Gemini, OpenCode, Kilo, Cursor, GitHub Copilot, Windsurf, Augment, Trae, Qwen Code, Hermes Agent, and CodeBuddy. The installer writes files to expected layout roots, but this repo does not verify that those hosts load the files or enforce clean-room behavior.
+
+Runtime install roots:
 
 - Codex global: `CODEX_HOME` or `~/.codex`
 - Claude Code global: `CLAUDE_CONFIG_DIR` or `~/.claude`
@@ -71,7 +76,7 @@ Supported runtime roots:
 - Hermes Agent global: `HERMES_HOME` or `~/.hermes`
 - CodeBuddy global: `CODEBUDDY_CONFIG_DIR` or `~/.codebuddy`
 
-Local installs are supported through `--local` using each runtime's project config directory. Antigravity local installs write `.agents/plugins/clean-room/`. Claude local, Gemini, OpenCode, and Kilo receive generated command wrappers; native skill runtimes receive `SKILL.md` directories. Gemini CLI support is legacy/enterprise compatibility because Google is transitioning consumer Gemini CLI users to Antigravity CLI on June 18, 2026. Cline is not supported because it has no verified clean-room skill or command layout.
+Local installs are available through `--local` using each runtime's project config directory. Antigravity local installs write `.agents/plugins/clean-room/`. Claude local, Gemini, OpenCode, and Kilo receive generated command wrappers; native skill runtimes receive `SKILL.md` directories. Gemini CLI support is legacy/enterprise compatibility because Google is transitioning consumer Gemini CLI users to Antigravity CLI on June 18, 2026. Cline is not included because it has no verified clean-room skill or command layout.
 
 Hook modes:
 
@@ -167,7 +172,7 @@ Prompt instructions alone are not a boundary. Use path separation, role-specific
 
 ![Clean Room Architecture](assets/clean-room-arch.svg)
 
-For a detailed breakdown of the flowchart representation, agent responsibilities, environment boundaries, and guardrail scripts, see the [Clean Room Architecture Documentation](file:///Users/whit3rabbit/Documents/GitHub/clean-room-skill/docs/ARCHITECTURE.md).
+For a detailed breakdown of the flowchart representation, agent responsibilities, environment boundaries, and guardrail scripts, see the [Clean Room Architecture Documentation](docs/ARCHITECTURE.md).
 
 ## Roles
 
@@ -340,7 +345,7 @@ python3 -m venv .venv
 npm run verify
 ```
 
-Optional, if skill-creator `quick_validate` is installed:
+Optional, if an external skill-creator `quick_validate` command is installed on your machine:
 
 ```bash
 quick_validate skills/attended

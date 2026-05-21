@@ -7,7 +7,7 @@ import argparse
 import copy
 import json
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 try:
@@ -20,6 +20,10 @@ except ImportError:  # pragma: no cover - exercised by missing local dependency.
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = ROOT / "skills" / "clean-room" / "assets"
 EXAMPLE_DIR = ROOT / "skills" / "clean-room" / "examples" / "minimal-spec-package"
+EXAMPLE_DIRS = [
+    EXAMPLE_DIR,
+    ROOT / "skills" / "clean-room" / "examples" / "valid-handoff-package",
+]
 NEGATIVE_DIR = ROOT / "tests" / "fixtures" / "jsonschema-negative"
 SCHEMA_BY_ARTIFACT = {
     "task-manifest": "task-manifest.schema.json",
@@ -97,14 +101,15 @@ def sorted_errors(validator: jsonschema.Draft202012Validator, instance: Any) -> 
 
 def validate_examples() -> int:
     failures: list[str] = []
-    for path in sorted(EXAMPLE_DIR.glob("*.json")):
-        kind = artifact_kind(path)
-        errors = sorted_errors(validator_for(kind), load_json(path))
-        if errors:
-            failures.append(f"{path.relative_to(ROOT)} failed {kind} schema:")
-            failures.extend(f"  {error_label(error)}" for error in errors[:10])
-            if len(errors) > 10:
-                failures.append(f"  ... {len(errors) - 10} more error(s)")
+    for example_dir in EXAMPLE_DIRS:
+        for path in sorted(example_dir.glob("*.json")):
+            kind = artifact_kind(path)
+            errors = sorted_errors(validator_for(kind), load_json(path))
+            if errors:
+                failures.append(f"{path.relative_to(ROOT)} failed {kind} schema:")
+                failures.extend(f"  {error_label(error)}" for error in errors[:10])
+                if len(errors) > 10:
+                    failures.append(f"  ... {len(errors) - 10} more error(s)")
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1
@@ -128,10 +133,17 @@ def path_remove(root: Any, path: list[str | int]) -> None:
     del parent[path[-1]]
 
 
-def negative_instance(fixture: dict[str, Any]) -> Any:
-    base_name = fixture.get("base")
-    if not isinstance(base_name, str) or "/" in base_name or base_name.startswith("."):
+def bundled_example_name(value: Any) -> str:
+    if not isinstance(value, str) or value.startswith("."):
         raise ValueError("negative fixture base must name a bundled example JSON file")
+    for candidate in (PurePosixPath(value), PureWindowsPath(value)):
+        if len(candidate.parts) != 1 or candidate.parts[0] in {"", ".", ".."}:
+            raise ValueError("negative fixture base must name a bundled example JSON file")
+    return value
+
+
+def negative_instance(fixture: dict[str, Any]) -> Any:
+    base_name = bundled_example_name(fixture.get("base"))
     instance = copy.deepcopy(load_json(EXAMPLE_DIR / base_name))
     for path in fixture.get("remove", []):
         path_remove(instance, path)

@@ -43,7 +43,7 @@ const EXPECTED_GLOBAL = {
   augment: { root: '/tmp/clean-room/augment', kinds: ['skills:skills', 'hooks:hooks/clean-room'], hooks: false },
   trae: { root: '/tmp/clean-room/trae', kinds: ['skills:skills', 'hooks:hooks/clean-room'], hooks: false },
   qwen: { root: '/tmp/clean-room/qwen', kinds: ['skills:skills', 'hooks:hooks/clean-room'], hooks: false },
-  hermes: { root: '/tmp/clean-room/hermes', kinds: ['skills:skills/clean-room', 'hooks:hooks/clean-room'], hooks: false },
+  hermes: { root: '/tmp/clean-room/hermes', kinds: ['skills:skills', 'hooks:hooks/clean-room'], hooks: false },
   codebuddy: { root: '/tmp/clean-room/codebuddy', kinds: ['skills:skills', 'hooks:hooks/clean-room'], hooks: false },
 };
 
@@ -69,7 +69,7 @@ function kindLabels(layout) {
 }
 
 describe('runtime layout', () => {
-  test('declares every supported runtime global root and artifact surface', () => {
+  test('declares every runtime layout global root and artifact surface', () => {
     assert.deepEqual(RUNTIMES, Object.keys(EXPECTED_GLOBAL));
     for (const runtime of RUNTIMES) {
       const layout = resolveRuntimeLayout(runtime, 'global', {

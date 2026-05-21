@@ -25,6 +25,7 @@ echo "Checking JavaScript syntax..."
 node --check bin/install.js
 node --check lib/fs-utils.cjs
 node --check lib/hooks.cjs
+node --check lib/runtime-layout.cjs
 
 echo "Running unit tests..."
 npm test
@@ -51,6 +52,11 @@ done
 
 echo "Running full JSON Schema draft validation..."
 "$python_cmd" tests/validate_jsonschema.py
+
+echo "Validating handoff integrity fixture..."
+printf '{"tool_input":{"file_path":"%s"}}' "$PWD/skills/clean-room/examples/valid-handoff-package/handoff-package.json" \
+  | CLEAN_ROOM_CLEAN_ROOTS="$PWD/skills/clean-room/examples/valid-handoff-package" \
+    "$python_cmd" hooks/validate-handoff-package.py
 
 echo "Running example leakage checks..."
 for f in skills/clean-room/examples/minimal-spec-package/*.json; do

@@ -12,6 +12,8 @@
     "agents",
     "hooks",
     "examples",
+    "assets",
+    "docs",
     "plugin.json",
     ".codex-plugin",
     ".claude-plugin",

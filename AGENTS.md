@@ -5,8 +5,8 @@
 - npm package: `clean-room-skill`.
 - CLI entrypoint: `bin/install.js`.
 - Full local verifier: `bin/verify.sh`.
-- Node requirement: `>=20`.
-- CI runs Node 20 and 22 with Python 3.12 on macOS.
+- Node requirement: `>=22`.
+- CI runs Node 22 with Python 3.12 on macOS.
 - This repo installs clean-room skills, role agents, hooks, schemas, and examples for multiple agent runtimes.
 - The workflow creates clean behavioral spec packages. It does not create replacement implementation code.
 - Full docs: [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
