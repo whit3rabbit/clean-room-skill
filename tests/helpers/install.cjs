@@ -73,7 +73,7 @@ function assertManagedHookDetails(value) {
 function postWriteHookCommand(value) {
   const entries = hookTable(value).PostToolUse || [];
   for (const entry of entries) {
-    if (entry.matcher !== 'Write|Edit|MultiEdit') continue;
+    if (typeof entry.matcher !== 'string' || !entry.matcher.includes('Write')) continue;
     for (const hook of entry.hooks || []) {
       if (typeof hook.command === 'string' && hook.command.includes('clean-room-hook.py')) {
         return hook.command;
@@ -94,4 +94,3 @@ module.exports = {
   runInstall,
   tempDir,
 };
-

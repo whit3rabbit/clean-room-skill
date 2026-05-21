@@ -333,6 +333,7 @@
         "reviewer_role": {
           "enum": [
             "contaminated-source-analyst",
+            "contaminated-handoff-sanitizer",
             "clean-qa-editor"
           ]
         },

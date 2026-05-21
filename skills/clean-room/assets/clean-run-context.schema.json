@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Clean-Room Clean Run Context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "context_id",
+    "task_id",
+    "created_at",
+    "target_profile",
+    "native_artifacts",
+    "formatting_rules",
+    "clean_artifacts",
+    "approved_public_reference_roots",
+    "clean_isolation",
+    "model_preferences",
+    "user_rules"
+  ],
+  "properties": {
+    "context_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target_profile": {
+      "$ref": "#/$defs/target_profile"
+    },
+    "native_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "formatting_rules": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "clean_artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clean_root",
+        "handoff_package",
+        "behavior_specs",
+        "skeleton_manifest",
+        "qc_report"
+      ],
+      "properties": {
+        "clean_root": {
+          "$ref": "#/$defs/clean_path"
+        },
+        "handoff_package": {
+          "$ref": "#/$defs/clean_path"
+        },
+        "behavior_specs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clean_path"
+          }
+        },
+        "skeleton_manifest": {
+          "$ref": "#/$defs/clean_path"
+        },
+        "qc_report": {
+          "$ref": "#/$defs/clean_path"
+        },
+        "open_questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clean_path"
+          }
+        },
+        "abstract_delta_tickets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clean_path"
+          }
+        }
+      }
+    },
+    "approved_public_reference_roots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/clean_path"
+      }
+    },
+    "clean_isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "clean_agents_start_cwd",
+        "source_mounted"
+      ],
+      "properties": {
+        "mode": {
+          "const": "clean-workspace"
+        },
+        "clean_agents_start_cwd": {
+          "const": "clean_root"
+        },
+        "source_mounted": {
+          "const": false
+        }
+      }
+    },
+    "model_preferences": {
+      "$ref": "#/$defs/model_preferences"
+    },
+    "user_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clean_safe"
+      ],
+      "properties": {
+        "clean_safe": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "clean_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!.*(?:source-index|coverage-ledger|evidence-ledger|task-manifest)\\.json).+"
+    },
+    "target_profile": {
+      "enum": [
+        "openspec-delta",
+        "gsd-planning-package",
+        "speckit-feature-folder",
+        "kiro-spec-folder"
+      ]
+    },
+    "role": {
+      "enum": [
+        "clean-architect",
+        "clean-qa-editor"
+      ]
+    },
+    "model_preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_model"
+      ],
+      "properties": {
+        "default_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain_overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "clean": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "role_overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "model"
+            ],
+            "properties": {
+              "role": {
+                "$ref": "#/$defs/role"
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

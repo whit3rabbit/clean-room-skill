@@ -13,10 +13,12 @@ from clean_room_paths import paths_overlap
 ROLES = {
     "contaminated-manager-verifier",
     "contaminated-source-analyst",
+    "contaminated-handoff-sanitizer",
     "clean-architect",
     "clean-qa-editor",
 }
 CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
+SOURCE_DENIED_CONTAMINATED_ROLES = {"contaminated-handoff-sanitizer"}
 NONEMPTY_VARS = (
     "CLEAN_ROOM_ROLE",
     "CLEAN_ROOM_SOURCE_ROOTS",
@@ -87,6 +89,8 @@ def main() -> int:
             errors.extend(validate_roots(name, require_existing=name == "CLEAN_ROOM_SCHEMA_DIR"))
     if role in CLEAN_ROLES and "CLEAN_ROOM_ALLOWED_READ_ROOTS" not in os.environ:
         errors.append("CLEAN_ROOM_ALLOWED_READ_ROOTS is not set for clean role")
+    if role in SOURCE_DENIED_CONTAMINATED_ROLES and "CLEAN_ROOM_ALLOWED_READ_ROOTS" not in os.environ:
+        errors.append("CLEAN_ROOM_ALLOWED_READ_ROOTS is not set for source-denied contaminated role")
     errors.extend(
         reject_overlaps(
             "CLEAN_ROOM_SOURCE_ROOTS",

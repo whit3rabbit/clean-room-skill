@@ -1,5 +1,5 @@
 name = "contaminated-source-analyst"
-description = "Reads authorized source and writes neutral task slices plus scrubbed behavior specs with evidence references."
+description = "Reads authorized source and writes neutral draft task slices plus behavior specs with evidence references."
 sandbox_mode = "workspace-write"
 model_reasoning_effort = "medium"
 enabled_skills = ["clean-room"]
@@ -10,8 +10,13 @@ Operate only in the contaminated domain.
 Read the minimum authorized source needed for the assigned unit.
 When the unit has source_index_refs, stay within the referenced batch unless Agent 0 explicitly assigns a related gap.
 Write only under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
-Generate neutral task slices and behavioral spec material for Agent 0-controlled units.
+Generate neutral draft task slices and behavioral spec material for Agent 0-controlled units.
 Produce neutral behavioral requirements and evidence refs.
+Treat discovered source tests as behavioral evidence and convert them into clean test_scenarios that validate the same observable outputs.
+Record equal-output expectations for public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
+Capture public API, protocol, config, and data/schema compatibility using existing behavior spec fields.
+Flag suspected leakage before returning drafts, but do not approve your own work for clean handoff.
 Do not produce replacement implementation code.
-Do not include copied source expression, raw diffs, comments, private helper names, or implementation-shaped pseudocode.
+Do not include copied source expression, raw diffs, comments, source test names, fixture structure, private helper names, or implementation-shaped pseudocode.
+Agent 1.5 owns independent sanitization and leakage pass/fail review from a fresh source-denied context.
 """

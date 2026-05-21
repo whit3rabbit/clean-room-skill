@@ -17,6 +17,7 @@ MAX_DENYLIST_BYTES = 1_000_000
 MAX_DENYLIST_TERMS = 20_000
 MAX_DENYLIST_TERM_LENGTH = 512
 PRIVATE_IDENTIFIER_DENYLIST_ENV = "CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST"
+SANITIZER_ROLE = "contaminated-handoff-sanitizer"
 PUBLIC_NAME_KEYS = {"name", "kind", "compatibility_reason", "visibility"}
 PUBLIC_NAME_VISIBILITIES = {"public", "destination", "protocol", "user-required"}
 NEVER_SCAN_JSON_STRING_KEYS = {
@@ -113,11 +114,26 @@ IDENTIFIER_PATTERNS = {
 URL_PATTERN = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s\"')]+", re.I)
 
 
-def is_clean_artifact(path: Path) -> bool:
-    clean_roots = [Path(p).expanduser().resolve() for p in os.environ.get("CLEAN_ROOM_CLEAN_ROOTS", "").split(os.pathsep) if p]
-    if clean_roots and not any(path == root or root in path.parents for root in clean_roots):
+def path_under_any(path: Path, roots: list[Path]) -> bool:
+    return any(path == root or root in path.parents for root in roots)
+
+
+def is_scannable_artifact(path: Path) -> bool:
+    if path.suffix.lower() not in {".json", ".md", ".yaml", ".yml", ".txt"}:
         return False
-    return path.suffix.lower() in {".json", ".md", ".yaml", ".yml", ".txt"}
+    clean_roots = [Path(p).expanduser().resolve() for p in os.environ.get("CLEAN_ROOM_CLEAN_ROOTS", "").split(os.pathsep) if p]
+    if clean_roots and path_under_any(path, clean_roots):
+        return True
+    if os.environ.get("CLEAN_ROOM_ROLE") == SANITIZER_ROLE:
+        contaminated_roots = [
+            Path(p).expanduser().resolve()
+            for p in os.environ.get("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS", "").split(os.pathsep)
+            if p
+        ]
+        return bool(contaminated_roots) and path_under_any(path, contaminated_roots)
+    if clean_roots:
+        return False
+    return True
 
 
 def load_private_identifier_terms() -> tuple[list[str], list[str]]:
@@ -287,7 +303,7 @@ def main() -> int:
         return 1
     private_patterns = compile_private_identifier_terms(private_terms)
     for path in paths:
-        if not is_clean_artifact(path):
+        if not is_scannable_artifact(path):
             continue
         if path.stat().st_size > MAX_SCAN_BYTES:
             print(

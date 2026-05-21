@@ -1,0 +1,15 @@
+{
+  "schema_kind": "clean-run-context",
+  "base": "clean-run-context.json",
+  "description": "Clean run context must not reference source-index artifacts.",
+  "set": [
+    {
+      "path": [
+        "clean_artifacts",
+        "handoff_package"
+      ],
+      "value": "source-index.json"
+    }
+  ],
+  "expected_error": "does not match"
+}

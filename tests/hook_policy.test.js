@@ -143,6 +143,13 @@ describe('clean-room hook policy', () => {
     const result = runHook('deny-clean-room-shell.py', {}, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /denied shell tool use/);
+
+    const sanitizerResult = runHook('deny-clean-room-shell.py', {}, {
+      ...env,
+      CLEAN_ROOM_ROLE: 'contaminated-handoff-sanitizer',
+    });
+    assert.notEqual(sanitizerResult.status, 0);
+    assert.match(sanitizerResult.stderr, /denied shell tool use/);
   });
 
   test('post-write schema hook handles supported payload path variants and fails closed on bad payloads', () => {
@@ -324,6 +331,89 @@ describe('clean-room hook policy', () => {
     assert.match(result.stderr, /read with no resolved path/);
   });
 
+  test('clean roles may read schema roots but not source or contaminated roots', () => {
+    const root = tempDir('clean-room-schema-read');
+    const env = policyEnv(root, 'clean-qa-editor');
+    const schema = path.join(SCHEMA_DIR, 'behavior-spec.schema.json');
+    const sourceFile = path.join(env.CLEAN_ROOM_SOURCE_ROOTS, 'secret.py');
+    const contaminatedFile = path.join(env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, 'coverage-ledger.json');
+    fs.writeFileSync(sourceFile, 'VALUE = 1\n');
+    fs.writeFileSync(contaminatedFile, '{}\n');
+
+    let result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: schema },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: sourceFile },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /reading source path/);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: contaminatedFile },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /outside allowed roots/);
+  });
+
+  test('source-denied sanitizer can read staged artifacts but not source, clean, or source-index files', () => {
+    const root = tempDir('clean-room-sanitizer-read');
+    const env = policyEnv(root, 'contaminated-handoff-sanitizer');
+    const contaminated = env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS;
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const source = env.CLEAN_ROOM_SOURCE_ROOTS;
+    const allowed = env.CLEAN_ROOM_ALLOWED_READ_ROOTS;
+    fs.writeFileSync(path.join(contaminated, 'behavior-spec.json'), '{}');
+    fs.writeFileSync(path.join(contaminated, 'source-index.json'), '{}');
+    fs.writeFileSync(path.join(source, 'secret.py'), 'VALUE = 1\n');
+    fs.writeFileSync(path.join(clean, 'handoff-package.json'), '{}');
+    fs.writeFileSync(path.join(allowed, 'public.md'), '# Public reference\n');
+
+    let result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { cwd: contaminated, file_path: 'behavior-spec.json' },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: path.join(SCHEMA_DIR, 'behavior-spec.schema.json') },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: path.join(allowed, 'public.md') },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: path.join(source, 'secret.py') },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /reading source path/);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: path.join(clean, 'handoff-package.json') },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /reading clean path/);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: path.join(contaminated, 'source-index.json') },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /source-index artifact/);
+  });
+
   test('write policy resolves relative payload paths against tool cwd', () => {
     const root = tempDir('clean-room-write-cwd');
     const env = policyEnv(root, 'clean-architect');
@@ -370,7 +460,42 @@ describe('clean-room hook policy', () => {
       tool_name: 'NotebookEdit',
       tool_input: { content: 'no file path in this payload' },
     }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /write with no resolved path/);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'FutureWriteTool',
+      tool_input: { content: 'no file path in this payload' },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /write with no resolved path/);
+  });
+
+  test('sanitizer writes only under contaminated artifact roots', () => {
+    const root = tempDir('clean-room-sanitizer-write');
+    const env = policyEnv(root, 'contaminated-handoff-sanitizer');
+    const contaminated = env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS;
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+
+    let result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: contaminated, file_path: 'sanitized-behavior-spec.json' },
+    }, env);
     assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: contaminated, file_path: '../clean/handoff-package.json' },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /writing clean path/);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: path.join(clean, 'handoff-package.json') },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /writing clean path/);
   });
 
   test('clean-root JSON artifacts must be recognized or explicitly allowlisted', () => {
@@ -405,7 +530,17 @@ describe('clean-room hook policy', () => {
 
     const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: sourceIndex } }, env);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /source-index\.json is contaminated-only/);
+    assert.match(result.stderr, /source-index\.json is not a clean-role artifact/);
+  });
+
+  test('init-config JSON is rejected under clean roots', () => {
+    const root = tempDir('clean-room-init-config-clean');
+    const env = policyEnv(root, 'clean-architect');
+    const initConfig = copyExample('init-config.json', env.CLEAN_ROOM_CLEAN_ROOTS);
+
+    const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: initConfig } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /init-config\.json is not a clean-role artifact/);
   });
 
   test('handoff integrity verifies referenced artifact path and sha256', () => {
@@ -418,7 +553,7 @@ describe('clean-room hook policy', () => {
       task_id: 'task-test',
       from_domain: 'contaminated',
       to_domain: 'clean',
-      created_by_role: 'contaminated-source-analyst',
+      created_by_role: 'contaminated-handoff-sanitizer',
       artifacts: [
         {
           artifact_id: 'spec-example-flow',
@@ -430,7 +565,7 @@ describe('clean-room hook policy', () => {
       excluded_material: ['source_excerpt'],
       leakage_review: {
         status: 'passed',
-        reviewer_role: 'contaminated-source-analyst',
+        reviewer_role: 'contaminated-handoff-sanitizer',
         notes: 'fixture',
       },
     }));
@@ -450,6 +585,32 @@ describe('clean-room hook policy', () => {
     result = runHook('validate-handoff-package.py', { tool_name: 'Write', tool_input: { file_path: handoff } }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /artifact sha256 must be a 64-character hex string/);
+
+    const taskManifest = copyExample('task-manifest.json', env.CLEAN_ROOM_CLEAN_ROOTS);
+    fs.writeFileSync(handoff, JSON.stringify({
+      package_id: 'package-test',
+      task_id: 'task-test',
+      from_domain: 'contaminated',
+      to_domain: 'clean',
+      created_by_role: 'contaminated-handoff-sanitizer',
+      artifacts: [
+        {
+          artifact_id: 'task-manifest',
+          artifact_type: 'task-manifest',
+          path: 'task-manifest.json',
+          sha256: sha256(taskManifest),
+        },
+      ],
+      excluded_material: ['source_excerpt'],
+      leakage_review: {
+        status: 'passed',
+        reviewer_role: 'contaminated-handoff-sanitizer',
+        notes: 'fixture',
+      },
+    }));
+    result = runHook('validate-handoff-package.py', { tool_name: 'Write', tool_input: { file_path: handoff } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task-manifest\.json must not be included/);
   });
 
   test('source-index builder refuses output outside contaminated artifact roots', () => {
@@ -475,6 +636,71 @@ describe('clean-room hook policy', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /--output must be under a contaminated artifact root/);
     assert.equal(fs.existsSync(outside), false);
+  });
+
+  test('source-index builder rejects overlapping roots and output under source roots', () => {
+    const root = tempDir('clean-room-source-index-overlap');
+    const source = path.join(root, 'source');
+    const nested = path.join(source, 'nested');
+    const contaminated = path.join(root, 'contaminated');
+    mkdirs(nested, contaminated);
+    fs.writeFileSync(path.join(source, 'example.py'), 'VALUE = 1\n');
+
+    const cases = [
+      {
+        name: 'source-under-contaminated',
+        sourceRoots: [path.join(contaminated, 'source')],
+        contaminatedRoot: contaminated,
+        output: path.join(contaminated, 'source-index.json'),
+        message: /source roots and contaminated artifact roots must be separate/,
+      },
+      {
+        name: 'contaminated-under-source',
+        sourceRoots: [source],
+        contaminatedRoot: path.join(source, 'contaminated'),
+        output: path.join(source, 'contaminated', 'source-index.json'),
+        message: /--output must not be under a source root/,
+      },
+      {
+        name: 'nested-source-roots',
+        sourceRoots: [source, nested],
+        contaminatedRoot: contaminated,
+        output: path.join(contaminated, 'source-index.json'),
+        message: /source roots must not overlap/,
+      },
+      {
+        name: 'output-under-source',
+        sourceRoots: [source],
+        contaminatedRoot: source,
+        output: path.join(source, 'source-index.json'),
+        message: /--output must not be under a source root/,
+      },
+    ];
+
+    for (const item of cases) {
+      for (const sourceRoot of item.sourceRoots) {
+        mkdirs(sourceRoot);
+      }
+      mkdirs(item.contaminatedRoot);
+      const args = [
+        SOURCE_INDEX,
+        '--output', item.output,
+        '--contaminated-artifact-root', item.contaminatedRoot,
+        '--task-id', `task-${item.name}`,
+        '--skip-tool-detection',
+      ];
+      for (const sourceRoot of item.sourceRoots) {
+        args.push('--source-root', sourceRoot);
+      }
+      const result = spawnSync('python3', args, {
+        cwd: ROOT,
+        env: process.env,
+        encoding: 'utf8',
+      });
+      assert.notEqual(result.status, 0, item.name);
+      assert.match(result.stderr, item.message, item.name);
+      assert.equal(fs.existsSync(item.output), false, item.name);
+    }
   });
 
   test('source-index resolves package-relative Python imports to the package base', () => {
@@ -609,6 +835,57 @@ describe('clean-room hook policy', () => {
 
     const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
     assert.equal(result.status, 0, result.stderr);
+  });
+
+  test('sanitizer staged artifacts are leakage-scanned while analyst drafts are not', () => {
+    const root = tempDir('clean-room-sanitizer-leakage');
+    const env = policyEnv(root, 'contaminated-handoff-sanitizer');
+    const filePath = path.join(env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, 'behavior-spec.json');
+    fs.writeFileSync(filePath, JSON.stringify({
+      summary: 'Call private.module.name.doThing() after setup.',
+    }));
+
+    let result = runHook('check-artifact-leakage.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: filePath },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /package_or_module_identifier|source_like_call|source_like_scoped_identifier/);
+
+    result = runHook('check-artifact-leakage.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: filePath },
+    }, {
+      ...env,
+      CLEAN_ROOM_ROLE: 'contaminated-source-analyst',
+    });
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  test('schema hook accepts sanitizer role in manifest, behavior spec, handoff, and incident artifacts', () => {
+    const root = tempDir('clean-room-sanitizer-schema');
+    const env = policyEnv(root, 'clean-architect');
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const artifacts = [
+      copyExample('task-manifest.json', clean),
+      copyExample('clean-run-context.json', clean),
+      copyExample('behavior-spec.json', clean),
+      copyExample('handoff-package.json', clean),
+      copyExample('contamination-incident.json', clean),
+    ];
+
+    const incidentPath = path.join(clean, 'contamination-incident.json');
+    const incident = JSON.parse(fs.readFileSync(incidentPath, 'utf8'));
+    incident.reported_by_role = 'contaminated-handoff-sanitizer';
+    fs.writeFileSync(incidentPath, JSON.stringify(incident));
+
+    for (const artifact of artifacts) {
+      const result = runHook('validate-json-schema.py', {
+        tool_name: 'Write',
+        tool_input: { file_path: artifact },
+      }, env);
+      assert.equal(result.status, 0, `${artifact}\n${result.stderr}`);
+    }
   });
 
   test('leakage scanner uses only the leaf key for denylist-only string classification', () => {

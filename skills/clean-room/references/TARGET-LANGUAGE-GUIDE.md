@@ -11,6 +11,7 @@ When target constraints exist, record:
 - language and version policy, if discoverable from the destination repo
 - package, crate, module, or service boundaries
 - public API compatibility requirements
+- protocol, config, and data/schema compatibility requirements
 - serialization and schema constraints
 - error model expectations
 - concurrency or async model expectations
@@ -41,3 +42,9 @@ Represent eventual implementation areas as neutral destinations:
 - `open_decisions`: choices intentionally left for a later implementation phase
 
 When no target language is supplied, use `target_language: "unspecified"` and keep all design notes language-neutral.
+
+## Compatibility And Test Parity
+
+Use existing artifact fields for compatibility. Record public API, protocol, config, and data/schema compatibility in `public_surface`, `compatibility_notes`, `public_contracts`, and `target_constraints`. Record equal-output expectations in behavior spec `outputs`, `observable_behaviors`, `invariants`, and `test_scenarios`.
+
+When source tests exist, convert their behavioral intent into clean tests that validate the same observable outputs. Equal output covers public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects. Do not copy source test names, fixture structure, private helpers, or source-shaped assertions.

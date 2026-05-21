@@ -37,6 +37,7 @@ Start from the scope gate, not from prior QC:
 - Preserve source roots and authorization only when they are still valid for the requested restart.
 - Create a fresh `task_id` by default.
 - Record `run_state.generation`, `run_state.started_at`, optional `run_state.previous_generation_ref`, and `run_state.restart_reason`.
+- Recreate `clean-run-context.json` from the new effective initialization choices; do not carry forward an old clean context by default.
 - Rebuild `source-index.json` unless the user explicitly says the source scope is unchanged and a recorded old index hash can still be validated.
 - Preserve the selected controller mode only if the user reconfirms it or it is recorded in the still-valid manifest.
 

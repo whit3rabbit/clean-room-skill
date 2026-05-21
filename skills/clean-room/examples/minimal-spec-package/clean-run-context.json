@@ -1,0 +1,54 @@
+{
+  "context_id": "clean-context-example",
+  "task_id": "task-example",
+  "created_at": "2024-01-01T00:00:00Z",
+  "target_profile": "speckit-feature-folder",
+  "native_artifacts": [
+    "specs/<feature-id>/spec.md - feature specification",
+    "specs/<feature-id>/plan.md - technical plan",
+    "specs/<feature-id>/tasks.md - executable work items"
+  ],
+  "formatting_rules": [
+    "Use prioritized user stories with Given/When/Then acceptance scenarios."
+  ],
+  "clean_artifacts": {
+    "clean_root": "clean-artifacts/",
+    "handoff_package": "handoff-package.json",
+    "behavior_specs": [
+      "behavior-spec.json"
+    ],
+    "skeleton_manifest": "skeleton-manifest.json",
+    "qc_report": "qc-report.json",
+    "open_questions": [
+      "open-questions.json"
+    ],
+    "abstract_delta_tickets": [
+      "abstract-delta-tickets.json"
+    ]
+  },
+  "approved_public_reference_roots": [
+    "public-refs/"
+  ],
+  "clean_isolation": {
+    "mode": "clean-workspace",
+    "clean_agents_start_cwd": "clean_root",
+    "source_mounted": false
+  },
+  "model_preferences": {
+    "default_model": "runtime-default",
+    "domain_overrides": {
+      "clean": "runtime-clean-model"
+    },
+    "role_overrides": [
+      {
+        "role": "clean-qa-editor",
+        "model": "runtime-high-reasoning-model"
+      }
+    ]
+  },
+  "user_rules": {
+    "clean_safe": [
+      "Use concise acceptance criteria."
+    ]
+  }
+}

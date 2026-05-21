@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Refocus realigns the current run to the declared scope, controller policy, artifact schemas, and clean-room boundary.
 
-Refocus does not optimize, expand, or reinterpret the task. It does not invent new requirements or add behavior beyond `task-manifest.json`, ledgers, QC, and abstract delta tickets.
+Refocus does not optimize, expand, or reinterpret the task. It does not invent new requirements or add behavior beyond `task-manifest.json`, `clean-run-context.json`, ledgers, QC, and abstract delta tickets.
 
 Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the same spec-only boundary, role separation, artifact schemas, leakage rules, and hook expectations.
 
@@ -17,12 +17,14 @@ Use the canonical `clean-room` skill workflow and references in this plugin. Pre
 
 Compare current artifacts to the canonical gate checklist:
 
-- Scope gate recorded authorization, roots, boundaries, prohibited actions, evidence handling, selected target profile, and Agent 0-3 pipeline.
+- Scope gate recorded authorization, roots, boundaries, prohibited actions, evidence handling, selected target profile, Agent 0-3 pipeline, and Agent 1.5 sanitizer role for new runs.
+- Initialization snapshot exists when init preferences were used, and reusable `init-config.json` drift is reported instead of silently applied.
+- `clean-run-context.json` exists before clean roles run and excludes source roots, contaminated roots, source index refs, and ledger paths.
 - Source index preflight exists when required and remains contaminated-only.
 - Decomposition produced neutral `task-manifest.json` units.
-- Contaminated analysis wrote behavior specs without implementation code.
-- Leakage review ran before handoff.
-- Handoff package excludes `source-index.json`, source paths, raw diffs, copied comments, private identifiers, source-shaped pseudocode, and contaminated ledgers.
+- Contaminated analysis wrote draft behavior specs without implementation code.
+- Agent 1.5 sanitization ran before handoff, or older artifacts clearly predate the Agent 1.5 gate and require review before reuse.
+- Handoff package excludes full `task-manifest.json`, `source-index.json`, source paths, raw diffs, copied comments, private identifiers, source-shaped pseudocode, and contaminated ledgers.
 - Clean organization produced clean-only `skeleton-manifest.json` when the run reached that gate.
 - QC produced `qc-report.json` with schema, leakage, coverage, and abstract delta ticket status when the run reached that gate.
 - Contaminated verification returned only abstract delta tickets.

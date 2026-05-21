@@ -1,0 +1,16 @@
+{
+  "schema_kind": "clean-run-context",
+  "base": "clean-run-context.json",
+  "description": "Clean run context must not expose contaminated artifact roots.",
+  "set": [
+    {
+      "path": [
+        "contaminated_artifact_roots"
+      ],
+      "value": [
+        "/private/contaminated"
+      ]
+    }
+  ],
+  "expected_error": "Additional"
+}

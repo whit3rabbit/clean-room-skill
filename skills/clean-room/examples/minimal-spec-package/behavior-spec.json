@@ -54,7 +54,7 @@
   "open_questions": [],
   "leakage_review": {
     "status": "passed",
-    "reviewer_role": "contaminated-source-analyst",
+    "reviewer_role": "contaminated-handoff-sanitizer",
     "notes": "No blocked material in example."
   },
   "review_history": []

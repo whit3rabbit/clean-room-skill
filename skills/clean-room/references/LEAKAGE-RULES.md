@@ -11,6 +11,9 @@ Block these from clean artifacts:
 - raw source files
 - copied source excerpts
 - raw diffs
+- full `task-manifest.json`
+- `init-config.json`
+- source roots, contaminated roots, source index refs, coverage ledger refs, and evidence ledger refs
 - copied comments
 - decompiled output
 - private package, module, class, helper, method, function, variable, constant, or field names
@@ -41,7 +44,9 @@ Treat implementation identifiers as contaminated by default. Package names, name
 
 Public compatibility surface means the name is externally documented, required by an existing integration, visible in a public protocol or file format, or explicitly required by the destination scope. If a name is retained, place it in `public_surface` or `public_contracts` with `name`, `kind`, `visibility`, and a concrete compatibility reason. Valid `visibility` values are `public`, `destination`, `protocol`, and `user-required`. Do not mention source-private names in summaries, claims, tests, open questions, skeleton areas, QC findings, or delta tickets.
 
-The contaminated side should maintain a private identifier denylist for guardrail scanning when practical. The denylist is line-oriented, ignores blank lines and `#` comments, and is bounded to 1,000,000 bytes per file, 20,000 total terms, and 512 characters per term. Keep that list out of clean-role readable roots and do not paste its contents into clean artifacts or model-visible reports.
+The contaminated side should maintain a private identifier denylist for guardrail scanning when practical. The denylist is line-oriented, ignores blank lines and `#` comments, and is bounded to 1,000,000 bytes per file, 20,000 total terms, and 512 characters per term. Keep that list out of clean/source-denied readable roots and do not paste its contents into clean artifacts or model-visible reports.
+
+Agent 1.5 may use the denylist only through hook scanning. Do not include denylist terms in the neutral sanitizer brief, sanitizer prompts, sanitizer reports, clean artifacts, or model-visible feedback.
 
 ## Rewrite Pattern
 
@@ -54,7 +59,7 @@ Convert source-adjacent observations into neutral requirements:
 
 ## Review Checklist
 
-Before clean handoff, confirm:
+Before clean handoff, Agent 1.5 confirms from a fresh source-denied context:
 
 - No copied source text remains.
 - No source code block remains.
@@ -65,6 +70,8 @@ Before clean handoff, confirm:
 - Every claim has an evidence status.
 - Every retained public name has a compatibility reason.
 - Every uncertain behavior is marked as an open question.
+- `leakage_review.reviewer_role` is `contaminated-handoff-sanitizer`.
+- Clean roles receive `clean-run-context.json`, not `task-manifest.json` or `init-config.json`.
 
 ## Contamination Response
 
@@ -73,7 +80,7 @@ If clean work receives blocked material:
 1. Stop clean processing for the affected artifact.
 2. Mark the artifact contaminated.
 3. Remove it from the clean workspace or quarantine it outside the clean artifact set.
-4. Regenerate a scrubbed artifact from the contaminated side.
+4. Regenerate a scrubbed artifact from the contaminated side through Agent 1.5.
 5. Record the incident in `qc-report.json` and, when useful, a standalone `contamination-incident.json`.
 
 Do not try to "forget" source material inside the same clean context and continue.
@@ -82,9 +89,10 @@ Do not try to "forget" source material inside the same clean context and continu
 
 Use hook scripts as audit and guardrail support, not as the only boundary:
 
-- `hooks/deny-clean-source-read.py`: denies clean-role reads from `CLEAN_ROOM_SOURCE_ROOTS` and any path outside `CLEAN_ROOM_CLEAN_ROOTS` plus `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
+- `hooks/deny-clean-source-read.py`: denies clean-role and Agent 1.5 reads from `CLEAN_ROOM_SOURCE_ROOTS`; clean roles may read only `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS`, while Agent 1.5 may read only assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
 - `hooks/deny-contaminated-clean-write.py`: enforces write roots. Clean roles may write only under `CLEAN_ROOM_CLEAN_ROOTS`; contaminated roles may write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 - `hooks/check-artifact-leakage.py`: scans clean artifacts for high-risk leakage markers, obvious source-like identifiers, and terms from optional `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST` files.
+- For Agent 1.5, `hooks/check-artifact-leakage.py` also scans staged contaminated artifacts before promotion to clean handoff.
 - `hooks/validate-json-schema.py`: checks JSON syntax and common bundled schema constraints, including the conditional and bounded fields used by these schemas. It is not a full JSON Schema 2020-12 validator.
 - `hooks/require-clean-room-env.py`: fails closed when the role, root, or schema environment block is missing.
 - `hooks/deny-clean-room-shell.py`: denies shell-style tools for clean-room role sessions because shell reads can bypass path-aware hooks.

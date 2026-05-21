@@ -12,11 +12,11 @@ from typing import Any
 ROLES = {
     "contaminated-manager-verifier",
     "contaminated-source-analyst",
+    "contaminated-handoff-sanitizer",
     "clean-architect",
     "clean-qa-editor",
 }
 CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
-WRITE_TOOL_NAMES = {"Write", "Edit", "MultiEdit"}
 PATH_KEYS = {
     "file_path",
     "filePath",
@@ -94,19 +94,8 @@ def load_payload() -> tuple[dict[str, Any], str | None]:
     return data, None
 
 
-def tool_name(payload: dict[str, Any]) -> str:
-    for key in ("tool_name", "tool", "name"):
-        value = payload.get(key)
-        if isinstance(value, str):
-            return value
-    return ""
-
-
 def should_fail_closed_for_write(payload: dict[str, Any]) -> bool:
-    if not active_clean_room_role():
-        return False
-    name = tool_name(payload)
-    return not name or name in WRITE_TOOL_NAMES
+    return bool(active_clean_room_role())
 
 
 def _path_values(value: Any, depth: int = 0) -> list[str]:

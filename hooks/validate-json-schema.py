@@ -15,6 +15,8 @@ from clean_room_paths import checked_write_paths, load_payload, path_under_env
 
 
 SCHEMA_BY_ARTIFACT = {
+    "init-config": "init-config.schema.json",
+    "clean-run-context": "clean-run-context.schema.json",
     "task-manifest": "task-manifest.schema.json",
     "behavior-spec": "behavior-spec.schema.json",
     "skeleton-manifest": "skeleton-manifest.schema.json",
@@ -43,6 +45,10 @@ def artifact_kind(path: Path, data: dict) -> str | None:
         return name
     if "spec_id" in data:
         return "behavior-spec"
+    if "config_id" in data and "artifact_base_root" in data:
+        return "init-config"
+    if "context_id" in data and "clean_isolation" in data:
+        return "clean-run-context"
     if "manifest_id" in data:
         return "skeleton-manifest"
     if "report_id" in data:
@@ -336,8 +342,8 @@ def main() -> int:
                 print(f"clean-room schema check failed for {path}: unrecognized clean JSON artifact", file=sys.stderr)
                 return 1
             continue
-        if in_clean_root and kind == "source-index":
-            print(f"clean-room schema check failed for {path}: source-index.json is contaminated-only", file=sys.stderr)
+        if in_clean_root and kind in {"source-index", "init-config"}:
+            print(f"clean-room schema check failed for {path}: {kind}.json is not a clean-role artifact", file=sys.stderr)
             return 1
         schema_path = schema_dir() / SCHEMA_BY_ARTIFACT[kind]
         try:

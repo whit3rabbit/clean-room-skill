@@ -1,0 +1,16 @@
+{
+  "schema_kind": "clean-run-context",
+  "base": "clean-run-context.json",
+  "description": "Clean run context must not reference contaminated ledgers.",
+  "set": [
+    {
+      "path": [
+        "clean_artifacts",
+        "behavior_specs",
+        0
+      ],
+      "value": "coverage-ledger.json"
+    }
+  ],
+  "expected_error": "does not match"
+}

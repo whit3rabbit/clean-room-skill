@@ -58,7 +58,15 @@
     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="#f97316" transform="translate(12, 16) scale(1.1)"/>
     <text x="48" y="32" class="body-bold">Agent 1</text>
     <text x="48" y="47" class="body-text">Contaminated</text>
-    <text x="48" y="61" class="body-text">Source Analyst</text>
+    <text x="48" y="61" class="body-text">Draft Spec Writer</text>
+  </g>
+
+  <g transform="translate(235, 110)" class="shadow-sm">
+    <rect width="180" height="75" fill="#ffffff" stroke="#f97316" stroke-width="1" rx="6" />
+    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="#f97316" transform="translate(12, 16) scale(1.1)"/>
+    <text x="48" y="29" class="body-bold">Agent 1.5</text>
+    <text x="48" y="45" class="body-text">Source-denied</text>
+    <text x="48" y="60" class="body-text">Handoff Sanitizer</text>
   </g>
 
   <g transform="translate(235, 210)" class="shadow-sm">
@@ -77,11 +85,11 @@
     </g>
     <g transform="translate(12, 116)">
       <rect width="156" height="26" fill="#ffffff" stroke="#fcd34d" stroke-width="1" rx="4" />
-      <text x="10" y="17" class="code-text">coverage-ledger.json</text>
+      <text x="10" y="17" class="code-text">draft specs</text>
     </g>
     <g transform="translate(12, 148)">
       <rect width="156" height="26" fill="#ffffff" stroke="#fcd34d" stroke-width="1" rx="4" />
-      <text x="10" y="17" class="code-text">evidence-ledger.json</text>
+      <text x="10" y="17" class="code-text">agent_1_5_stage</text>
     </g>
   </g>
 
@@ -89,6 +97,9 @@
   <line x1="117" y1="260" x2="117" y2="295" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
   <line x1="200" y1="332" x2="235" y2="332" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
   <path d="M 235 225 L 210 225 L 210 205 L 200 205" fill="none" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
+  <path d="M 200 222 L 218 222 L 218 148 L 235 148" fill="none" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
+  <line x1="325" y1="326" x2="325" y2="185" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
+  <path d="M 415 148 L 430 148 L 430 325 L 435 325" fill="none" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
 
   <g transform="translate(445, 40)">
     <text x="85" y="25" class="header-title" fill="#374151" text-anchor="middle">Clean-Room Boundary</text>
@@ -159,7 +170,8 @@
     <line x1="4" y1="18" x2="14" y2="18" stroke="#ea580c" stroke-width="1.5" />
   </g>
   <line x1="435" y1="325" x2="615" y2="325" stroke="#111827" stroke-width="2" marker-end="url(#arrow)" />
-  <text x="525" y="342" class="body-bold" text-anchor="middle">Approved handoff</text>
+  <text x="525" y="341" class="body-bold" text-anchor="middle">Agent 1.5-approved</text>
+  <text x="525" y="356" class="body-bold" text-anchor="middle">handoff only</text>
   
   <g transform="translate(620, 312)" class="shadow-sm">
     <rect width="20" height="26" fill="#ffffff" stroke="#047857" stroke-width="1.5" rx="3" />
@@ -270,10 +282,9 @@
     <rect width="136" height="100" fill="#ffffff" stroke="#2563eb" stroke-width="1" rx="6" />
     <circle cx="68" cy="-12" r="12" fill="#2563eb" />
     <text x="68" y="-7" class="step-num" text-anchor="middle">4</text>
-    <text x="68" y="28" class="body-text" text-anchor="middle">4. Analyze source</text>
-    <text x="68" y="44" class="body-text" text-anchor="middle">and write</text>
-    <text x="68" y="60" class="body-text" text-anchor="middle">scrubbed</text>
-    <text x="68" y="76" class="body-text" text-anchor="middle">behavior specs</text>
+    <text x="68" y="36" class="body-text" text-anchor="middle">4. Analyze source</text>
+    <text x="68" y="54" class="body-text" text-anchor="middle">and write draft</text>
+    <text x="68" y="72" class="body-text" text-anchor="middle">behavior specs</text>
   </g>
   <line x1="612" y1="575" x2="628" y2="575" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)" />
 
@@ -281,10 +292,10 @@
     <rect width="136" height="100" fill="#ffffff" stroke="#2563eb" stroke-width="1" rx="6" />
     <circle cx="68" cy="-12" r="12" fill="#2563eb" />
     <text x="68" y="-7" class="step-num" text-anchor="middle">5</text>
-    <text x="68" y="28" class="body-text" text-anchor="middle">5. Cross the wall</text>
-    <text x="68" y="44" class="body-text" text-anchor="middle">with approved</text>
-    <text x="68" y="60" class="body-text" text-anchor="middle">clean artifacts</text>
-    <text x="68" y="76" class="body-text" text-anchor="middle">only</text>
+    <text x="68" y="28" class="body-text" text-anchor="middle">5. Agent 1.5</text>
+    <text x="68" y="44" class="body-text" text-anchor="middle">sanitizes staged</text>
+    <text x="68" y="60" class="body-text" text-anchor="middle">drafts before</text>
+    <text x="68" y="76" class="body-text" text-anchor="middle">clean handoff</text>
   </g>
   <line x1="764" y1="575" x2="780" y2="575" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)" />
 

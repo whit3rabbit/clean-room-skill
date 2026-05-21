@@ -39,9 +39,12 @@ def source_roots(values: list[str]) -> list[dict[str, str]]:
     for index, value in enumerate(values, start=1):
         path = Path(value).expanduser().resolve()
         if path in seen:
-            continue
+            raise SystemExit(f"duplicate --source-root: {path}")
         if not path.is_dir():
             raise SystemExit(f"source root is not a directory: {path}")
+        for existing in seen:
+            if paths_overlap(path, existing):
+                raise SystemExit(f"source roots must not overlap: {path} overlaps {existing}")
         seen.add(path)
         roots.append({"root_id": f"root-{index:03d}", "path": str(path)})
     if not roots:
@@ -51,6 +54,10 @@ def source_roots(values: list[str]) -> list[dict[str, str]]:
 
 def path_is_under(path: Path, root: Path) -> bool:
     return path == root or root in path.parents
+
+
+def paths_overlap(left: Path, right: Path) -> bool:
+    return path_is_under(left, right) or path_is_under(right, left)
 
 
 def contaminated_artifact_roots(args: argparse.Namespace) -> list[Path]:
@@ -67,19 +74,32 @@ def contaminated_artifact_roots(args: argparse.Namespace) -> list[Path]:
     return roots
 
 
-def checked_output_path(args: argparse.Namespace) -> Path:
+def checked_output_path(args: argparse.Namespace, source_root_records: list[dict[str, str]]) -> Path:
     output = Path(args.output).expanduser().resolve()
+    source_root_paths = [Path(root["path"]) for root in source_root_records]
+    if any(path_is_under(output, root) for root in source_root_paths):
+        raise SystemExit(f"--output must not be under a source root: {output}")
     roots = contaminated_artifact_roots(args)
     if not roots:
         raise SystemExit(
             "--output must be under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS or an explicit --contaminated-artifact-root"
         )
+    for source_root in source_root_paths:
+        for contaminated_root in roots:
+            if paths_overlap(source_root, contaminated_root):
+                raise SystemExit(
+                    f"source roots and contaminated artifact roots must be separate: "
+                    f"{source_root} overlaps {contaminated_root}"
+                )
     if not any(path_is_under(output, root) for root in roots):
         allowed = ", ".join(root.as_posix() for root in roots)
         raise SystemExit(f"--output must be under a contaminated artifact root ({allowed}): {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
     resolved_output = output.resolve()
     resolved_roots = [root.resolve() for root in roots]
+    resolved_source_roots = [root.resolve() for root in source_root_paths]
+    if any(path_is_under(resolved_output, root) for root in resolved_source_roots):
+        raise SystemExit(f"--output must not be under a source root: {resolved_output}")
     if not any(path_is_under(resolved_output, root) for root in resolved_roots):
         allowed = ", ".join(root.as_posix() for root in resolved_roots)
         raise SystemExit(f"--output must be under a contaminated artifact root ({allowed}): {resolved_output}")

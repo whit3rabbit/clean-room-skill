@@ -1,0 +1,16 @@
+{
+  "schema_kind": "clean-run-context",
+  "base": "clean-run-context.json",
+  "description": "Clean run context must not expose source roots.",
+  "set": [
+    {
+      "path": [
+        "source_roots"
+      ],
+      "value": [
+        "/private/source"
+      ]
+    }
+  ],
+  "expected_error": "Additional"
+}

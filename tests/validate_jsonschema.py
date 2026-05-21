@@ -26,6 +26,8 @@ EXAMPLE_DIRS = [
 ]
 NEGATIVE_DIR = ROOT / "tests" / "fixtures" / "jsonschema-negative"
 SCHEMA_BY_ARTIFACT = {
+    "init-config": "init-config.schema.json",
+    "clean-run-context": "clean-run-context.schema.json",
     "task-manifest": "task-manifest.schema.json",
     "behavior-spec": "behavior-spec.schema.json",
     "skeleton-manifest": "skeleton-manifest.schema.json",

@@ -3,13 +3,13 @@
   "task_id": "task-valid-fixture",
   "from_domain": "contaminated",
   "to_domain": "clean",
-  "created_by_role": "contaminated-source-analyst",
+  "created_by_role": "contaminated-handoff-sanitizer",
   "artifacts": [
     {
       "artifact_id": "spec-valid-handoff-flow",
       "artifact_type": "behavior-spec",
       "path": "behavior-spec.json",
-      "sha256": "23116f56af7ee673e83ee11378a01b41a6ef2cbaeaa9637305eae170588d3049"
+      "sha256": "8006c50453a115d38230f0c6047b015764da002bda509205461edb4a9a86c8a0"
     }
   ],
   "excluded_material": [
@@ -20,7 +20,7 @@
   ],
   "leakage_review": {
     "status": "passed",
-    "reviewer_role": "contaminated-source-analyst",
+    "reviewer_role": "contaminated-handoff-sanitizer",
     "notes": "Fixture package references a real clean artifact with a matching checksum."
   }
 }

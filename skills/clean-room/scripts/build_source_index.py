@@ -91,8 +91,8 @@ def main() -> int:
     args = parse_args()
     validate_limits(args)
 
-    output_path = checked_output_path(args)
     roots = source_roots(args.source_root)
+    output_path = checked_output_path(args, roots)
     files, file_segments, skipped_entries, counters = collect_files(args, roots)
     relationships = resolve_relationships(files)
     groups = build_groups(files, relationships)

@@ -8,11 +8,15 @@ The `valid-handoff-package` directory is the positive handoff-integrity fixture.
 
 The minimal `task-manifest.json` uses `speckit-feature-folder` as a non-normative example. Real tasks must record the user's actual `format_selection.target_profile` from OpenSpec, GSD, Spec Kit, or Kiro before agents start work.
 
-The minimal `source-index.json` is a contaminated-side shape example. Real source indexes may contain source paths and private import/export names, so they must stay out of clean handoff packages.
+The minimal `init-config.json` is a controller-side preference example and may contain source roots, so do not place it in clean-role readable roots. The minimal `clean-run-context.json` is the sanitized Agent 2/3 context.
+
+The minimal `source-index.json` is a contaminated-side shape example. Real source indexes may contain source paths and private import/export names, so they must stay out of Agent 1.5 inputs and clean handoff packages.
 
 Use them to seed tests, docs, or dry runs:
 
 - `minimal-spec-package/task-manifest.json`
+- `minimal-spec-package/init-config.json`
+- `minimal-spec-package/clean-run-context.json`
 - `minimal-spec-package/source-index.json`
 - `minimal-spec-package/evidence-ledger.json`
 - `minimal-spec-package/coverage-ledger.json`

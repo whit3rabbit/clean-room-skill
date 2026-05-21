@@ -31,6 +31,7 @@
     "created_by_role": {
       "enum": [
         "contaminated-source-analyst",
+        "contaminated-handoff-sanitizer",
         "contaminated-manager-verifier"
       ]
     },
@@ -52,7 +53,7 @@
           },
           "artifact_type": {
             "enum": [
-              "task-manifest",
+              "clean-run-context",
               "behavior-spec",
               "coverage-ledger-summary",
               "open-questions",

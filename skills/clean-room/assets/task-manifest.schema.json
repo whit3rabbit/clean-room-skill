@@ -110,6 +110,9 @@
         }
       }
     },
+    "initialization_snapshot": {
+      "$ref": "#/$defs/initialization_snapshot"
+    },
     "source_scope": {
       "$ref": "#/$defs/workspace_scope"
     },
@@ -198,6 +201,9 @@
         },
         "agent_1": {
           "$ref": "#/$defs/agent_1_stage"
+        },
+        "agent_1_5": {
+          "$ref": "#/$defs/agent_1_5_stage"
         },
         "agent_2": {
           "$ref": "#/$defs/agent_2_stage"
@@ -377,7 +383,7 @@
           "type": "array",
           "items": {
             "enum": [
-              "task-manifest",
+              "clean-run-context",
               "behavior-spec",
               "handoff-package",
               "skeleton-manifest",
@@ -509,6 +515,7 @@
       "enum": [
         "contaminated-manager-verifier",
         "contaminated-source-analyst",
+        "contaminated-handoff-sanitizer",
         "clean-architect",
         "clean-qa-editor"
       ]
@@ -545,6 +552,27 @@
       "properties": {
         "role": {
           "const": "contaminated-source-analyst"
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_domain": {
+          "const": "contaminated"
+        }
+      }
+    },
+    "agent_1_5_stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "responsibility",
+        "trust_domain"
+      ],
+      "properties": {
+        "role": {
+          "const": "contaminated-handoff-sanitizer"
         },
         "responsibility": {
           "type": "string",
@@ -617,6 +645,190 @@
         "path_policy": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "initialization_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "config_id",
+        "captured_at",
+        "artifact_base_root",
+        "target_profile",
+        "clean_isolation_mode",
+        "model_preferences",
+        "user_rules",
+        "effective_roots",
+        "reconfiguration_policy"
+      ],
+      "properties": {
+        "config_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "captured_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "artifact_base_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_profile": {
+          "enum": [
+            "openspec-delta",
+            "gsd-planning-package",
+            "speckit-feature-folder",
+            "kiro-spec-folder"
+          ]
+        },
+        "clean_isolation_mode": {
+          "const": "clean-workspace"
+        },
+        "model_preferences": {
+          "$ref": "#/$defs/model_preferences"
+        },
+        "user_rules": {
+          "$ref": "#/$defs/initialization_rules"
+        },
+        "effective_roots": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_roots",
+            "contaminated_artifact_roots",
+            "clean_root",
+            "quarantine_root",
+            "approved_public_reference_roots"
+          ],
+          "properties": {
+            "source_roots": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "contaminated_artifact_roots": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "clean_root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "quarantine_root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "approved_public_reference_roots": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "reconfiguration_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root_changes_require_confirmation",
+            "schema_changes_require_confirmation",
+            "model_changes_require_confirmation",
+            "artifact_root_changes_start_new_generation"
+          ],
+          "properties": {
+            "root_changes_require_confirmation": {
+              "const": true
+            },
+            "schema_changes_require_confirmation": {
+              "const": true
+            },
+            "model_changes_require_confirmation": {
+              "const": true
+            },
+            "artifact_root_changes_start_new_generation": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "model_preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_model"
+      ],
+      "properties": {
+        "default_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain_overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "contaminated": {
+              "type": "string",
+              "minLength": 1
+            },
+            "clean": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "role_overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "model"
+            ],
+            "properties": {
+              "role": {
+                "$ref": "#/$defs/role"
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "initialization_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clean_safe",
+        "contaminated_only"
+      ],
+      "properties": {
+        "clean_safe": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "contaminated_only": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }

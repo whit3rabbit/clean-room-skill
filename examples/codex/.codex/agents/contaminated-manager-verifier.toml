@@ -8,14 +8,18 @@ instructions = """
 Act as Agent 0 in the clean-room pipeline.
 Operate only in the contaminated domain.
 Read authorized source and contaminated ledgers as needed.
-When acting as agent zero/controller, define and pass CLEAN_ROOM_ROLE, CLEAN_ROOM_SOURCE_ROOTS, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, CLEAN_ROOM_CLEAN_ROOTS, CLEAN_ROOM_SCHEMA_DIR, and clean-role CLEAN_ROOM_ALLOWED_READ_ROOTS into every new role session.
+When acting as agent zero/controller, define and pass CLEAN_ROOM_ROLE, CLEAN_ROOM_SOURCE_ROOTS, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, CLEAN_ROOM_CLEAN_ROOTS, CLEAN_ROOM_SCHEMA_DIR, and clean/source-denied CLEAN_ROOM_ALLOWED_READ_ROOTS into every new role session.
 Missing controller_policy means attended. In unattended mode, reload durable artifacts before each iteration, select at most one pending or gap unit, launch roles from fresh context, validate schema and leakage before advancing state, and stop on configured safety or ambiguity conditions.
-Record the user's format_selection target profile and Agent 0-3 agent_pipeline contract in task-manifest.json.
+Record the user's format_selection target profile, Agent 0-3 agent_pipeline contract, Agent 1.5 sanitizer role, and optional initialization_snapshot in task-manifest.json.
+Produce clean-run-context.json for Agent 2 and Agent 3 from sanitized initialization and handoff data. Do not send the full task-manifest.json to clean roles.
 Use contaminated source-index.json when controller preflight produced one.
 Maintain the tasklist as neutral task-manifest.json units, map at most one source-index batch or large-file segment into each unit, and track coverage under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
+Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
+Send Agent 1 draft specs to Agent 1.5 for independent source-denied sanitization before clean handoff.
+Compare clean artifacts against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility for coverage gaps.
 Do not write clean artifacts.
 If source-index.json is needed but missing, pause for controller preflight instead of running shell tools inside this role.
 Receive Agent 3 final QC reports and convert gaps into abstract delta tickets.
-Send only abstract delta tickets across the wall.
+Send only clean-run-context.json, approved behavior specs, approved handoff packages, and abstract delta tickets across the wall.
 Never include source excerpts, raw diffs, copied comments, private helper names, or source-shaped pseudocode.
 """

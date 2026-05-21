@@ -17,6 +17,41 @@ const {
   tempDir,
 } = require('./helpers/install.cjs');
 
+function managedHookCommands(value) {
+  const table = hookTable(value);
+  const commands = [];
+  for (const entries of Object.values(table)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      for (const hook of entry.hooks || []) {
+        if (typeof hook.command === 'string' && hook.command.includes('clean-room-hook.py')) {
+          commands.push(hook.command);
+        }
+      }
+    }
+  }
+  return commands;
+}
+
+function firstManagedHookCommand(configPath) {
+  const commands = managedHookCommands(readJson(configPath));
+  assert.ok(commands.length > 0);
+  return commands[0];
+}
+
+function symlinkDirOrSkip(t, target, linkPath) {
+  try {
+    fs.symlinkSync(target, linkPath, 'dir');
+    return true;
+  } catch (err) {
+    if (['EACCES', 'EINVAL', 'EPERM'].includes(err?.code)) {
+      t.skip(`directory symlink unavailable: ${err.code}`);
+      return false;
+    }
+    throw err;
+  }
+}
+
 describe('clean-room-skill installer', () => {
   test('installs Codex skills, agents, hooks, manifest, and preserves user hooks', () => {
     const codexHome = tempDir('clean-room-codex');
@@ -34,7 +69,9 @@ describe('clean-room-skill installer', () => {
     const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(fs.existsSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(codexHome, 'skills', 'init', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(codexHome, 'agents', 'clean-architect.toml')));
+    assert.ok(fs.existsSync(path.join(codexHome, 'agents', 'contaminated-handoff-sanitizer.toml')));
     assert.ok(fs.existsSync(path.join(codexHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
     assert.ok(fs.existsSync(path.join(codexHome, 'clean-room-install-manifest.json')));
 
@@ -65,7 +102,9 @@ describe('clean-room-skill installer', () => {
     const result = runInstall(['--claude', '--global', '--yes'], { CLAUDE_CONFIG_DIR: claudeHome });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(fs.existsSync(path.join(claudeHome, 'skills', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(claudeHome, 'skills', 'init', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(claudeHome, 'agents', 'clean-architect.md')));
+    assert.ok(fs.existsSync(path.join(claudeHome, 'agents', 'contaminated-handoff-sanitizer.md')));
     assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
 
     const settings = readJson(path.join(claudeHome, 'settings.json'));
@@ -88,6 +127,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'plugin.json')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'clean-architect.md')));
+    assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'contaminated-handoff-sanitizer.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'hooks', 'clean-room', 'clean-room-hook.py')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'clean-room-install-manifest.json')));
     assert.equal(readJson(path.join(antigravityPlugin, 'plugin.json')).hooks, undefined);
@@ -151,6 +191,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'plugin.json')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'clean-architect.md')));
+    assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'contaminated-handoff-sanitizer.md')));
     assert.ok(fs.existsSync(path.join(geminiHome, 'commands', 'clean-room', 'clean-room.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-clean-room.md')));
     assert.ok(fs.existsSync(path.join(kiloHome, 'command', 'clean-room-clean-room.md')));
@@ -187,6 +228,7 @@ describe('clean-room-skill installer', () => {
     result = runInstall(['--opencode', '--global', '--yes'], { OPENCODE_CONFIG_DIR: opencodeHome });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-clean-room.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-init.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-attended.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-refocus.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-resume.md')));
@@ -202,6 +244,50 @@ describe('clean-room-skill installer', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /--hooks=strict is not supported for gemini/);
     assert.equal(fs.existsSync(geminiHome), false);
+  });
+
+  test('installed safe hooks warn, no-op without env, and fail closed when enforced', () => {
+    const codexHome = tempDir('clean-room-installed-safe-hook');
+    const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /safe hooks are compatibility-only/);
+
+    const command = firstManagedHookCommand(path.join(codexHome, 'hooks.json'));
+    let hook = spawnSync(command, {
+      cwd: codexHome,
+      encoding: 'utf8',
+      env: {},
+      input: '',
+      shell: true,
+    });
+    assert.equal(hook.status, 0, hook.stderr);
+
+    hook = spawnSync(command, {
+      cwd: codexHome,
+      encoding: 'utf8',
+      env: { CLEAN_ROOM_HOOK_ENFORCE: '1' },
+      input: '',
+      shell: true,
+    });
+    assert.notEqual(hook.status, 0);
+    assert.match(hook.stderr, /environment check failed/);
+  });
+
+  test('installed strict hooks fail closed without clean-room env', () => {
+    const codexHome = tempDir('clean-room-installed-strict-hook');
+    const result = runInstall(['--codex', '--global', '--hooks=strict', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+
+    const command = firstManagedHookCommand(path.join(codexHome, 'hooks.json'));
+    const hook = spawnSync(command, {
+      cwd: codexHome,
+      encoding: 'utf8',
+      env: {},
+      input: '',
+      shell: true,
+    });
+    assert.notEqual(hook.status, 0);
+    assert.match(hook.stderr, /environment check failed/);
   });
 
   test('reinstall is idempotent for managed hooks', () => {
@@ -242,6 +328,37 @@ describe('clean-room-skill installer', () => {
     const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
     assert.notEqual(result.status, 0);
     assert.equal(fs.readFileSync(conflictPath, 'utf8'), '# user file\n');
+  });
+
+  test('install rejects pre-existing skills symlink outside target root', (t) => {
+    const root = tempDir('clean-room-skills-symlink');
+    const codexHome = path.join(root, 'codex');
+    const outside = path.join(root, 'outside-skills');
+    fs.mkdirSync(codexHome, { recursive: true });
+    fs.mkdirSync(outside, { recursive: true });
+    fs.writeFileSync(path.join(outside, 'marker.txt'), 'keep\n');
+    if (!symlinkDirOrSkip(t, outside, path.join(codexHome, 'skills'))) return;
+
+    const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /managed install path must not contain symlinks/);
+    assert.equal(fs.readFileSync(path.join(outside, 'marker.txt'), 'utf8'), 'keep\n');
+    assert.equal(fs.existsSync(path.join(outside, 'clean-room')), false);
+  });
+
+  test('install rejects pre-existing hooks symlink outside target root', (t) => {
+    const root = tempDir('clean-room-hooks-symlink');
+    const codexHome = path.join(root, 'codex');
+    const outside = path.join(root, 'outside-hooks');
+    fs.mkdirSync(codexHome, { recursive: true });
+    fs.mkdirSync(outside, { recursive: true });
+    if (!symlinkDirOrSkip(t, outside, path.join(codexHome, 'hooks'))) return;
+
+    const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /managed install path must not contain symlinks/);
+    assert.equal(fs.existsSync(path.join(outside, 'clean-room')), false);
+    assert.equal(fs.existsSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md')), false);
   });
 
   test('uninstall removes only managed files and clean-room hooks', () => {
@@ -319,6 +436,44 @@ describe('clean-room-skill installer', () => {
       fs.readFileSync(path.join(patchesDir, backups[0], 'skills', 'clean-room', 'SKILL.md'), 'utf8'),
       '# local edit before uninstall\n'
     );
+  });
+
+  test('uninstall rejects symlinked managed directories without deleting outside files', (t) => {
+    const root = tempDir('clean-room-uninstall-symlink');
+    const codexHome = path.join(root, 'codex');
+    const outside = path.join(root, 'outside-skills');
+    let result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+
+    const original = fs.readFileSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md'));
+    fs.rmSync(path.join(codexHome, 'skills'), { recursive: true, force: true });
+    fs.mkdirSync(path.join(outside, 'clean-room'), { recursive: true });
+    fs.writeFileSync(path.join(outside, 'clean-room', 'SKILL.md'), original);
+    if (!symlinkDirOrSkip(t, outside, path.join(codexHome, 'skills'))) return;
+
+    result = runInstall(['--codex', '--global', '--yes', '--uninstall'], { CODEX_HOME: codexHome });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /managed install path must not contain symlinks/);
+    assert.equal(fs.existsSync(path.join(outside, 'clean-room', 'SKILL.md')), true);
+  });
+
+  test('install rejects modified managed files behind symlink without backup or overwrite', (t) => {
+    const root = tempDir('clean-room-reinstall-symlink');
+    const codexHome = path.join(root, 'codex');
+    const outside = path.join(root, 'outside-skills');
+    let result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+
+    fs.rmSync(path.join(codexHome, 'skills'), { recursive: true, force: true });
+    fs.mkdirSync(path.join(outside, 'clean-room'), { recursive: true });
+    fs.writeFileSync(path.join(outside, 'clean-room', 'SKILL.md'), '# outside edit\n');
+    if (!symlinkDirOrSkip(t, outside, path.join(codexHome, 'skills'))) return;
+
+    result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /managed install path must not contain symlinks/);
+    assert.equal(fs.readFileSync(path.join(outside, 'clean-room', 'SKILL.md'), 'utf8'), '# outside edit\n');
+    assert.equal(fs.existsSync(path.join(codexHome, 'clean-room-patches')), false);
   });
 
   test('uninstall without manifest removes clean-room hook registrations only', () => {

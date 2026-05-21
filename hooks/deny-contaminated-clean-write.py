@@ -10,7 +10,11 @@ from pathlib import Path
 from clean_room_paths import candidate_paths, env_roots, load_payload, path_is_under, should_fail_closed_for_write
 
 
-CONTAMINATED_ROLES = {"contaminated-manager-verifier", "contaminated-source-analyst"}
+CONTAMINATED_ROLES = {
+    "contaminated-manager-verifier",
+    "contaminated-source-analyst",
+    "contaminated-handoff-sanitizer",
+}
 CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
 
 

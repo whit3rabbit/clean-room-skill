@@ -10,6 +10,7 @@ import sys
 ROLES = {
     "contaminated-manager-verifier",
     "contaminated-source-analyst",
+    "contaminated-handoff-sanitizer",
     "clean-architect",
     "clean-qa-editor",
 }

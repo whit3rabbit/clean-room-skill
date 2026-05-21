@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deny clean-role reads outside explicitly configured clean roots."""
+"""Deny source-denied role reads outside explicitly configured roots."""
 
 from __future__ import annotations
 
@@ -11,7 +11,10 @@ from clean_room_paths import env_roots, load_payload, path_is_under, payload_cwd
 
 
 CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
+SANITIZER_ROLE = "contaminated-handoff-sanitizer"
+SOURCE_DENIED_ROLES = CLEAN_ROLES | {SANITIZER_ROLE}
 ADDITIONAL_CLEAN_READ_ROOTS = "CLEAN_ROOM_ALLOWED_READ_ROOTS"
+SCHEMA_READ_ROOTS = "CLEAN_ROOM_SCHEMA_DIR"
 DIRECTORY_SCOPED_READ_TOOLS = {"glob", "grep"}
 PATH_REQUIRED_READ_TOOLS = {"read"}
 
@@ -54,45 +57,74 @@ def is_under(path: Path, root: Path) -> bool:
     return path_is_under(path, root)
 
 
+def allowed_roots_for_role(role: str) -> list[Path]:
+    if role in CLEAN_ROLES:
+        return (
+            env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+            + env_roots(ADDITIONAL_CLEAN_READ_ROOTS)
+            + env_roots(SCHEMA_READ_ROOTS)
+        )
+    if role == SANITIZER_ROLE:
+        return (
+            env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
+            + env_roots(ADDITIONAL_CLEAN_READ_ROOTS)
+            + env_roots(SCHEMA_READ_ROOTS)
+        )
+    return []
+
+
 def main() -> int:
     role = os.environ.get("CLEAN_ROOM_ROLE", "")
-    if role not in CLEAN_ROLES:
+    if role not in SOURCE_DENIED_ROLES:
         return 0
     payload, payload_error = load_payload()
     if payload_error:
         print(
-            f"clean-room policy denied clean role {role} read: {payload_error}",
+            f"clean-room policy denied role {role} read: {payload_error}",
             file=sys.stderr,
         )
         return 1
     source_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS")
-    allowed_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS") + env_roots(ADDITIONAL_CLEAN_READ_ROOTS)
+    clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+    allowed_roots = allowed_roots_for_role(role)
     paths = candidate_paths(payload)
     if not paths:
         tool = str(payload.get("tool_name") or payload.get("tool") or "").lower()
         if tool and tool not in PATH_REQUIRED_READ_TOOLS:
             return 0
         print(
-            f"clean-room policy denied clean role {role} read with no resolved path",
+            f"clean-room policy denied role {role} read with no resolved path",
             file=sys.stderr,
         )
         return 1
     for path in paths:
         if any(is_under(path, root) for root in source_roots):
             print(
-                f"clean-room policy denied clean role {role} reading source path {path}",
+                f"clean-room policy denied role {role} reading source path {path}",
+                file=sys.stderr,
+            )
+            return 1
+        if role == SANITIZER_ROLE and any(is_under(path, root) for root in clean_roots):
+            print(
+                f"clean-room policy denied role {role} reading clean path {path}",
+                file=sys.stderr,
+            )
+            return 1
+        if role == SANITIZER_ROLE and path.name == "source-index.json":
+            print(
+                f"clean-room policy denied role {role} reading source-index artifact {path}",
                 file=sys.stderr,
             )
             return 1
         if not allowed_roots:
             print(
-                f"clean-room policy denied clean role {role} reading {path}: no clean read roots configured",
+                f"clean-room policy denied role {role} reading {path}: no allowed read roots configured",
                 file=sys.stderr,
             )
             return 1
         if not any(is_under(path, root) for root in allowed_roots):
             print(
-                f"clean-room policy denied clean role {role} reading outside allowed clean roots: {path}",
+                f"clean-room policy denied role {role} reading outside allowed roots: {path}",
                 file=sys.stderr,
             )
             return 1

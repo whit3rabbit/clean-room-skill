@@ -68,6 +68,8 @@ def validate_artifact(
         return ["handoff artifact path must be a non-empty string"]
     if Path(raw_path).name == "source-index.json" or item.get("artifact_type") == "source-index":
         errors.append("source-index.json must not be included in a clean handoff package")
+    if Path(raw_path).name == "task-manifest.json" or item.get("artifact_type") == "task-manifest":
+        errors.append("task-manifest.json must not be included in a clean handoff package; use clean-run-context.json")
 
     artifact_path, path_errors = resolve_artifact_path(raw_path, clean_roots)
     errors.extend(path_errors)

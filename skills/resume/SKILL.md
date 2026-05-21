@@ -16,6 +16,8 @@ Use the canonical `clean-room` skill workflow and references in this plugin. Pre
 Load these artifacts from the paths recorded in `task-manifest.json` and the configured root environment. Treat missing optional artifacts as blockers only when the current gate requires them.
 
 - `task-manifest.json`
+- `init-config.json`, when present, only for drift comparison against `task-manifest.json` `initialization_snapshot`
+- `clean-run-context.json`, when present, only on the clean side
 - `source-index.json`, only when referenced by the task manifest and only on the contaminated side
 - `coverage-ledger.json`
 - `evidence-ledger.json`
@@ -35,8 +37,11 @@ Before choosing work:
 - Confirm source roots, contaminated artifact roots, clean roots, and clean allowed-read roots remain separated.
 - Confirm authorization still covers the recorded source scope and allowed actions.
 - Report `run_state` when present; do not infer generation from chat history when it is missing.
+- Trust `initialization_snapshot` before any reusable `init-config.json`. If they differ, report drift and stop before changing roots, model policy, schema profile, or rule classification.
 - Preserve the existing `controller_policy`; missing policy means `attended`.
-- Stop if clean roles appear to require source, contaminated ledgers, contaminated chat history, raw diffs, source excerpts, or `source-index.json`.
+- Stop if clean roles appear to require source, contaminated ledgers, contaminated chat history, raw diffs, source excerpts, `source-index.json`, or the full `task-manifest.json`.
+- Stop if `clean-run-context.json` exposes source roots, contaminated roots, source index refs, coverage ledgers, or evidence ledgers.
+- Stop if Agent 1.5 appears to require source roots, `source-index.json` contents, contaminated evidence ledgers, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 
 ## Selection Rules
 

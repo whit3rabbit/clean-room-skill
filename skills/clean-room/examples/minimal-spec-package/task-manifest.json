@@ -22,6 +22,52 @@
     "started_at": "2024-01-01T00:00:00Z",
     "restart_reason": "user-requested"
   },
+  "initialization_snapshot": {
+    "config_id": "init-example",
+    "captured_at": "2024-01-01T00:00:00Z",
+    "artifact_base_root": "~/Documents/CleanRoom/task-example",
+    "target_profile": "speckit-feature-folder",
+    "clean_isolation_mode": "clean-workspace",
+    "model_preferences": {
+      "default_model": "runtime-default",
+      "domain_overrides": {
+        "clean": "runtime-clean-model"
+      },
+      "role_overrides": [
+        {
+          "role": "clean-qa-editor",
+          "model": "runtime-high-reasoning-model"
+        }
+      ]
+    },
+    "user_rules": {
+      "clean_safe": [
+        "Use concise acceptance criteria."
+      ],
+      "contaminated_only": [
+        "Source-specific private notes stay on the contaminated side."
+      ]
+    },
+    "effective_roots": {
+      "source_roots": [
+        "/authorized/source"
+      ],
+      "contaminated_artifact_roots": [
+        "contaminated-artifacts/"
+      ],
+      "clean_root": "clean-artifacts/",
+      "quarantine_root": "quarantine/",
+      "approved_public_reference_roots": [
+        "public-refs/"
+      ]
+    },
+    "reconfiguration_policy": {
+      "root_changes_require_confirmation": true,
+      "schema_changes_require_confirmation": true,
+      "model_changes_require_confirmation": true,
+      "artifact_root_changes_start_new_generation": true
+    }
+  },
   "source_scope": {
     "workspace_id": "source-workspace",
     "description": "Authorized source workspace.",
@@ -79,7 +125,12 @@
     },
     "agent_1": {
       "role": "contaminated-source-analyst",
-      "responsibility": "Read authorized source and generate neutral source units, task slices, and behavior specs.",
+      "responsibility": "Read authorized source and generate neutral draft source units, task slices, and behavior specs.",
+      "trust_domain": "contaminated"
+    },
+    "agent_1_5": {
+      "role": "contaminated-handoff-sanitizer",
+      "responsibility": "Review draft specs from a source-denied contaminated context and approve only sanitized handoff candidates.",
       "trust_domain": "contaminated"
     },
     "agent_2": {
@@ -94,7 +145,7 @@
     },
     "handoff_rules": {
       "allowed_inputs": [
-        "task-manifest.json",
+        "clean-run-context.json",
         "approved behavior-spec.json",
         "handoff-package.json",
         "abstract coverage summaries",
@@ -128,6 +179,11 @@
       "workspace_id": "source-workspace"
     },
     {
+      "role": "contaminated-handoff-sanitizer",
+      "profile_id": "contaminated-sanitizer-profile",
+      "workspace_id": "contaminated-artifact-workspace"
+    },
+    {
       "role": "clean-architect",
       "profile_id": "clean-architect-profile",
       "workspace_id": "clean-workspace"
@@ -148,6 +204,7 @@
   },
   "handoff_policy": {
     "allowed_artifacts": [
+      "clean-run-context",
       "behavior-spec",
       "handoff-package",
       "abstract-delta-ticket"
@@ -163,10 +220,12 @@
   "tool_policy": [
     "Run source indexing only as controller preflight before clean-room role sessions.",
     "Use read-only source tools in contaminated roles.",
+    "Use source-denied reads for the contaminated handoff sanitizer.",
     "Use write tools only in contaminated artifact roots for contaminated roles.",
     "Use write tools only in clean spec workspace for clean roles."
   ],
   "model_policy": [
+    "Use the initialization snapshot default model plus clean and contaminated overrides.",
     "Use separate profiles for contaminated and clean roles."
   ],
   "retention_policy": "Retain clean artifacts; keep contaminated evidence separate.",
@@ -185,6 +244,15 @@
       "allowed_access": [
         "source-workspace",
         "contaminated-artifacts"
+      ]
+    },
+    {
+      "role": "contaminated-handoff-sanitizer",
+      "trust_domain": "contaminated",
+      "allowed_access": [
+        "contaminated-artifacts",
+        "schema-assets",
+        "approved-public-reference-roots"
       ]
     },
     {
@@ -214,6 +282,8 @@
     }
   ],
   "expected_artifacts": [
+    "init-config.json",
+    "clean-run-context.json",
     "source-index.json",
     "behavior-spec.json",
     "skeleton-manifest.json",
