@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -33,6 +34,35 @@ ROOT_VARS = (
     "CLEAN_ROOM_SCHEMA_DIR",
     "CLEAN_ROOM_ALLOWED_READ_ROOTS",
 )
+GENERIC_SOURCE_NAME_TOKENS = {
+    "app",
+    "apps",
+    "artifact",
+    "artifacts",
+    "clean",
+    "code",
+    "contaminated",
+    "doc",
+    "docs",
+    "document",
+    "documents",
+    "lib",
+    "main",
+    "output",
+    "outputs",
+    "project",
+    "quarantine",
+    "repo",
+    "room",
+    "source",
+    "spec",
+    "src",
+    "test",
+    "tests",
+    "workspace",
+    "worktree",
+}
+MIN_SOURCE_NAME_TOKEN_LENGTH = 4
 
 
 def split_roots(value: str) -> list[str]:
@@ -65,6 +95,71 @@ def resolved_roots(name: str) -> tuple[list[Path], list[str]]:
         except OSError as exc:
             errors.append(f"{name} has invalid path {item!r}: {exc}")
     return roots, errors
+
+
+def normalize_path_name(value: str) -> str:
+    separated = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", value)
+    return re.sub(r"[^a-z0-9]+", "-", separated.lower()).strip("-")
+
+
+def compact_path_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def source_name_terms(source_root: Path) -> tuple[set[str], set[str]]:
+    normalized = normalize_path_name(source_root.name)
+    if not normalized:
+        return set(), set()
+    raw_tokens = [token for token in normalized.split("-") if token]
+    tokens = {
+        token
+        for token in raw_tokens
+        if len(token) >= MIN_SOURCE_NAME_TOKEN_LENGTH and token not in GENERIC_SOURCE_NAME_TOKENS
+    }
+    exact_names = (
+        {normalized}
+        if any(token not in GENERIC_SOURCE_NAME_TOKENS for token in raw_tokens)
+        else set()
+    )
+    return exact_names, tokens
+
+
+def artifact_components_after_common_prefix(source_root: Path, artifact_root: Path) -> tuple[str, ...]:
+    try:
+        common = Path(os.path.commonpath([str(source_root), str(artifact_root)]))
+        return artifact_root.relative_to(common).parts
+    except ValueError:
+        return artifact_root.parts
+
+
+def has_source_derived_name(source_root: Path, artifact_root: Path) -> bool:
+    exact_names, tokens = source_name_terms(source_root)
+    if not exact_names and not tokens:
+        return False
+    for component in artifact_components_after_common_prefix(source_root, artifact_root):
+        normalized = normalize_path_name(component)
+        compact = compact_path_name(component)
+        if not normalized and not compact:
+            continue
+        if normalized in exact_names or compact in exact_names:
+            return True
+        if any(token in normalized or token in compact for token in tokens):
+            return True
+    return False
+
+
+def reject_source_derived_artifact_names(target_name: str) -> list[str]:
+    source_roots, source_errors = resolved_roots("CLEAN_ROOM_SOURCE_ROOTS")
+    target_roots, target_errors = resolved_roots(target_name)
+    errors = source_errors + target_errors
+    for source_root in source_roots:
+        for target_root in target_roots:
+            if has_source_derived_name(source_root, target_root):
+                errors.append(
+                    f"{target_name} path appears source-derived from a source root name; "
+                    "use a neutral task id such as task-8af2c91d"
+                )
+    return errors
 
 
 def reject_overlaps(left_name: str, right_name: str, message: str) -> list[str]:
@@ -140,6 +235,8 @@ def main() -> int:
             "schema directory must be separate from contaminated artifact roots",
         )
     )
+    errors.extend(reject_source_derived_artifact_names("CLEAN_ROOM_CLEAN_ROOTS"))
+    errors.extend(reject_source_derived_artifact_names("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS"))
     if errors:
         print("clean-room environment check failed:", file=sys.stderr)
         for error in errors:

@@ -29,11 +29,7 @@
       "const": "clean"
     },
     "created_by_role": {
-      "enum": [
-        "contaminated-source-analyst",
-        "contaminated-handoff-sanitizer",
-        "contaminated-manager-verifier"
-      ]
+      "const": "contaminated-handoff-sanitizer"
     },
     "artifacts": {
       "type": "array",
@@ -103,8 +99,7 @@
           ]
         },
         "reviewer_role": {
-          "type": "string",
-          "minLength": 1
+          "const": "contaminated-handoff-sanitizer"
         },
         "notes": {
           "type": "string"

@@ -15,8 +15,21 @@ SANITIZER_ROLE = "contaminated-handoff-sanitizer"
 SOURCE_DENIED_ROLES = CLEAN_ROLES | {SANITIZER_ROLE}
 ADDITIONAL_CLEAN_READ_ROOTS = "CLEAN_ROOM_ALLOWED_READ_ROOTS"
 SCHEMA_READ_ROOTS = "CLEAN_ROOM_SCHEMA_DIR"
-DIRECTORY_SCOPED_READ_TOOLS = {"glob", "grep"}
-PATH_REQUIRED_READ_TOOLS = {"read"}
+DIRECTORY_SCOPED_READ_TOOLS = {"glob", "grep", "ls", "lsp", "list_dir"}
+PATH_REQUIRED_READ_TOOLS = {"read", "notebookread", "view_image"}
+MCP_RESOURCE_TOOLS = {
+    "listmcpresourcestool",
+    "readmcpresourcetool",
+    "listmcpresourcetemplatestool",
+    "list_mcp_resources",
+    "list_mcp_resource_templates",
+    "read_mcp_resource",
+}
+READ_PATH_KEYS = ("file_path", "filePath", "path", "notebook_path", "notebookPath")
+
+
+def tool_name_for(payload: dict) -> str:
+    return str(payload.get("tool_name") or payload.get("tool") or "").lower()
 
 
 def append_path_value(paths: list[Path], value: str, base: Path) -> None:
@@ -30,13 +43,13 @@ def candidate_paths(payload: dict) -> list[Path]:
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         tool_input = {}
-    tool_name = str(payload.get("tool_name") or payload.get("tool") or "").lower()
+    tool_name = tool_name_for(payload)
     try:
         base = payload_cwd(payload)
     except OSError:
         return []
     paths = []
-    for key in ("file_path", "path"):
+    for key in READ_PATH_KEYS:
         value = tool_input.get(key) or payload.get(key)
         if isinstance(value, str):
             append_path_value(paths, value, base)
@@ -84,13 +97,19 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    tool = tool_name_for(payload)
+    if tool in MCP_RESOURCE_TOOLS:
+        print(
+            f"clean-room policy denied role {role} MCP resource access: no MCP resource allowlist configured",
+            file=sys.stderr,
+        )
+        return 1
     source_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS")
     clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
     allowed_roots = allowed_roots_for_role(role)
     paths = candidate_paths(payload)
     if not paths:
-        tool = str(payload.get("tool_name") or payload.get("tool") or "").lower()
-        if tool and tool not in PATH_REQUIRED_READ_TOOLS:
+        if tool and tool not in PATH_REQUIRED_READ_TOOLS and tool not in DIRECTORY_SCOPED_READ_TOOLS:
             return 0
         print(
             f"clean-room policy denied role {role} read with no resolved path",

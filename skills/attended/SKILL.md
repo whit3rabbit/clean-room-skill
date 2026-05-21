@@ -14,13 +14,13 @@ Use the canonical `clean-room` skill workflow and references in this plugin. Pre
 Gather only required setup facts:
 
 - Authorization statement, requester, allowed actions, prohibited actions, and evidence handling.
-- Artifact base root, defaulting to `~/Documents/CleanRoom/<task-id>/`.
+- Artifact base root, defaulting to `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
 - Source roots, contaminated artifact root, clean root, quarantine root, and optional public or destination reference roots.
 - Target language or destination constraints, if known.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.
 - Default model plus optional clean, contaminated, or per-role overrides.
 
-Before indexing or artifact generation, confirm that source roots, contaminated artifact roots, clean roots, approved public reference roots, and schema directory are separate paths. Stop if authorization is unclear, if the requested output includes replacement implementation code, or if clean and contaminated roots overlap. Clean roles must receive `clean-run-context.json`, not the full `task-manifest.json`.
+Before indexing or artifact generation, confirm that source roots, contaminated artifact roots, clean roots, approved public reference roots, and schema directory are separate paths, and that artifact root path names are not source-derived. Stop if authorization is unclear, if the requested output includes replacement implementation code, if clean and contaminated roots overlap, or if artifact root paths contain source root basenames or meaningful non-generic source-name tokens. Clean roles must receive `clean-run-context.json`, not the full `task-manifest.json`.
 
 Record `controller_policy.mode` as `attended`. Pause for human review at scope gate, clean handoff, QC deltas, blocked units, and final coverage. Include stop conditions for `authorization-missing`, `scope-change`, `contamination-suspected`, `schema-validation-failed`, `leakage-scan-failed`, `unit-blocked`, and `coverage-complete`; attended mode does not add an iteration-limit stop unless the user explicitly sets one.
 

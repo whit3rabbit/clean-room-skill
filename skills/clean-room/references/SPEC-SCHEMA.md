@@ -60,9 +60,15 @@ Use neutral ids such as `unit-auth-flow` or `unit-config-loading`. Avoid source 
 
 `init-config.json` records reusable controller-side preferences. It may contain source roots and contaminated-only rules, so keep it outside clean-role readable roots.
 
+### Path Naming Guards
+
+Default artifact roots live under `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not use the source folder name as the task ID.
+
+Clean and contaminated artifact roots must not contain source root basenames or meaningful non-generic tokens from those basenames. The environment preflight enforces this for `CLEAN_ROOM_CLEAN_ROOTS` and `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+
 Capture:
 
-- artifact base root, defaulting to `~/Documents/CleanRoom/<task-id>/`
+- artifact base root, defaulting to `~/Documents/CleanRoom/<task-id>/` with a neutral task ID
 - source roots, contaminated artifact root, clean root, quarantine root, and approved public references
 - target profile
 - default model plus optional clean, contaminated, or per-role overrides

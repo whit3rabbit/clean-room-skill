@@ -14,6 +14,7 @@
     "examples",
     "assets",
     "docs",
+    "!docs/research-skill-spec.md",
     "plugin.json",
     ".codex-plugin",
     ".claude-plugin",

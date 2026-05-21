@@ -8,10 +8,10 @@ import os
 import re
 import sys
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
-from clean_room_paths import checked_write_paths, load_payload, path_under_env
+from clean_room_paths import checked_write_paths, env_roots, load_payload, path_is_under, path_under_env
 
 
 SCHEMA_BY_ARTIFACT = {
@@ -28,6 +28,13 @@ SCHEMA_BY_ARTIFACT = {
     "contamination-incident": "contamination-incident.schema.json",
 }
 CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV = "CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST"
+FORBIDDEN_CLEAN_CONTEXT_ARTIFACT_NAMES = {
+    "source-index.json",
+    "coverage-ledger.json",
+    "evidence-ledger.json",
+    "task-manifest.json",
+    "init-config.json",
+}
 MAX_REPORTED_ERRORS = 20
 MAX_VALIDATION_ERRORS = MAX_REPORTED_ERRORS + 1
 
@@ -137,6 +144,68 @@ def valid_date_time(value: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def clean_context_path_values(data: dict[str, Any]) -> list[tuple[tuple[str | int, ...], str]]:
+    values: list[tuple[tuple[str | int, ...], str]] = []
+
+    def visit(value: Any, path: tuple[str | int, ...]) -> None:
+        if isinstance(value, str):
+            values.append((path, value))
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                visit(item, path + (key,))
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, path + (index,))
+
+    for field in ("clean_artifacts", "approved_public_reference_roots"):
+        if field in data:
+            visit(data[field], (field,))
+    return values
+
+
+def path_parts(value: str) -> list[str]:
+    parts: list[str] = []
+    for candidate in (PurePosixPath(value), PureWindowsPath(value)):
+        for part in candidate.parts:
+            if part not in {"", ".", "/", "\\"} and part not in parts:
+                parts.append(part)
+    return parts
+
+
+def clean_context_path_errors(data: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+    blocked_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS") + env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
+    for location, raw_path in clean_context_path_values(data):
+        label = path_label(location)
+        posix = PurePosixPath(raw_path)
+        windows = PureWindowsPath(raw_path)
+        parts = path_parts(raw_path)
+        lowered_parts = {part.lower() for part in parts}
+        if raw_path.startswith("~"):
+            add_error(errors, f"{label}: clean-run-context path must not use home expansion")
+        if posix.is_absolute() or windows.is_absolute() or windows.drive:
+            add_error(errors, f"{label}: clean-run-context path must be relative")
+        if ".." in parts:
+            add_error(errors, f"{label}: clean-run-context path must not contain '..'")
+        forbidden = sorted(lowered_parts & FORBIDDEN_CLEAN_CONTEXT_ARTIFACT_NAMES)
+        if forbidden:
+            add_error(errors, f"{label}: forbidden clean-run-context artifact path {forbidden[0]!r}")
+        if clean_roots and blocked_roots:
+            try:
+                resolved_paths = [(root / raw_path).resolve() for root in clean_roots]
+            except OSError as exc:
+                add_error(errors, f"{label}: invalid clean-run-context path {raw_path!r}: {exc}")
+                continue
+            for resolved in resolved_paths:
+                if any(path_is_under(resolved, root) for root in blocked_roots):
+                    add_error(errors, f"{label}: clean-run-context path resolves into a source or contaminated root")
+                    break
+        if error_limit_reached(errors):
+            return errors
+    return errors
 
 
 def add_error(errors: list[str], message: str) -> None:
@@ -352,6 +421,8 @@ def main() -> int:
             print(f"clean-room schema load failed for {schema_path}: {exc}", file=sys.stderr)
             return 1
         errors = validate_value(data, schema, schema)
+        if kind == "clean-run-context":
+            extend_errors(errors, clean_context_path_errors(data))
         if errors:
             print(f"clean-room schema check failed for {path}:", file=sys.stderr)
             for error in errors[:MAX_REPORTED_ERRORS]:

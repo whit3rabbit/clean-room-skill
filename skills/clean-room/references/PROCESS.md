@@ -16,6 +16,12 @@ Use separate locations for each trust domain:
 - Clean allowed reference workspace: public documentation or destination constraints explicitly configured for clean and source-denied role reads.
 - Optional implementation workspace: out of scope for this spec-only skill.
 
+### Path Naming Guards
+
+Clean and contaminated artifact paths must remain neutral. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters and use it under `~/Documents/CleanRoom/`.
+
+Do not derive task IDs, clean roots, or contaminated artifact roots from source folder names. The initialization wizard and environment preflight reject artifact paths that contain a source root basename or meaningful non-generic tokens from that basename.
+
 Prefer separate agent profiles or homes when the host supports them. Do not rely on one chat context with role labels as the only separation control.
 
 Use host-level policy where available:
@@ -138,7 +144,8 @@ Clean QA/spec editor:
 
 1. Initialization gate:
    - Record reusable preferences in `init-config.json` when requested.
-   - Default the artifact base root to `~/Documents/CleanRoom/<task-id>/` unless the user selects another separated location.
+   - Default the artifact base root to `~/Documents/CleanRoom/<task-id>/` unless the user selects another separated location. Generate a neutral `task-` plus 8 lowercase hex characters when the user does not provide an explicitly approved neutral task ID.
+   - Reject clean or contaminated artifact roots that mirror source root basenames or meaningful non-generic source-name tokens.
    - Record model preferences as a default model plus optional domain or role overrides.
    - Split user rules into clean-safe and contaminated-only rules.
    - Set clean isolation mode to `clean-workspace`; Docker or container execution is out of scope for v1.

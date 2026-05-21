@@ -247,7 +247,7 @@ async function installRuntime(runtime, options) {
     console.log('  hook registration unsupported for this runtime; copied hooks only');
   }
   if (options.hookMode === 'safe') {
-    console.log('  WARNING: safe hooks are compatibility-only until CLEAN_ROOM_HOOK_ENFORCE=1 or --hooks=strict is enabled');
+    console.log('  WARNING: safe hooks are installed but not enforcing until clean-room env vars, CLEAN_ROOM_HOOK_ENFORCE=1, or --hooks=strict are set');
   }
   if (result) {
     writeInstallManifest(targetRoot, result.manifest, runtime, options.scope, options.hookMode, options.dryRun);

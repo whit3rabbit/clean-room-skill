@@ -4,37 +4,63 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { describe, test } = require('node:test');
+const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-const SCAN_TARGETS = ['README.md', 'AGENTS.md', 'docs', 'skills', 'agents'];
-const BLOCKED_PATTERNS = [/file:\/\/\/Users/, /\/Users\/whit3rabbit/];
+const TEXT_EXTENSIONS = new Set([
+  '.cjs',
+  '.js',
+  '.json',
+  '.md',
+  '.py',
+  '.sh',
+  '.svg',
+  '.toml',
+  '.txt',
+  '.yml',
+]);
+const BLOCKED_PATTERNS = [
+  { name: 'macOS file URL', pattern: /file:\/\/\/Users\// },
+  { name: 'macOS user path', pattern: /\/Users\/[A-Za-z0-9._-]+/ },
+  { name: 'Linux user path', pattern: /\/home\/[A-Za-z0-9._-]+/ },
+  { name: 'Windows user path', pattern: /[A-Za-z]:\\Users\\/ },
+  { name: 'env file reference', pattern: /(^|[^A-Za-z0-9_])\.env(?:$|[^A-Za-z0-9_])/ },
+  { name: 'OpenAI-style secret', pattern: /(^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}/ },
+  { name: 'AWS access key', pattern: /AKIA[0-9A-Z]{16}/ },
+  { name: 'GitHub token', pattern: /gh[pousr]_[A-Za-z0-9_]{20,}/ },
+  { name: 'Slack token', pattern: /xox[baprs]-[A-Za-z0-9-]{20,}/ },
+  { name: 'private key block', pattern: /BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY/ },
+  { name: 'retained citation token', pattern: /cite|turn[0-9]+(?:view|search)[0-9]+/ },
+];
 
-function walkFiles(target) {
-  const fullPath = path.join(ROOT, target);
-  const stat = fs.statSync(fullPath);
-  if (stat.isFile()) return [fullPath];
+function packagedFiles() {
+  const result = spawnSync('npm', ['pack', '--dry-run', '--json'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const packages = JSON.parse(result.stdout);
+  assert.equal(packages.length, 1);
+  return packages[0].files.map((file) => file.path);
+}
 
-  const files = [];
-  for (const entry of fs.readdirSync(fullPath, { withFileTypes: true })) {
-    if (entry.name === '__pycache__') continue;
-    const child = path.join(target, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...walkFiles(child));
-    } else if (entry.isFile()) {
-      files.push(path.join(ROOT, child));
-    }
-  }
-  return files;
+function isTextFile(filePath) {
+  return TEXT_EXTENSIONS.has(path.extname(filePath));
 }
 
 describe('release hygiene', () => {
-  test('docs and bundled text do not include local file URLs or user paths', () => {
+  test('research memo is not included in npm package contents', () => {
+    assert.equal(packagedFiles().includes('docs/research-skill-spec.md'), false);
+  });
+
+  test('packaged text does not include local paths, secrets, or stale citation tokens', () => {
     const offenders = [];
-    for (const target of SCAN_TARGETS) {
-      for (const filePath of walkFiles(target)) {
-        const content = fs.readFileSync(filePath, 'utf8');
-        if (BLOCKED_PATTERNS.some((pattern) => pattern.test(content))) {
-          offenders.push(path.relative(ROOT, filePath));
+    for (const filePath of packagedFiles()) {
+      if (!isTextFile(filePath)) continue;
+      const content = fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+      for (const { name, pattern } of BLOCKED_PATTERNS) {
+        if (pattern.test(content)) {
+          offenders.push(`${filePath}: ${name}`);
         }
       }
     }

@@ -33,9 +33,9 @@ If safe archive targets cannot be proven from `task-manifest.json`, root environ
 Start from the scope gate, not from prior QC:
 
 - Reconfirm requester authorization, source scope, allowed actions, prohibited actions, and evidence handling.
-- Reconfirm source roots, contaminated artifact roots, clean roots, and clean allowed-read roots are separated.
+- Reconfirm source roots, contaminated artifact roots, clean roots, and clean allowed-read roots are separated, and that artifact root path names are not source-derived.
 - Preserve source roots and authorization only when they are still valid for the requested restart.
-- Create a fresh `task_id` by default.
+- Create a fresh neutral `task_id` by default. Use `task-` plus 8 lowercase hex characters unless the user provides an explicitly approved neutral ID. Do not derive the new ID or output directory names from source folder names.
 - Record `run_state.generation`, `run_state.started_at`, optional `run_state.previous_generation_ref`, and `run_state.restart_reason`.
 - Recreate `clean-run-context.json` from the new effective initialization choices; do not carry forward an old clean context by default.
 - Rebuild `source-index.json` unless the user explicitly says the source scope is unchanged and a recorded old index hash can still be validated.

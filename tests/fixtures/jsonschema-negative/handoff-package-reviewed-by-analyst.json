@@ -1,0 +1,15 @@
+{
+  "schema_kind": "handoff-package",
+  "base": "handoff-package.json",
+  "description": "Clean-bound handoff packages must be reviewed by the sanitizer.",
+  "set": [
+    {
+      "path": [
+        "leakage_review",
+        "reviewer_role"
+      ],
+      "value": "contaminated-source-analyst"
+    }
+  ],
+  "expected_error": "contaminated-handoff-sanitizer"
+}

@@ -38,7 +38,7 @@ echo "Validating JSON metadata..."
 "$python_cmd" -m json.tool hooks/hooks.json >/dev/null
 
 echo "Compiling Python hooks and scripts..."
-"$python_cmd" -m py_compile hooks/*.py skills/clean-room/scripts/*.py
+"$python_cmd" -m compileall -q hooks skills/clean-room/scripts
 
 echo "Smoke testing source index CLI..."
 "$python_cmd" skills/clean-room/scripts/build_source_index.py --help >/dev/null

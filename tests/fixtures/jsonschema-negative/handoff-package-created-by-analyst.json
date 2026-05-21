@@ -1,0 +1,14 @@
+{
+  "schema_kind": "handoff-package",
+  "base": "handoff-package.json",
+  "description": "Clean-bound handoff packages must be created by the sanitizer.",
+  "set": [
+    {
+      "path": [
+        "created_by_role"
+      ],
+      "value": "contaminated-source-analyst"
+    }
+  ],
+  "expected_error": "contaminated-handoff-sanitizer"
+}

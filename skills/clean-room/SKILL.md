@@ -63,7 +63,7 @@ Use the startup wizard when the user invokes this skill directly, such as `/clea
 Gather only the setup facts needed to decide whether the workflow may start, or invoke `init` when the user wants a dedicated setup pass:
 
 - Authorization statement, requester, allowed actions, prohibited actions, and evidence handling.
-- Artifact base root. Default to `~/Documents/CleanRoom/<task-id>/`.
+- Artifact base root. Default to `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
 - Source roots, contaminated artifact root, clean root, quarantine root, and optional public or destination reference roots.
 - Target language or destination constraints, if known.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.
@@ -72,7 +72,7 @@ Gather only the setup facts needed to decide whether the workflow may start, or 
 - Controller mode. If unspecified, use `attended`.
 - Run state. New runs use `generation: 1`, current `started_at`, and `restart_reason: user-requested`.
 
-Before indexing or artifact generation, confirm that source roots, contaminated artifact roots, clean roots, approved public reference roots, and schema directory are separate paths. Stop if authorization is unclear, if the requested output includes replacement implementation code, or if clean and contaminated roots overlap. Agent 2 and Agent 3 must start from the clean root and must not receive source mounts or the full task manifest.
+Before indexing or artifact generation, confirm that source roots, contaminated artifact roots, clean roots, approved public reference roots, and schema directory are separate paths, and that artifact root path names are not source-derived. Stop if authorization is unclear, if the requested output includes replacement implementation code, if clean and contaminated roots overlap, or if artifact root paths contain source root basenames or meaningful non-generic source-name tokens. Agent 2 and Agent 3 must start from the clean root and must not receive source mounts or the full task manifest.
 
 For `attended` mode, record a `controller_policy` that pauses for human review at scope gate, clean handoff, QC deltas, blocked units, and final coverage. Include stop conditions for `authorization-missing`, `scope-change`, `contamination-suspected`, `schema-validation-failed`, `leakage-scan-failed`, `unit-blocked`, and `coverage-complete`; attended mode does not add an iteration-limit stop unless the user explicitly sets one.
 
@@ -80,7 +80,7 @@ For `unattended` mode, require explicit authorization, separated roots, and fini
 
 Default sequence:
 
-1. Initialization gate: record reusable preferences in controller-side `init-config.json` when requested, then copy effective choices into `task-manifest.json` `initialization_snapshot`.
+1. Initialization gate: record reusable preferences in controller-side `init-config.json` when requested, choose a neutral task ID when needed, then copy effective choices into `task-manifest.json` `initialization_snapshot`.
 2. Scope gate: record authorization and boundaries in `task-manifest.json`.
 3. Format and pipeline gate: record the user's selected canonical-plus-target profile, model policy, `run_state`, Agent 0-3 handoff contract, and Agent 1.5 sanitizer role in `task-manifest.json`.
 4. Clean context gate: create sanitized `clean-run-context.json` for Agent 2 and Agent 3. Include only clean artifact paths, target profile, approved public refs, clean-safe rules, and clean-side model preferences.

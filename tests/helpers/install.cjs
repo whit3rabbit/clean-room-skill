@@ -65,7 +65,7 @@ function assertManagedHookDetails(value) {
   assert.equal(hooks.length, 4);
   for (const hook of hooks) {
     assert.equal(hook.type, 'command');
-    assert.equal(hook.timeout, 10);
+    assert.equal(hook.timeout, 30);
     assert.equal(hook.statusMessage, 'Checking clean-room guardrails');
   }
 }

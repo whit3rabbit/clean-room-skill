@@ -37,6 +37,13 @@ It does not protect against:
 
 ## Install
 
+### Installation Model
+
+The `clean-room-skill` npm package is a **meta-installer**. It does not run analysis directly; instead, it installs clean-room skills, agent prompts, and verification hooks *into* your local or global agent runtimes (e.g., Claude Code, Codex, or Cursor).
+
+*   **Global Installation (Recommended)**: Integrates the clean-room workflow globally into your agent configuration directories (e.g., `~/.claude/` or `~/.codex/`).
+*   **Local Installation**: Places the plugin directly inside your current repository's workspace (e.g., `.claude/` or `.codex/`).
+
 Preferred direct installer:
 
 ```bash
@@ -76,13 +83,32 @@ Runtime install roots:
 - Hermes Agent global: `HERMES_HOME` or `~/.hermes`
 - CodeBuddy global: `CODEBUDDY_CONFIG_DIR` or `~/.codebuddy`
 
-Local installs are available through `--local` using each runtime's project config directory. Antigravity local installs write `.agents/plugins/clean-room/`. Claude local, Gemini, OpenCode, and Kilo receive generated command wrappers; native skill runtimes receive `SKILL.md` directories. Gemini CLI support is legacy/enterprise compatibility because Google is transitioning consumer Gemini CLI users to Antigravity CLI on June 18, 2026. Cline is not included because it has no verified clean-room skill or command layout.
+Local installs are available through `--local` using each runtime's project config directory. Antigravity local installs write `.agents/plugins/clean-room/`. Claude local, Gemini, **OpenCode, and Kilo** receive generated command wrappers (e.g. `clean-room-clean-room.md`, `clean-room-init.md`); native skill runtimes receive `SKILL.md` directories. Gemini CLI support is legacy/enterprise compatibility because Google is transitioning consumer Gemini CLI users to Antigravity CLI on June 18, 2026. Cline is not included because it has no verified clean-room skill or command layout.
 
 Hook modes:
 
 - `--hooks=safe`: default. Copies hooks and registers a wrapper that no-ops unless `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present. This is compatibility-only; use `--hooks=strict` for dedicated Codex or Claude clean-room homes.
 - `--hooks=copy-only` or `--no-hooks`: copies hook files but does not register Codex or Claude hook config.
 - `--hooks=strict`: registers fail-closed hooks for dedicated clean-room homes. Strict mode is supported only for Codex and Claude Code because other runtime hook payloads are not verified. Antigravity receives hook scripts in the plugin directory, but the generated plugin manifest does not enable them until an Antigravity-specific hook payload adapter exists.
+
+### Installer CLI Reference
+
+Execute the installer via `npx` with the following parameters:
+
+```bash
+npx clean-room-skill@latest [runtimes] [scope] [options]
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `--claude` / `--codex` | Runtime | Selects the target agent runtime. (Supports `--all` for all runtimes) |
+| `--global` / `--local` | Scope | Installs to the global user home config or the local project directory. |
+| `--hooks=<mode>` | Option | Sets hook mode: `safe` (default, opt-in), `strict` (fail-closed), or `copy-only`. |
+| `--no-hooks` | Option | Alias for `--hooks=copy-only`. Copies scripts without registering hooks. |
+| `--config-dir <path>` | Option | Overrides the target root directory (only for single-runtime installs). |
+| `--dry-run` | Option | Performs a trial run, logging actions without writing files. |
+| `--uninstall` | Option | Removes all manifest-managed files and hook registrations. |
+| `--yes` | Option | Non-interactive mode. Automatically accepts overwriting known files. |
 
 Useful maintenance commands:
 
@@ -157,7 +183,51 @@ Use this sequence for normal runs and recovery:
 | Restart a bad or obsolete run | `/clean-room:start-over` | Invoke `start-over` | Requires explicit confirmation, archives or quarantines current artifacts without deletion, then returns to the scope gate with a fresh `task_id`. |
 | Correct drift without changing scope | `/clean-room:refocus` | Invoke `refocus` | Audits current artifacts against declared scope and routes Agent 0 back to missed gates without expanding scope. |
 
-Before starting, prepare separate paths for source, contaminated artifacts, clean artifacts, optional clean reference docs, and quarantine. The default artifact base is `~/Documents/CleanRoom/<task-id>/`. For recovery, provide the existing `task-manifest.json` or the artifact roots so the skill can reload durable state. Prior chat history is not task state.
+Before starting, prepare separate paths for source, contaminated artifacts, clean artifacts, optional clean reference docs, and quarantine. The default artifact base is `~/Documents/CleanRoom/<task-id>/`; if no explicitly approved neutral task ID is provided, use `task-` plus 8 lowercase hex characters. For recovery, provide the existing `task-manifest.json` or the artifact roots so the skill can reload durable state. Prior chat history is not task state.
+
+## Quick Start: Onboarding your Codebase
+
+Once the skill package is installed in your runtime, follow these steps to initialize and execute a clean-room specification task.
+
+### Step 1: Initialize Workspace Preferences
+In your agent session (e.g., Claude Code), run the initialization subcommand:
+
+```text
+/clean-room:init
+```
+
+The agent will prompt you for setup choices and write an `init-config.json` file on the contaminated side (defaults to `~/Documents/CleanRoom/<task-id>/`). This file holds:
+*   The paths to your **Authorized Source Roots** and **Clean Output Roots**.
+*   Your output schema target profile (e.g., `speckit-feature-folder` or `openspec-delta`).
+*   Model configurations and `clean_safe` or `contaminated_only` rules.
+
+*Note: For security, `init-config.json` should never be written to or committed within your clean workspace.*
+
+### Step 2: Establish the Scope and Task Manifest
+Start the clean-room controller wizard:
+
+```text
+/clean-room
+```
+
+The agent (Agent 0) will:
+1. Re-verify the path separation of your source, contaminated, and clean workspace roots.
+2. Capture your authorization details and compile them into `task-manifest.json`.
+3. If analyzing a complex scope, guide you to run the local preflight indexer to generate a `source-index.json` under your contaminated artifacts directory.
+4. Decompose the workspace files into neutral, logical task units.
+
+### Step 3: Run the Specification Pipeline
+Choose either **Attended** (with explicit manual approval checkpoints) or **Unattended** mode to begin work on the logical units:
+
+```text
+/clean-room:attended
+/clean-room:unattended
+```
+
+*   **Agent 1** analyzes the source files mapped to the active unit and writes neutral draft specs under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+*   **Agent 1.5** sanitizes the drafts, ensuring no private symbols, code snippets, or structure are leaked.
+*   **Agent 2** merges sanitized specs into the clean schema files.
+*   **Agent 3** performs final schema validation and generates the `qc-report.json`.
 
 ## Operating Model
 
@@ -167,6 +237,12 @@ Use separate workspaces, worktrees, repositories, or profiles for contaminated a
 - Contaminated artifact workspace: init configs, source indexes, task manifests, coverage ledgers, evidence ledgers, draft specs, and abstract delta tickets. Configure as `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 - Clean spec workspace: clean run contexts, approved behavior specs, handoff packages, skeleton manifests, QC reports, and test plans.
 - Clean allowed reference workspace: public documentation or destination constraints explicitly approved for clean and source-denied role reads.
+
+### Path Naming Guards
+
+Artifact paths must be neutral. Do not name task IDs, clean roots, or contaminated artifact roots after private source folders or private code identifiers.
+
+When no explicitly approved neutral task ID is provided, the controller should generate `task-` plus 8 lowercase hex characters under `~/Documents/CleanRoom/`. The initialization wizard and `require-clean-room-env.py` preflight reject clean or contaminated artifact paths that contain source root basenames or meaningful non-generic tokens from those basenames. Guard errors avoid printing the private source name.
 
 Prompt instructions alone are not a boundary. Use path separation, role-specific sessions, hook checks, schema validation, and artifact quarantine.
 
@@ -202,6 +278,8 @@ CLEAN_ROOM_ALLOWED_READ_ROOTS
 For clean roles, reads are deny-by-default. They may read only `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and explicit public or destination constraint roots in `CLEAN_ROOM_ALLOWED_READ_ROOTS`. Agent 2 and Agent 3 receive `clean-run-context.json`, not the full `task-manifest.json`. Agent 1.5 is also source-denied: it may read only assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and explicit public or destination constraint roots. Source roots in `CLEAN_ROOM_SOURCE_ROOTS` stay denied.
 
 Writes are also deny-by-default. Clean roles may write only under `CLEAN_ROOM_CLEAN_ROOTS`. Contaminated roles may write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`. Source roots stay read-only for contaminated roles unless a separate, explicit process outside this plugin changes that policy.
+
+The environment preflight also audits artifact path names. `CLEAN_ROOM_CLEAN_ROOTS` and `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS` must not contain source-derived project basenames or meaningful non-generic source-name tokens.
 
 Optional hook-only guardrail:
 
@@ -294,6 +372,8 @@ Hook scaffolding lives in `hooks/` and is declared by `hooks/hooks.json`.
 
 `hooks/hooks.json` uses commands relative to the plugin package root, such as `python3 hooks/clean-room-hook.py --mode safe ...`. Confirm the host executes plugin hooks from that directory during install smoke tests.
 
+Expanded matcher coverage applies only to tool events the host runtime actually emits; do not treat matcher names as proof that an unsupported host tool is guarded.
+
 - `clean-room-hook.py`: safe/strict dispatch wrapper for the policy checks below.
 - `require-clean-room-env.py`: fails closed when required role and root environment is missing.
 - `deny-clean-room-shell.py`: denies shell-style tools for clean-room role sessions.
@@ -343,6 +423,8 @@ After changing plugin metadata, hooks, schemas, or skill instructions, run the s
 ```bash
 npm run verify
 ```
+
+Note: The unit test suite (`npm test`) utilizes the native Node.js test runner and requires Node.js >= 22 to execute successfully.
 
 The full JSON Schema validation requires Python `jsonschema` with format extras. On macOS with Homebrew Python, use a repo-local venv:
 

@@ -33,6 +33,16 @@ function managedHookCommands(value) {
   return commands;
 }
 
+function managedHookMatchers(value, event) {
+  return (hookTable(value)[event] || [])
+    .filter((entry) =>
+      (entry.hooks || []).some((hook) =>
+        typeof hook.command === 'string' && hook.command.includes('clean-room-hook.py')
+      )
+    )
+    .map((entry) => entry.matcher);
+}
+
 function firstManagedHookCommand(configPath) {
   const commands = managedHookCommands(readJson(configPath));
   assert.ok(commands.length > 0);
@@ -83,6 +93,14 @@ describe('clean-room-skill installer', () => {
       true
     );
     assertManagedHookDetails(hooksJson);
+    assert.deepEqual(managedHookMatchers(hooksJson, 'PreToolUse'), [
+      'Bash|Shell|PowerShell|Monitor|exec_command|shell_command|write_stdin',
+      'Read|Glob|Grep|LS|LSP|NotebookRead|view_image|list_dir|ListMcpResourcesTool|ReadMcpResourceTool|ListMcpResourceTemplatesTool|list_mcp_resources|list_mcp_resource_templates|read_mcp_resource',
+      'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
+    ]);
+    assert.deepEqual(managedHookMatchers(hooksJson, 'PostToolUse'), [
+      'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
+    ]);
     assert.match(postWriteHookCommand(hooksJson), /--check validate-handoff-package\.py/);
   });
 
@@ -115,7 +133,24 @@ describe('clean-room-skill installer', () => {
       true
     );
     assertManagedHookDetails(settings);
+    assert.deepEqual(managedHookMatchers(settings, 'PreToolUse'), [
+      'Bash|Shell|PowerShell|Monitor|exec_command|shell_command|write_stdin',
+      'Read|Glob|Grep|LS|LSP|NotebookRead|view_image|list_dir|ListMcpResourcesTool|ReadMcpResourceTool|ListMcpResourceTemplatesTool|list_mcp_resources|list_mcp_resource_templates|read_mcp_resource',
+      'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
+    ]);
     assert.match(postWriteHookCommand(settings), /--check validate-handoff-package\.py/);
+  });
+
+  test('bundled plugin hooks cover supported shell and read aliases', () => {
+    const hooksJson = readJson(path.join(ROOT, 'hooks', 'hooks.json'));
+    assert.deepEqual(managedHookMatchers(hooksJson, 'PreToolUse'), [
+      'Bash|Shell|PowerShell|Monitor|exec_command|shell_command|write_stdin',
+      'Read|Glob|Grep|LS|LSP|NotebookRead|view_image|list_dir|ListMcpResourcesTool|ReadMcpResourceTool|ListMcpResourceTemplatesTool|list_mcp_resources|list_mcp_resource_templates|read_mcp_resource',
+      'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
+    ]);
+    assert.deepEqual(managedHookMatchers(hooksJson, 'PostToolUse'), [
+      'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
+    ]);
   });
 
   test('installs Antigravity as a CLI plugin without enabling hooks', () => {
@@ -250,7 +285,7 @@ describe('clean-room-skill installer', () => {
     const codexHome = tempDir('clean-room-installed-safe-hook');
     const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /safe hooks are compatibility-only/);
+    assert.match(result.stdout, /safe hooks are installed but not enforcing/);
 
     const command = firstManagedHookCommand(path.join(codexHome, 'hooks.json'));
     let hook = spawnSync(command, {

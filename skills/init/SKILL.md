@@ -19,7 +19,7 @@ Collect only setup decisions that affect correctness, safety, resumability, or o
 
 - Requester authorization, allowed actions, prohibited actions, and evidence handling.
 - Source roots, contaminated artifact root, clean root, quarantine root, and approved public or destination reference roots.
-- Artifact base root. Default to `~/Documents/CleanRoom/<task-id>/`, never to the source workspace or a temporary directory unless the user explicitly chooses it.
+- Artifact base root. Default to `~/Documents/CleanRoom/<task-id>/`, never to the source workspace or a temporary directory unless the user explicitly chooses it. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.
 - Default model plus optional overrides for contaminated roles, clean roles, or individual roles. Keep model ids as runtime-specific strings.
 - Additional user rules split into `clean_safe` and `contaminated_only`. Put anything containing source paths, private identifiers, private dependency names, or source-derived specifics into `contaminated_only`.
@@ -29,6 +29,7 @@ Collect only setup decisions that affect correctness, safety, resumability, or o
 Before writing active artifacts:
 
 - Confirm source roots, contaminated artifact roots, clean roots, approved public reference roots, and schema directory are separated.
+- Confirm contaminated artifact roots and clean roots do not contain source-derived path names. Treat matches against source root basenames or meaningful non-generic source-name tokens as contamination risk.
 - Confirm Agent 2 and Agent 3 will launch from the clean root, not from the source workspace.
 - Set clean isolation to `clean-workspace`; Docker or other containers are out of scope for v1.
 - Treat root changes, model policy changes, target profile changes, and rule reclassification as safety-sensitive. Require explicit confirmation before changing an existing run.

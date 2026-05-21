@@ -68,7 +68,7 @@ jobs:
           python3 -m json.tool hooks/hooks.json >/dev/null
 
       - name: Compile Python hooks and scripts
-        run: python3 -m py_compile hooks/*.py skills/clean-room/scripts/*.py
+        run: python3 -m compileall -q hooks skills/clean-room/scripts
 
       - name: Run full JSON Schema validation
         run: python3 tests/validate_jsonschema.py
