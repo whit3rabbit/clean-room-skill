@@ -13,6 +13,8 @@ Initialize or revise durable Clean Room run preferences before source analysis s
 
 Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
+The CLI command `clean-room-skill init` may have pre-created neutral external folders and a clean-safe `.clean-room/README.md` stub in the target repository. Treat that bootstrap output as convenience scaffolding only. It does not replace this skill's initialization workflow, and it must not be treated as an active `init-config.json`, `task-manifest.json`, or `clean-run-context.json`.
+
 ## Gather
 
 Collect only setup decisions that affect correctness, safety, resumability, or output shape:

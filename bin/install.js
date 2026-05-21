@@ -5,6 +5,7 @@ const path = require('node:path');
 const readline = require('node:readline/promises');
 const { spawnSync } = require('node:child_process');
 
+const { runInit } = require('../lib/bootstrap.cjs');
 const {
   buildHookEntries,
   configPathForRuntime,
@@ -89,6 +90,10 @@ function setExclusive(current, next, flag) {
 
 function printHelp() {
   console.log(`Usage: clean-room-skill [runtime] [scope] [options]
+       clean-room-skill init [options]
+
+Commands:
+  init                Create clean-room bootstrap folders and repo guidance
 
 Runtime:
   --codex              Install for Codex
@@ -303,7 +308,12 @@ function uninstallRuntime(runtime, options) {
 }
 
 async function main() {
-  const options = await resolveInteractiveOptions(parseArgs(process.argv.slice(2)));
+  const argv = process.argv.slice(2);
+  if (argv[0] === 'init') {
+    runInit(argv.slice(1));
+    return;
+  }
+  const options = await resolveInteractiveOptions(parseArgs(argv));
   if (!options.scope) {
     options.scope = 'global';
   }
@@ -328,5 +338,6 @@ module.exports = {
   buildDesiredFiles,
   parseArgs,
   planInstall,
+  runInit,
   resolveTargetRoot,
 };

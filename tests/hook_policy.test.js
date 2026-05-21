@@ -1270,6 +1270,48 @@ describe('clean-room hook policy', () => {
     assert.equal(result.status, 0, result.stderr);
   });
 
+  test('leakage scanner ignores low-confidence prose identifiers', () => {
+    const root = tempDir('clean-room-leakage-prose');
+    const env = policyEnv(root, 'clean-architect');
+    const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'prose-identifiers.json');
+    fs.writeFileSync(filePath, JSON.stringify({
+      findings: [
+        {
+          summary: 'Run validate() and check() before publishing.',
+        },
+      ],
+      notes: 'Use docs.example.com for public docs and set logging.level.default in config.',
+    }));
+
+    const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  test('leakage scanner still catches reverse DNS packages and scoped calls', () => {
+    const root = tempDir('clean-room-leakage-scoped');
+    const env = policyEnv(root, 'clean-architect');
+    const cases = [
+      {
+        name: 'reverse-dns',
+        data: { summary: 'Keep com.example.product compatible with the public contract.' },
+        message: /package_or_module_identifier|source_like_scoped_identifier/,
+      },
+      {
+        name: 'scoped-call',
+        data: { summary: 'Call private.module.name.doThing() after setup.' },
+        message: /source_like_call|source_like_scoped_identifier/,
+      },
+    ];
+
+    for (const item of cases) {
+      const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, `${item.name}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(item.data));
+      const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+      assert.notEqual(result.status, 0, item.name);
+      assert.match(result.stderr, item.message, item.name);
+    }
+  });
+
   test('sanitizer staged artifacts are leakage-scanned while analyst drafts are not', () => {
     const root = tempDir('clean-room-sanitizer-leakage');
     const env = policyEnv(root, 'contaminated-handoff-sanitizer');

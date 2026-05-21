@@ -123,6 +123,23 @@ IDENTIFIER_PATTERNS = {
     ),
 }
 URL_PATTERN = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s\"')]+", re.I)
+PUBLIC_HOST_TLDS = {
+    "ai",
+    "app",
+    "au",
+    "ca",
+    "co",
+    "com",
+    "dev",
+    "edu",
+    "gov",
+    "io",
+    "mil",
+    "net",
+    "org",
+    "uk",
+    "us",
+}
 
 
 def path_under_any(path: Path, roots: list[Path]) -> bool:
@@ -189,6 +206,53 @@ def private_identifier_pattern(term: str) -> re.Pattern[str]:
 
 def compile_private_identifier_terms(private_terms: list[str]) -> list[tuple[str, re.Pattern[str]]]:
     return [(term, private_identifier_pattern(term)) for term in private_terms]
+
+
+def has_identifier_signal(value: str) -> bool:
+    return any(char.isupper() or char.isdigit() for char in value) or "_" in value or "$" in value
+
+
+def dotted_identifier_is_finding(value: str) -> bool:
+    parts = value.split(".")
+    if len(parts) < 3:
+        return False
+    if parts[0] in PUBLIC_HOST_TLDS:
+        return True
+    if parts[-1] in PUBLIC_HOST_TLDS:
+        return False
+    if len(parts) >= 4:
+        return True
+    return any(has_identifier_signal(part) for part in parts)
+
+
+def source_like_call_is_finding(text: str, match: re.Match[str]) -> bool:
+    name = match.group(0).rstrip("(").strip()
+    if has_identifier_signal(name):
+        return True
+    start = match.start()
+    return (
+        (start > 0 and text[start - 1] in ".#>")
+        or (start >= 2 and text[start - 2:start] == "::")
+    )
+
+
+def scoped_identifier_is_finding(value: str) -> bool:
+    if any(separator in value for separator in ("->", "::", "#")):
+        return True
+    if "." in value:
+        return dotted_identifier_is_finding(value)
+    return has_identifier_signal(value)
+
+
+def identifier_match_is_finding(name: str, text: str, match: re.Match[str]) -> bool:
+    value = match.group(0)
+    if name == "package_or_module_identifier":
+        return dotted_identifier_is_finding(value)
+    if name == "source_like_call":
+        return source_like_call_is_finding(text, match)
+    if name == "source_like_scoped_identifier":
+        return scoped_identifier_is_finding(value)
+    return True
 
 
 def public_names(value: object, path: tuple[str | int, ...] = ()) -> set[str]:
@@ -281,7 +345,7 @@ def scan_identifier_patterns(
         for name, pattern in IDENTIFIER_PATTERNS.items():
             if name in skipped_patterns:
                 continue
-            if pattern.search(text):
+            if any(identifier_match_is_finding(name, text, match) for match in pattern.finditer(text)):
                 findings.add(name)
     return sorted(findings)
 

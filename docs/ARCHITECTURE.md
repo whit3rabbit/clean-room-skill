@@ -23,7 +23,7 @@ To maintain compliance and mitigate leakage risks, the workflow utilizes strictl
 *   **Clean Allowed Reference Workspace**: Public documentation, specifications, or destination constraints explicitly approved for clean and source-denied role reads. Configure via `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
 
 > [!IMPORTANT]
-> Prompt instructions alone do not form a boundary. The system enforces safety using OS-level path separation, role-specific sessions, Git hook checks, JSON schema validation, and strict artifact quarantine.
+> Prompt instructions alone do not form a boundary. The system enforces safety using OS-level path separation, role-specific sessions, agent/tool hook checks, JSON schema validation, and strict artifact quarantine.
 
 ### Path Naming Guards
 
@@ -210,7 +210,7 @@ Note: Even though clean and source-denied roles (such as Agent 1.5, 2, and 3) ar
 
 ## Guardrails and Hooks
 
-The architecture relies on Git hook scaffolding located in `hooks/` to enforce boundary rules dynamically during agent sessions. Use strict hooks for dedicated Codex or Claude clean-room homes; safe hooks are compatibility-only until `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present.
+The architecture relies on agent/tool hook scaffolding located in `hooks/` to enforce boundary rules dynamically during agent sessions. Use strict hooks for dedicated Codex or Claude clean-room homes; safe hooks are compatibility-only until `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present.
 
 Matcher coverage depends on the host runtime emitting hook events for the tool invocation. Hosts that do not emit a pre/post tool event for a file, terminal, or resource tool are not protected by adding that tool name to `hooks.json`.
 

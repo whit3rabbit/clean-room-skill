@@ -63,6 +63,133 @@ function symlinkDirOrSkip(t, target, linkPath) {
 }
 
 describe('clean-room-skill installer', () => {
+  test('init dry run makes no target changes and prints bootstrap paths', () => {
+    const root = tempDir('clean-room-init-dry-run');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const result = runInstall([
+      'init',
+      '--target-dir',
+      targetDir,
+      '--artifact-base',
+      artifactBase,
+      '--task-id',
+      'task-dry',
+      '--dry-run',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Would create clean-room bootstrap/);
+    assert.match(result.stdout, new RegExp(path.join(artifactBase, 'task-dry').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.equal(fs.existsSync(artifactBase), false);
+    assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
+  });
+
+  test('init creates generated task directories, metadata, and clean repo stub', () => {
+    const root = tempDir('clean-room-init-create');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const result = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const taskIds = fs.readdirSync(artifactBase);
+    assert.equal(taskIds.length, 1);
+    assert.match(taskIds[0], /^task-[0-9a-f]{8}$/);
+
+    const outputRoot = path.join(artifactBase, taskIds[0]);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'contaminated')), true);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'clean')), true);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'quarantine')), true);
+
+    const metadata = readJson(path.join(outputRoot, 'clean-room-bootstrap.json'));
+    assert.equal(metadata.task_id, taskIds[0]);
+    assert.equal(metadata.target_profile, 'speckit-feature-folder');
+    assert.equal(metadata.roots.contaminated_artifacts, path.join(outputRoot, 'contaminated'));
+    assert.equal(metadata.roots.clean_artifacts, path.join(outputRoot, 'clean'));
+    assert.equal(metadata.roots.quarantine, path.join(outputRoot, 'quarantine'));
+
+    const stub = fs.readFileSync(path.join(targetDir, '.clean-room', 'README.md'), 'utf8');
+    assert.match(stub, /Clean Room Bootstrap/);
+    assert.match(stub, /Default target profile: `speckit-feature-folder`/);
+    assert.doesNotMatch(stub, /source roots:/i);
+    assert.match(result.stdout, /install safe hooks:/);
+    assert.match(result.stdout, /uninstall runtime install:/);
+  });
+
+  test('init does not overwrite existing repo stub without force', () => {
+    const root = tempDir('clean-room-init-conflict');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(path.join(targetDir, '.clean-room'), { recursive: true });
+    const stubPath = path.join(targetDir, '.clean-room', 'README.md');
+    fs.writeFileSync(stubPath, '# local clean-room notes\n');
+
+    const result = runInstall([
+      'init',
+      '--target-dir',
+      targetDir,
+      '--artifact-base',
+      artifactBase,
+      '--task-id',
+      'task-conflict',
+    ]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /bootstrap file already exists/);
+    assert.equal(fs.readFileSync(stubPath, 'utf8'), '# local clean-room notes\n');
+    assert.equal(fs.existsSync(path.join(artifactBase, 'task-conflict')), false);
+  });
+
+  test('init force overwrites existing repo stub', () => {
+    const root = tempDir('clean-room-init-force');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(path.join(targetDir, '.clean-room'), { recursive: true });
+    const stubPath = path.join(targetDir, '.clean-room', 'README.md');
+    fs.writeFileSync(stubPath, '# local clean-room notes\n');
+
+    const result = runInstall([
+      'init',
+      '--target-dir',
+      targetDir,
+      '--artifact-base',
+      artifactBase,
+      '--task-id',
+      'task-force',
+      '--force',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(fs.readFileSync(stubPath, 'utf8'), /Default target profile: `speckit-feature-folder`/);
+    assert.equal(fs.existsSync(path.join(artifactBase, 'task-force', 'clean-room-bootstrap.json')), true);
+  });
+
+  test('init rejects invalid target profile before writing files', () => {
+    const root = tempDir('clean-room-init-invalid-profile');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const result = runInstall([
+      'init',
+      '--target-dir',
+      targetDir,
+      '--artifact-base',
+      artifactBase,
+      '--target-profile',
+      'invalid-profile',
+    ]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /--target-profile must be one of/);
+    assert.equal(fs.existsSync(artifactBase), false);
+    assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
+  });
+
   test('installs Codex skills, agents, hooks, manifest, and preserves user hooks', () => {
     const codexHome = tempDir('clean-room-codex');
     fs.writeFileSync(path.join(codexHome, 'hooks.json'), JSON.stringify({

@@ -246,7 +246,8 @@ def validate_combinator(
         if not isinstance(subschema, dict):
             add_error(errors, f"{path_label(path)}: {keyword}[{index}] is not a schema object")
             continue
-        if not validate_value(value, subschema, root_schema, path):
+        sub_errors = validate_value(value, subschema, root_schema, path)
+        if not sub_errors:
             valid_count += 1
     if require_exactly_one:
         if valid_count != 1:

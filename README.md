@@ -39,7 +39,10 @@ It does not protect against:
 
 ### Installation Model
 
-The `clean-room-skill` npm package is a **meta-installer**. It does not run analysis directly; instead, it installs clean-room skills, agent prompts, and verification hooks *into* your local or global agent runtimes (e.g., Claude Code, Codex, or Cursor).
+The `clean-room-skill` npm package has two separate layers:
+
+*   **Agent/runtime install**: installs clean-room skills, agent prompts, and verification hooks *into* your local or global agent runtimes (e.g., Claude Code, Codex, or Cursor). This is the default command behavior.
+*   **Run bootstrap**: `clean-room-skill init` creates neutral external output folders and a clean-safe repo stub for a specific clean-room run. It does not install hooks, does not write active run artifacts, and does not replace the runtime skill workflow.
 
 *   **Global Installation (Recommended)**: Integrates the clean-room workflow globally into your agent configuration directories (e.g., `~/.claude/` or `~/.codex/`).
 *   **Local Installation**: Places the plugin directly inside your current repository's workspace (e.g., `.claude/` or `.codex/`).
@@ -119,6 +122,35 @@ npx clean-room-skill@latest --codex --global --uninstall --yes
 
 The installer writes `clean-room-install-manifest.json` into each target root. Reinstalling replaces only manifest-managed files automatically. If a managed file was locally modified, the previous version is backed up under `clean-room-patches/<timestamp>/`. Unknown existing files are not overwritten in non-interactive mode.
 
+### Bootstrap CLI Reference
+
+Use `init` to prepare a clean implementation repository and external run folder before starting the agent workflow:
+
+```bash
+npx clean-room-skill@latest init
+npx clean-room-skill@latest init --target-dir . --target-profile speckit-feature-folder
+npx clean-room-skill@latest init --artifact-base ~/Documents/CleanRoom --task-id task-1234abcd
+```
+
+By default, `init` writes external run folders under `~/Documents/CleanRoom/<task-id>/` and creates:
+
+- `contaminated/`
+- `clean/`
+- `quarantine/`
+- `clean-room-bootstrap.json`
+- `.clean-room/README.md` in the target repository
+
+The repo-local `.clean-room/README.md` is clean-safe guidance only. Do not commit source roots, contaminated artifact paths, private identifiers, source-derived names, `init-config.json`, `task-manifest.json`, or `clean-run-context.json` into the clean implementation repository.
+
+`init` prints the output folder, repo stub path, safe hook install command, runtime start guidance, and uninstall command. It never registers strict hooks. For normal use, install safe hooks into your agent home:
+
+```bash
+npx clean-room-skill@latest --codex --global --hooks=safe --yes
+npx clean-room-skill@latest --claude --global --hooks=safe --yes
+```
+
+Use `--hooks=strict` only for dedicated clean-room Codex or Claude homes, not a daily agent profile.
+
 Marketplace install remains available.
 
 From Codex marketplace:
@@ -188,6 +220,15 @@ Before starting, prepare separate paths for source, contaminated artifacts, clea
 ## Quick Start: Onboarding your Codebase
 
 Once the skill package is installed in your runtime, follow these steps to initialize and execute a clean-room specification task.
+
+### Optional: Bootstrap Run Folders
+Before invoking the runtime skill, you can create the external output folders and a clean-safe repository stub:
+
+```bash
+npx clean-room-skill@latest init
+```
+
+The command prints the output folder path to pass into the runtime skill. It does not write `init-config.json`, `task-manifest.json`, or `clean-run-context.json`; those are still created by the runtime initialization workflow.
 
 ### Step 1: Initialize Workspace Preferences
 In your agent session (e.g., Claude Code), run the initialization subcommand:
@@ -373,7 +414,7 @@ Example artifact shapes are in `skills/clean-room/examples/minimal-spec-package/
 
 ## Hook Guardrails
 
-Hook scaffolding lives in `hooks/` and is declared by `hooks/hooks.json`.
+Agent/tool hook scaffolding lives in `hooks/` and is declared by `hooks/hooks.json`.
 
 `hooks/hooks.json` routes through `hooks/clean-room-hook.py`. In safe mode, the wrapper exits successfully unless `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present. Safe mode is compatibility-only until enforcement is enabled. In strict mode, it runs the configured checks immediately and fails closed when required role or path configuration is missing. Prefer strict mode for dedicated Codex or Claude clean-room homes.
 
