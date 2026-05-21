@@ -31,6 +31,8 @@ SCHEMA_BY_ARTIFACT = {
     "task-manifest": "task-manifest.schema.json",
     "behavior-spec": "behavior-spec.schema.json",
     "skeleton-manifest": "skeleton-manifest.schema.json",
+    "implementation-plan": "implementation-plan.schema.json",
+    "implementation-report": "implementation-report.schema.json",
     "qc-report": "qc-report.schema.json",
     "coverage-ledger": "coverage-ledger.schema.json",
     "evidence-ledger": "evidence-ledger.schema.json",

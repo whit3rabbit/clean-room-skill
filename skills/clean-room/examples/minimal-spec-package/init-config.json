@@ -8,6 +8,9 @@
     ],
     "contaminated_artifact_root": "~/Documents/CleanRoom/task-example/contaminated",
     "clean_root": "~/Documents/CleanRoom/task-example/clean",
+    "implementation_roots": [
+      "~/Documents/CleanRoom/task-example/implementation"
+    ],
     "quarantine_root": "~/Documents/CleanRoom/task-example/quarantine",
     "approved_public_reference_roots": [
       "~/Documents/CleanRoom/task-example/public-refs"

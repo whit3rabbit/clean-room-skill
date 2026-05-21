@@ -1,0 +1,14 @@
+{
+  "schema_kind": "implementation-report",
+  "base": "implementation-report.json",
+  "description": "Implementation reports must be produced by Agent 3.",
+  "set": [
+    {
+      "path": [
+        "implementer_role"
+      ],
+      "value": "clean-architect"
+    }
+  ],
+  "expected_error": "clean-qa-editor"
+}

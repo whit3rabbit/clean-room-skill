@@ -49,6 +49,7 @@ def main() -> int:
 
     source_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS")
     clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+    implementation_roots = env_roots("CLEAN_ROOM_IMPLEMENTATION_ROOTS")
     contaminated_artifact_roots = env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
 
     if role in CLEAN_ROLES:
@@ -61,7 +62,7 @@ def main() -> int:
                 )
                 return 1
             if any(is_under(path, root) for root in allowed_read_roots) and not any(
-                is_under(path, root) for root in clean_roots
+                is_under(path, root) for root in clean_roots + implementation_roots
             ):
                 print(
                     f"clean-room policy denied clean role {role} writing read-only allowed-read path {path}",
@@ -74,6 +75,14 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 1
+            if role == "clean-architect" and any(is_under(path, root) for root in implementation_roots):
+                print(
+                    f"clean-room policy denied Agent 2 writing implementation path {path}",
+                    file=sys.stderr,
+                )
+                return 1
+            if role == "clean-qa-editor" and any(is_under(path, root) for root in implementation_roots):
+                continue
             if not any(is_under(path, root) for root in clean_roots):
                 print(
                     f"clean-room policy denied clean role {role} writing outside clean roots: {path}",
@@ -86,6 +95,12 @@ def main() -> int:
         if any(is_under(path, root) for root in clean_roots):
             print(
                 f"clean-room policy denied contaminated role {role} writing clean path {path}",
+                file=sys.stderr,
+            )
+            return 1
+        if any(is_under(path, root) for root in implementation_roots):
+            print(
+                f"clean-room policy denied contaminated role {role} writing implementation path {path}",
                 file=sys.stderr,
             )
             return 1

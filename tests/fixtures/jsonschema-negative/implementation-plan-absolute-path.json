@@ -1,0 +1,17 @@
+{
+  "schema_kind": "implementation-plan",
+  "base": "implementation-plan.json",
+  "description": "Implementation plans must use relative destination paths.",
+  "set": [
+    {
+      "path": [
+        "work_items",
+        0,
+        "target_paths",
+        0
+      ],
+      "value": "/private/source/file.js"
+    }
+  ],
+  "expected_error": "does not match"
+}

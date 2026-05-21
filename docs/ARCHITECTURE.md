@@ -1,12 +1,12 @@
 # Clean Room Architecture
 
-This document provides a comprehensive technical overview of the spec-first Clean Room workflow. The architecture enforces separation of concerns between contaminated source analysis and clean behavioral specification.
+This document provides a comprehensive technical overview of the Clean Room workflow for clean specs and clean implementation. The architecture enforces separation of concerns between contaminated source analysis, clean planning, and clean code development.
 
 ---
 
 ## High-Level Overview
 
-The Clean Room workflow acts as an engineering risk-reduction process by establishing a unidirectional boundary (the "clean-room wall"). It isolates agents with access to source code from agents responsible for producing clean, target-agnostic behavioral specifications.
+The Clean Room workflow acts as an engineering risk-reduction process by establishing a unidirectional boundary (the "clean-room wall"). It isolates agents with access to source code from agents responsible for producing clean behavioral specifications, implementation plans, and clean destination code.
 
 ![Clean Room Architecture](../assets/clean-room-arch.svg)
 
@@ -18,7 +18,8 @@ To maintain compliance and mitigate leakage risks, the workflow utilizes strictl
 
 *   **Contaminated Source Workspace**: Source-readable, read-only where practical. Contains the codebase under analysis.
 *   **Contaminated Artifact Workspace**: Holds intermediate outputs like init configs, source indexes, task manifests, coverage ledgers, evidence ledgers, draft specs, and abstract delta tickets. Configure via `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
-*   **Clean Spec Workspace**: Houses sanitized clean run contexts, approved behavioral specifications, handoff packages, skeleton manifests, QC reports, and test plans. Configure via `CLEAN_ROOM_CLEAN_ROOTS`.
+*   **Clean Artifact Workspace**: Houses sanitized clean run contexts, approved behavioral specifications, handoff packages, skeleton manifests, implementation plans, implementation reports, QC reports, and test plans. Configure via `CLEAN_ROOM_CLEAN_ROOTS`.
+*   **Clean Implementation Workspace**: Houses clean destination code and tests. Configure via `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 *   **Clean Allowed Reference Workspace**: Public documentation, specifications, or destination constraints explicitly approved for clean and source-denied role reads. Configure via `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
 
 > [!IMPORTANT]
@@ -28,7 +29,7 @@ To maintain compliance and mitigate leakage risks, the workflow utilizes strictl
 
 Artifact roots must not disclose private source names. New runs default to `~/Documents/CleanRoom/<task-id>/`; when no explicitly approved neutral task ID is provided, the controller generates `task-` plus 8 lowercase hex characters instead of using the source folder name.
 
-The initialization wizard and `require-clean-room-env.py` audit clean and contaminated artifact root names. They fail closed when a path contains a source root basename or meaningful non-generic tokens from that basename, while filtering generic terms such as `src`, `app`, `test`, `repo`, and `workspace`.
+The initialization wizard and `require-clean-room-env.py` audit clean, implementation, and contaminated artifact root names. They fail closed when a path contains a source root basename or meaningful non-generic tokens from that basename, while filtering generic terms such as `src`, `app`, `test`, `repo`, and `workspace`.
 
 ### Contaminated Preflight Tooling
 
@@ -65,10 +66,12 @@ flowchart LR
 
   subgraph clean["Clean domain: source-denied"]
     cleanroots["Clean artifact roots<br/>CLEAN_ROOM_CLEAN_ROOTS"]
+    implroots["Clean implementation roots<br/>CLEAN_ROOM_IMPLEMENTATION_ROOTS"]
     publicrefs["Allowed public refs<br/>CLEAN_ROOM_ALLOWED_READ_ROOTS"]
-    architect["Agent 2: clean-architect<br/>Read clean-run-context<br/>manage schema base and skeleton manifest"]
-    qa["Agent 3: clean-qa-editor<br/>Validate schema, leakage, coverage, testability"]
-    outputs["Clean outputs<br/>skeleton-manifest.json<br/>qc-report.json<br/>test plan notes"]
+    architect["Agent 2: clean-architect<br/>Plan implementation from clean specs and foundation"]
+    qa["Agent 3: clean-qa-editor<br/>Implement, verify, terminal report"]
+    outputs["Clean artifacts<br/>implementation-plan.json<br/>qc-report.json<br/>test plan notes"]
+    imploutputs["Implementation outputs<br/>code and tests<br/>implementation-report.json"]
   end
 
   subgraph guardrails["Guardrails and audit"]
@@ -92,21 +95,27 @@ flowchart LR
   staged --> handoff
   handoff --> cleanroots
   cleanroots --> architect
+  implroots --> architect
   publicrefs --> architect
   architect --> outputs
+  architect --> imploutputs
   outputs --> qa
+  implroots --> qa
+  qa --> imploutputs
   qa --> outputs
-  qa -. abstract delta tickets only .-> manager
+  qa -. terminal report only<br/>abstract delta tickets .-> manager
 
   blocked -. quarantine do not hand off .-> ledgers
   env -. required for every role session .-> manager
   env -. required for every role session .-> architect
   denyread -. clean and source-denied roles cannot read source roots .-> cleanroots
-  denyread -. Agent 1.5 cannot read source roots, clean roots, or source-index.json .-> sanitizer
+  denyread -. clean roles may read implementation roots .-> implroots
+  denyread -. Agent 1.5 cannot read source roots, clean roots, implementation roots, or source-index.json .-> sanitizer
   denywrite -. contaminated writes only to contaminated artifact roots .-> ledgers
-  denywrite -. clean writes only to clean roots .-> cleanroots
+  denywrite -. Agent 2 writes clean artifacts only; Agent 3 writes implementation roots .-> cleanroots
+  denywrite -. Agent 3 writes code and tests only here .-> implroots
   denyshell -. no shell-style tools in role sessions .-> manager
-  denyshell -. no shell-style tools in role sessions .-> architect
+  denyshell -. no shell for Agent 2; bounded verification shell for Agent 3 .-> architect
   scan -. post-write checks .-> outputs
   scan -. Agent 1.5 staged-output checks .-> staged
 
@@ -115,7 +124,7 @@ flowchart LR
   classDef wallClass fill:#f8fafc,stroke:#475569,color:#111827;
   classDef guardClass fill:#f0fdf4,stroke:#15803d,color:#111827;
   class source,manager,analyst,sanitizer,brief,ledgers,drafts,staged contaminatedDomain;
-  class cleanroots,publicrefs,architect,qa,outputs cleanDomain;
+  class cleanroots,implroots,publicrefs,architect,qa,outputs,imploutputs cleanDomain;
   class handoff,blocked wallClass;
   class env,denyread,denywrite,denyshell,scan guardClass;
 ```
@@ -124,7 +133,7 @@ flowchart LR
 
 ## Agent Roles
 
-The architecture delegates work across five distinct custom role agents to enforce separation between source reading, independent sanitization, and clean specification authoring.
+The architecture delegates work across five distinct custom role agents to enforce separation between source reading, independent sanitization, clean planning, and clean implementation.
 
 ### [Agent 0: Contaminated Manager Verifier](../agents/contaminated-manager-verifier.md)
 *   **Domain**: Contaminated (Source-readable)
@@ -135,8 +144,9 @@ The architecture delegates work across five distinct custom role agents to enfor
     *   Controls execution flow and iteration loop state.
     *   Provides Agent 1.5 only a neutral sanitizer brief containing domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
     *   Produces `clean-run-context.json` for Agent 2 and Agent 3 instead of handing over the full `task-manifest.json`.
-    *   Performs final verification of clean specification coverage against the source scope.
-    *   Sends only abstract delta tickets across the clean-room wall (no source leakage).
+    *   Influences Agent 2 and Agent 3 only through durable sanitized artifacts, never direct chat, progress feedback, implementation hints, or priority changes.
+    *   Performs final verification of clean specification and implementation coverage against the source scope.
+    *   Consumes Agent 3 reports only after Agent 3 reaches a terminal state, then sends only abstract delta tickets into a fresh clean artifact cycle.
 
 ### [Agent 1: Contaminated Source Analyst](../agents/contaminated-source-analyst.md)
 *   **Domain**: Contaminated (Source-readable, Read-only access to source)
@@ -159,23 +169,26 @@ The architecture delegates work across five distinct custom role agents to enfor
 
 ### [Agent 2: Clean Architect](../agents/clean-architect.md)
 *   **Domain**: Clean (Source-denied, no access to source or contaminated chat histories)
-*   **Write Target**: Clean workspace (`CLEAN_ROOM_CLEAN_ROOTS`)
+*   **Write Target**: Clean artifact workspace (`CLEAN_ROOM_CLEAN_ROOTS`)
 *   **Responsibilities**:
-    *   Starts from the clean workspace and reads `clean-run-context.json` for target profile, clean-safe rules, clean artifact paths, and clean-side model preferences.
-    *   Manages the selected clean specification schema base.
+    *   Starts from the clean artifact workspace and reads `clean-run-context.json` for target profile, clean-safe rules, clean artifact paths, implementation root refs, and clean-side model preferences.
+    *   Accepts Agent 0 input only as schema-valid durable sanitized artifacts.
+    *   Reads the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
     *   Merges approved handoff artifacts into the clean workspace.
-    *   Organizes behavioral specifications into a target-neutral `skeleton-manifest.json`.
-    *   Records target-language constraints and public contract references.
+    *   Writes `implementation-plan.json` with relative destination paths, tests, constraints, risks, and verification commands.
+    *   Keeps `skeleton-manifest.json` valid when the target profile expects it.
 
-### [Agent 3: Clean QA Editor](../agents/clean-qa-editor.md)
+### [Agent 3: Clean Implementer Verifier](../agents/clean-qa-editor.md)
 *   **Domain**: Clean (Source-denied)
-*   **Write Target**: Clean workspace (`CLEAN_ROOM_CLEAN_ROOTS`)
+*   **Write Target**: Clean reports in `CLEAN_ROOM_CLEAN_ROOTS`; code and tests in `CLEAN_ROOM_IMPLEMENTATION_ROOTS`
 *   **Responsibilities**:
-    *   Starts from the clean workspace and validates `clean-run-context.json`.
-    *   Validates clean specification files against the schema directory (`CLEAN_ROOM_SCHEMA_DIR`).
-    *   Performs leakage reviews using guidelines in [LEAKAGE-RULES.md](../skills/clean-room/references/LEAKAGE-RULES.md).
-    *   Drafts the final `qc-report.json`.
-    *   Communicates findings and coverage gaps back to Agent 0 using abstract delta tickets only.
+    *   Starts from the clean domain and validates `clean-run-context.json`.
+    *   Reads `implementation-plan.json` and implements unblocked work items.
+    *   Writes code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
+    *   Runs bounded verification only with `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd under implementation roots.
+    *   Writes `implementation-report.json` and maintains `qc-report.json`.
+    *   Does not report progress or ask Agent 0 for guidance during implementation.
+    *   Emits one terminal report for Agent 0 only when the assigned plan or task is complete, blocked, or quarantined.
 
 ---
 
@@ -186,11 +199,12 @@ Every clean-room role session requires a populated environment block before any 
 *   `CLEAN_ROOM_ROLE`: Defines the active role (e.g. `clean-architect`).
 *   `CLEAN_ROOM_SOURCE_ROOTS`: Source roots (only readable by source-reading contaminated roles, not Agent 1.5).
 *   `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`: Target write directory for contaminated roles.
-*   `CLEAN_ROOM_CLEAN_ROOTS`: Target write directory for clean roles.
+*   `CLEAN_ROOM_CLEAN_ROOTS`: Target write directory for clean artifacts and reports.
+*   `CLEAN_ROOM_IMPLEMENTATION_ROOTS`: Target write directory for Agent 3 clean implementation code and tests.
 *   `CLEAN_ROOM_ALLOWED_READ_ROOTS`: Approved reference docs or constraints readable by clean and source-denied roles.
 *   `CLEAN_ROOM_SCHEMA_DIR`: Path to the directory containing JSON schema assets.
 
-Note: Even though clean and source-denied roles (such as Agent 1.5, 2, and 3) are restricted from accessing contaminated or source workspaces, they must still be configured with the full environment block (including `CLEAN_ROOM_SOURCE_ROOTS` and `CLEAN_ROOM_CLEAN_ROOTS`). The hook guardrails require these paths to validate that tool inputs do not cross-pollinate or violate boundary constraints.
+Note: Even though clean and source-denied roles (such as Agent 1.5, 2, and 3) are restricted from accessing contaminated or source workspaces, they must still be configured with the full environment block. The hook guardrails require these paths to validate that tool inputs do not cross-pollinate or violate boundary constraints.
 
 ---
 
@@ -201,10 +215,10 @@ The architecture relies on Git hook scaffolding located in `hooks/` to enforce b
 Matcher coverage depends on the host runtime emitting hook events for the tool invocation. Hosts that do not emit a pre/post tool event for a file, terminal, or resource tool are not protected by adding that tool name to `hooks.json`.
 
 *   [clean-room-hook.py](../hooks/clean-room-hook.py): The main safe/strict dispatch wrapper for the policy checks.
-*   [require-clean-room-env.py](../hooks/require-clean-room-env.py): Fails closed if the required role and root environment variables are missing, if trust-domain roots overlap, or if clean or contaminated artifact root names appear source-derived.
-*   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions to prevent command-based read/write bypasses.
-*   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles and Agent 1.5 cannot read source roots or unapproved paths; Agent 1.5 is also denied clean roots and direct `source-index.json` reads.
-*   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots (Clean roles write only to `CLEAN_ROOM_CLEAN_ROOTS`; contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`).
+*   [require-clean-room-env.py](../hooks/require-clean-room-env.py): Fails closed if the required role and root environment variables are missing, if trust-domain roots overlap, or if clean, implementation, or contaminated artifact root names appear source-derived.
+*   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions except explicitly allowed Agent 3 verification commands under implementation roots.
+*   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles and Agent 1.5 cannot read source roots or unapproved paths; clean roles may read implementation roots, and Agent 1.5 is denied clean roots, implementation roots, and direct `source-index.json` reads.
+*   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots. Agent 2 writes clean artifacts only, Agent 3 writes implementation files and clean reports, and contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 *   [check-artifact-leakage.py](../hooks/check-artifact-leakage.py): Scans clean artifacts and Agent 1.5 staged contaminated artifacts for high-risk leakage markers, source-like identifiers, and private identifier denylist terms. The private identifier denylist (loaded via `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST`) is subject to hard limits to protect hook execution performance: a maximum of 1,000,000 bytes per file, 20,000 total terms, and 512 characters per individual term.
 *   [validate-json-schema.py](../hooks/validate-json-schema.py): Verifies JSON syntax and structural conformance against schemas under `CLEAN_ROOM_SCHEMA_DIR`. Under clean roots, any unrecognized JSON files that do not conform to canonical schemas will trigger a failure unless they are explicitly registered in the path-separated `CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST` environment variable.
 *   [validate-handoff-package.py](../hooks/validate-handoff-package.py): Verifies that handoff packages stay within clean roots, do not reference contaminated paths, `task-manifest.json`, or `source-index.json`, and match declared `sha256` checksums.

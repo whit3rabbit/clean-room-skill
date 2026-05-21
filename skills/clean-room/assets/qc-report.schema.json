@@ -192,6 +192,8 @@
             "schema",
             "leakage",
             "coverage",
+            "implementation",
+            "verification",
             "ambiguity",
             "testability",
             "terminology",

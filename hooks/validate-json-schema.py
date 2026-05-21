@@ -20,6 +20,8 @@ SCHEMA_BY_ARTIFACT = {
     "task-manifest": "task-manifest.schema.json",
     "behavior-spec": "behavior-spec.schema.json",
     "skeleton-manifest": "skeleton-manifest.schema.json",
+    "implementation-plan": "implementation-plan.schema.json",
+    "implementation-report": "implementation-report.schema.json",
     "qc-report": "qc-report.schema.json",
     "coverage-ledger": "coverage-ledger.schema.json",
     "evidence-ledger": "evidence-ledger.schema.json",
@@ -58,6 +60,10 @@ def artifact_kind(path: Path, data: dict) -> str | None:
         return "clean-run-context"
     if "manifest_id" in data:
         return "skeleton-manifest"
+    if "plan_id" in data and "planner_role" in data:
+        return "implementation-plan"
+    if "report_id" in data and "implementer_role" in data:
+        return "implementation-report"
     if "report_id" in data:
         return "qc-report"
     if "package_id" in data:

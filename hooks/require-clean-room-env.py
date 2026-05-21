@@ -25,12 +25,14 @@ NONEMPTY_VARS = (
     "CLEAN_ROOM_SOURCE_ROOTS",
     "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS",
     "CLEAN_ROOM_CLEAN_ROOTS",
+    "CLEAN_ROOM_IMPLEMENTATION_ROOTS",
     "CLEAN_ROOM_SCHEMA_DIR",
 )
 ROOT_VARS = (
     "CLEAN_ROOM_SOURCE_ROOTS",
     "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS",
     "CLEAN_ROOM_CLEAN_ROOTS",
+    "CLEAN_ROOM_IMPLEMENTATION_ROOTS",
     "CLEAN_ROOM_SCHEMA_DIR",
     "CLEAN_ROOM_ALLOWED_READ_ROOTS",
 )
@@ -46,6 +48,8 @@ GENERIC_SOURCE_NAME_TOKENS = {
     "docs",
     "document",
     "documents",
+    "implementation",
+    "impl",
     "lib",
     "main",
     "output",
@@ -202,9 +206,30 @@ def main() -> int:
     )
     errors.extend(
         reject_overlaps(
+            "CLEAN_ROOM_SOURCE_ROOTS",
+            "CLEAN_ROOM_IMPLEMENTATION_ROOTS",
+            "source roots and implementation roots must be separate",
+        )
+    )
+    errors.extend(
+        reject_overlaps(
             "CLEAN_ROOM_CLEAN_ROOTS",
             "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS",
             "clean roots and contaminated artifact roots must be separate",
+        )
+    )
+    errors.extend(
+        reject_overlaps(
+            "CLEAN_ROOM_CLEAN_ROOTS",
+            "CLEAN_ROOM_IMPLEMENTATION_ROOTS",
+            "clean roots and implementation roots must be separate",
+        )
+    )
+    errors.extend(
+        reject_overlaps(
+            "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS",
+            "CLEAN_ROOM_IMPLEMENTATION_ROOTS",
+            "contaminated artifact roots and implementation roots must be separate",
         )
     )
     errors.extend(
@@ -231,11 +256,19 @@ def main() -> int:
     errors.extend(
         reject_overlaps(
             "CLEAN_ROOM_SCHEMA_DIR",
+            "CLEAN_ROOM_IMPLEMENTATION_ROOTS",
+            "schema directory must be separate from implementation roots",
+        )
+    )
+    errors.extend(
+        reject_overlaps(
+            "CLEAN_ROOM_SCHEMA_DIR",
             "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS",
             "schema directory must be separate from contaminated artifact roots",
         )
     )
     errors.extend(reject_source_derived_artifact_names("CLEAN_ROOM_CLEAN_ROOTS"))
+    errors.extend(reject_source_derived_artifact_names("CLEAN_ROOM_IMPLEMENTATION_ROOTS"))
     errors.extend(reject_source_derived_artifact_names("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS"))
     if errors:
         print("clean-room environment check failed:", file=sys.stderr)

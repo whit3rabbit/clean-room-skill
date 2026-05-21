@@ -1,0 +1,27 @@
+{
+  "report_id": "implementation-report-example",
+  "task_id": "task-example",
+  "plan_ref": "implementation-plan.json",
+  "implementer_role": "clean-qa-editor",
+  "updated_at": "2024-01-01T00:00:00Z",
+  "implementation_status": "not-started",
+  "agent0_reporting": {
+    "report_state": "internal-draft",
+    "terminal_report_target": "agent_0",
+    "interim_updates_allowed": false
+  },
+  "completed_work_items": [],
+  "blocked_work_items": [],
+  "changed_paths": [],
+  "verification_results": [
+    {
+      "command": "npm test",
+      "cwd": "CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]",
+      "status": "not-run",
+      "output_summary": "Example report has not run verification."
+    }
+  ],
+  "findings": [],
+  "abstract_delta_tickets": [],
+  "final_status": "partial"
+}

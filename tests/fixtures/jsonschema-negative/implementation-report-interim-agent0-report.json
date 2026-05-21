@@ -1,0 +1,21 @@
+{
+  "schema_kind": "implementation-report",
+  "base": "implementation-report.json",
+  "description": "Implementation reports cannot be marked ready for Agent 0 while Agent 3 is still in progress.",
+  "set": [
+    {
+      "path": [
+        "implementation_status"
+      ],
+      "value": "in-progress"
+    },
+    {
+      "path": [
+        "agent0_reporting",
+        "report_state"
+      ],
+      "value": "terminal-report"
+    }
+  ],
+  "expected_error": "internal-draft"
+}

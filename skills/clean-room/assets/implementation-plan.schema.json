@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Clean-Room Implementation Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_id",
+    "task_id",
+    "created_at",
+    "planner_role",
+    "implementation_root_refs",
+    "source_artifacts",
+    "foundation_summary",
+    "work_items",
+    "verification_strategy",
+    "implementation_forbidden_material",
+    "open_decisions"
+  ],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "planner_role": {
+      "const": "clean-architect"
+    },
+    "implementation_root_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/implementation_root_ref"
+      }
+    },
+    "source_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "foundation_summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "work_items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "work_item_id",
+          "status",
+          "summary",
+          "spec_ids",
+          "implementation_root_ref",
+          "target_paths",
+          "test_paths",
+          "acceptance_criteria"
+        ],
+        "properties": {
+          "work_item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "in-progress",
+              "complete",
+              "blocked"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "spec_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "public_contract_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "implementation_root_ref": {
+            "$ref": "#/$defs/implementation_root_ref"
+          },
+          "target_paths": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/relative_path"
+            }
+          },
+          "test_paths": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/relative_path"
+            }
+          },
+          "local_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "verification_commands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/verification_command"
+            }
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "verification_strategy": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/verification_command"
+      }
+    },
+    "implementation_forbidden_material": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "source_excerpt",
+          "raw_diff",
+          "private_identifier",
+          "source_shaped_pseudocode",
+          "copied_comments",
+          "decompiled_output",
+          "other"
+        ]
+      }
+    },
+    "open_decisions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/open_decision"
+      }
+    }
+  },
+  "$defs": {
+    "implementation_root_ref": {
+      "type": "string",
+      "pattern": "^CLEAN_ROOM_IMPLEMENTATION_ROOTS\\[[0-9]+\\]$"
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+    },
+    "verification_command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cwd"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cwd": {
+          "$ref": "#/$defs/implementation_root_ref"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "open_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "summary",
+        "status",
+        "owner"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "open",
+            "resolved",
+            "deferred"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -3,13 +3,13 @@
   "target_identifier": "example-system",
   "authorization": {
     "requester": "example-requester",
-    "scope_statement": "Authorized example clean-room source-to-spec task.",
+    "scope_statement": "Authorized example clean-room source-to-implementation task.",
     "allowed_actions": [
       "read authorized source",
-      "produce spec-only artifacts"
+      "produce clean implementation artifacts",
+      "write clean implementation code"
     ],
     "prohibited_actions": [
-      "generate replacement implementation code",
       "move source excerpts into clean artifacts"
     ],
     "evidence_handling": "Retain source evidence only in the contaminated workspace."
@@ -56,6 +56,9 @@
         "contaminated-artifacts/"
       ],
       "clean_root": "clean-artifacts/",
+      "implementation_roots": [
+        "implementation/"
+      ],
       "quarantine_root": "quarantine/",
       "approved_public_reference_roots": [
         "public-refs/"
@@ -75,7 +78,7 @@
   },
   "clean_scope": {
     "workspace_id": "clean-workspace",
-    "description": "Clean spec workspace.",
+    "description": "Clean artifact and implementation workspace.",
     "path_policy": "Contaminated roles must not write here."
   },
   "trust_boundary": {
@@ -97,6 +100,7 @@
       "schema-validation-failed",
       "leakage-scan-failed",
       "unit-blocked",
+      "implementation-complete",
       "coverage-complete"
     ],
     "notes": "Missing controller policy defaults to attended mode."
@@ -120,7 +124,7 @@
   "agent_pipeline": {
     "agent_0": {
       "role": "contaminated-manager-verifier",
-      "responsibility": "Manage scope, assign agents, verify coverage, and receive Agent 3 final report.",
+      "responsibility": "Manage scope, assign agents, verify coverage, and receive only terminal Agent 3 implementation reports.",
       "trust_domain": "contaminated"
     },
     "agent_1": {
@@ -135,12 +139,12 @@
     },
     "agent_2": {
       "role": "clean-architect",
-      "responsibility": "Merge approved handoff artifacts into the selected clean schema base and skeleton manifest without reading source or contaminated ledgers.",
+      "responsibility": "Plan clean implementation from approved handoff artifacts and the clean destination foundation without reading source or contaminated ledgers.",
       "trust_domain": "clean"
     },
     "agent_3": {
       "role": "clean-qa-editor",
-      "responsibility": "Run final schema, leakage, and coverage QC and report abstract findings to Agent 0.",
+      "responsibility": "Implement the clean plan in the clean implementation root, run bounded verification, and emit one terminal report for Agent 0.",
       "trust_domain": "clean"
     },
     "handoff_rules": {
@@ -154,6 +158,8 @@
       "allowed_outputs": [
         "behavior-spec.json",
         "skeleton-manifest.json",
+        "implementation-plan.json",
+        "implementation-report.json",
         "qc-report.json",
         "abstract-delta-ticket"
       ],
@@ -164,7 +170,10 @@
         "source-shaped pseudocode",
         "contaminated ledgers in clean inputs"
       ],
-      "report_back_to": "agent_0"
+      "report_back_to": "agent_0",
+      "agent0_to_clean_roles": "durable-sanitized-artifacts-only",
+      "agent3_to_agent0": "terminal-report-only",
+      "interim_agent3_reporting": false
     }
   },
   "required_profiles": [
@@ -192,6 +201,11 @@
       "role": "clean-qa-editor",
       "profile_id": "clean-qa-profile",
       "workspace_id": "clean-workspace"
+    },
+    {
+      "role": "clean-qa-editor",
+      "profile_id": "clean-qa-implementation-profile",
+      "workspace_id": "implementation-workspace"
     }
   ],
   "artifact_paths": {
@@ -200,6 +214,9 @@
       "contaminated-artifacts/"
     ],
     "clean_artifacts": "clean-artifacts/",
+    "implementation_roots": [
+      "implementation/"
+    ],
     "quarantine": "quarantine/"
   },
   "handoff_policy": {
@@ -207,6 +224,8 @@
       "clean-run-context",
       "behavior-spec",
       "handoff-package",
+      "implementation-plan",
+      "implementation-report",
       "abstract-delta-ticket"
     ],
     "blocked_material": [
@@ -222,13 +241,21 @@
     "Use read-only source tools in contaminated roles.",
     "Use source-denied reads for the contaminated handoff sanitizer.",
     "Use write tools only in contaminated artifact roots for contaminated roles.",
-    "Use write tools only in clean spec workspace for clean roles."
+    "Agent 2 writes only clean artifacts and reads the clean implementation foundation.",
+    "Agent 3 writes implementation code only under CLEAN_ROOM_IMPLEMENTATION_ROOTS and writes reports under clean artifacts.",
+    "Agent 3 may run verification shell commands only with CLEAN_ROOM_ALLOW_AGENT3_SHELL=1 and cwd under CLEAN_ROOM_IMPLEMENTATION_ROOTS."
   ],
   "model_policy": [
     "Use the initialization snapshot default model plus clean and contaminated overrides.",
     "Use separate profiles for contaminated and clean roles."
   ],
   "retention_policy": "Retain clean artifacts; keep contaminated evidence separate.",
+  "implementation_status": {
+    "state": "not-started",
+    "plan_ref": "implementation-plan.json",
+    "report_ref": "implementation-report.json",
+    "notes": "Agent 3 has not started implementation in this example."
+  },
   "roles": [
     {
       "role": "contaminated-manager-verifier",
@@ -259,14 +286,16 @@
       "role": "clean-architect",
       "trust_domain": "clean",
       "allowed_access": [
-        "clean-workspace"
+        "clean-workspace",
+        "implementation-workspace-read-only"
       ]
     },
     {
       "role": "clean-qa-editor",
       "trust_domain": "clean",
       "allowed_access": [
-        "clean-workspace"
+        "clean-workspace",
+        "implementation-workspace-read-write"
       ]
     }
   ],
@@ -287,6 +316,8 @@
     "source-index.json",
     "behavior-spec.json",
     "skeleton-manifest.json",
+    "implementation-plan.json",
+    "implementation-report.json",
     "qc-report.json"
   ],
   "audit_log_refs": [

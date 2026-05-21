@@ -18,6 +18,8 @@
       "behavior-spec.json"
     ],
     "skeleton_manifest": "skeleton-manifest.json",
+    "implementation_plan": "implementation-plan.json",
+    "implementation_report": "implementation-report.json",
     "qc_report": "qc-report.json",
     "open_questions": [
       "open-questions.json"
@@ -25,6 +27,26 @@
     "abstract_delta_tickets": [
       "abstract-delta-tickets.json"
     ]
+  },
+  "implementation": {
+    "implementation_root_refs": [
+      {
+        "root_id": "implementation-root-1",
+        "env_ref": "CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]",
+        "access": "read-write-for-agent-3"
+      }
+    ],
+    "planner_role": "clean-architect",
+    "implementer_role": "clean-qa-editor",
+    "shell_verification": {
+      "agent3_shell_allowed": true,
+      "cwd_policy": "implementation-root"
+    }
+  },
+  "coordination_boundary": {
+    "agent0_to_clean_roles": "durable-sanitized-artifacts-only",
+    "agent3_to_agent0": "terminal-report-only",
+    "interim_agent3_reports": false
   },
   "approved_public_reference_roots": [
     "public-refs/"

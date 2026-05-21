@@ -39,13 +39,15 @@ function policyEnv(root, role) {
   const source = path.join(root, 'source');
   const contaminated = path.join(root, 'contaminated');
   const clean = path.join(root, 'clean');
+  const implementation = path.join(root, 'implementation');
   const allowed = path.join(root, 'allowed');
-  mkdirs(source, contaminated, clean, allowed);
+  mkdirs(source, contaminated, clean, implementation, allowed);
   return {
     CLEAN_ROOM_ROLE: role,
     CLEAN_ROOM_SOURCE_ROOTS: source,
     CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
     CLEAN_ROOM_CLEAN_ROOTS: clean,
+    CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
     CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
     CLEAN_ROOM_SCHEMA_DIR: SCHEMA_DIR,
   };
@@ -111,8 +113,9 @@ describe('clean-room hook policy', () => {
     const root = tempDir('clean-room-overlap');
     const source = path.join(root, 'source');
     const contaminated = path.join(root, 'contaminated');
+    const implementation = path.join(root, 'implementation');
     const allowed = path.join(root, 'allowed');
-    mkdirs(source, path.join(source, 'clean'), contaminated, allowed);
+    mkdirs(source, path.join(source, 'clean'), contaminated, implementation, allowed);
 
     const result = spawnSync('python3', [path.join(HOOKS, 'require-clean-room-env.py')], {
       cwd: ROOT,
@@ -122,6 +125,7 @@ describe('clean-room hook policy', () => {
         CLEAN_ROOM_SOURCE_ROOTS: source,
         CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
         CLEAN_ROOM_CLEAN_ROOTS: path.join(source, 'clean'),
+        CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
         CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
         CLEAN_ROOM_SCHEMA_DIR: SCHEMA_DIR,
       },
@@ -137,9 +141,10 @@ describe('clean-room hook policy', () => {
     const source = path.join(root, 'source');
     const contaminated = path.join(root, 'contaminated');
     const clean = path.join(root, 'clean');
+    const implementation = path.join(root, 'implementation');
     const allowed = path.join(root, 'allowed');
     const schemaDir = path.join(clean, 'schemas');
-    mkdirs(source, contaminated, schemaDir, allowed);
+    mkdirs(source, contaminated, schemaDir, implementation, allowed);
 
     const result = spawnSync('python3', [path.join(HOOKS, 'require-clean-room-env.py')], {
       cwd: ROOT,
@@ -149,6 +154,7 @@ describe('clean-room hook policy', () => {
         CLEAN_ROOM_SOURCE_ROOTS: source,
         CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
         CLEAN_ROOM_CLEAN_ROOTS: clean,
+        CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
         CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
         CLEAN_ROOM_SCHEMA_DIR: schemaDir,
       },
@@ -164,14 +170,16 @@ describe('clean-room hook policy', () => {
     const source = path.join(root, 'projects', 'private-payments-processor');
     const contaminated = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'contaminated');
     const clean = path.join(root, 'Documents', 'CleanRoom', 'private-payments-processor', 'clean');
+    const implementation = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'implementation');
     const allowed = path.join(root, 'allowed');
-    mkdirs(source, contaminated, clean, allowed);
+    mkdirs(source, contaminated, clean, implementation, allowed);
 
     const result = runEnvCheck({
       CLEAN_ROOM_ROLE: 'clean-architect',
       CLEAN_ROOM_SOURCE_ROOTS: source,
       CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
       CLEAN_ROOM_CLEAN_ROOTS: clean,
+      CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
       CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
       CLEAN_ROOM_SCHEMA_DIR: SCHEMA_DIR,
     });
@@ -187,14 +195,16 @@ describe('clean-room hook policy', () => {
     const source = path.join(root, 'projects', 'private-payments-processor');
     const contaminated = path.join(root, 'Documents', 'CleanRoom', 'task-payments-artifacts');
     const clean = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'clean');
+    const implementation = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'implementation');
     const allowed = path.join(root, 'allowed');
-    mkdirs(source, contaminated, clean, allowed);
+    mkdirs(source, contaminated, clean, implementation, allowed);
 
     const result = runEnvCheck({
       CLEAN_ROOM_ROLE: 'contaminated-manager-verifier',
       CLEAN_ROOM_SOURCE_ROOTS: source,
       CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
       CLEAN_ROOM_CLEAN_ROOTS: clean,
+      CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
       CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
       CLEAN_ROOM_SCHEMA_DIR: SCHEMA_DIR,
     });
@@ -208,14 +218,16 @@ describe('clean-room hook policy', () => {
     const source = path.join(root, 'projects', 'private-payments-processor');
     const contaminated = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'contaminated');
     const clean = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'clean');
+    const implementation = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'implementation');
     const allowed = path.join(root, 'allowed');
-    mkdirs(source, contaminated, clean, allowed);
+    mkdirs(source, contaminated, clean, implementation, allowed);
 
     const result = runEnvCheck({
       CLEAN_ROOM_ROLE: 'clean-architect',
       CLEAN_ROOM_SOURCE_ROOTS: source,
       CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
       CLEAN_ROOM_CLEAN_ROOTS: clean,
+      CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
       CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
       CLEAN_ROOM_SCHEMA_DIR: SCHEMA_DIR,
     });
@@ -228,19 +240,69 @@ describe('clean-room hook policy', () => {
     const source = path.join(root, 'projects', 'src-app-test');
     const contaminated = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'src');
     const clean = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'app-test');
+    const implementation = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'implementation');
     const allowed = path.join(root, 'allowed');
-    mkdirs(source, contaminated, clean, allowed);
+    mkdirs(source, contaminated, clean, implementation, allowed);
 
     const result = runEnvCheck({
       CLEAN_ROOM_ROLE: 'clean-architect',
       CLEAN_ROOM_SOURCE_ROOTS: source,
       CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
       CLEAN_ROOM_CLEAN_ROOTS: clean,
+      CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
       CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
       CLEAN_ROOM_SCHEMA_DIR: SCHEMA_DIR,
     });
 
     assert.equal(result.status, 0, result.stderr);
+  });
+
+  test('environment preflight rejects overlapping implementation roots', () => {
+    const root = tempDir('clean-room-implementation-overlap');
+    const source = path.join(root, 'source');
+    const contaminated = path.join(root, 'contaminated');
+    const clean = path.join(root, 'clean');
+    const implementation = path.join(clean, 'implementation');
+    const allowed = path.join(root, 'allowed');
+    mkdirs(source, contaminated, implementation, allowed);
+
+    const result = runEnvCheck({
+      CLEAN_ROOM_ROLE: 'clean-qa-editor',
+      CLEAN_ROOM_SOURCE_ROOTS: source,
+      CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
+      CLEAN_ROOM_CLEAN_ROOTS: clean,
+      CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
+      CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
+      CLEAN_ROOM_SCHEMA_DIR: SCHEMA_DIR,
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean roots and implementation roots must be separate/);
+  });
+
+  test('environment preflight rejects source-derived implementation root names', () => {
+    const root = tempDir('clean-room-implementation-source-name');
+    const source = path.join(root, 'projects', 'private-payments-processor');
+    const contaminated = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'contaminated');
+    const clean = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'clean');
+    const implementation = path.join(root, 'Documents', 'CleanRoom', 'task-payments-implementation');
+    const allowed = path.join(root, 'allowed');
+    mkdirs(source, contaminated, clean, implementation, allowed);
+
+    const result = runEnvCheck({
+      CLEAN_ROOM_ROLE: 'clean-qa-editor',
+      CLEAN_ROOM_SOURCE_ROOTS: source,
+      CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: contaminated,
+      CLEAN_ROOM_CLEAN_ROOTS: clean,
+      CLEAN_ROOM_IMPLEMENTATION_ROOTS: implementation,
+      CLEAN_ROOM_ALLOWED_READ_ROOTS: allowed,
+      CLEAN_ROOM_SCHEMA_DIR: SCHEMA_DIR,
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CLEAN_ROOM_IMPLEMENTATION_ROOTS path appears source-derived/);
+    assert.doesNotMatch(result.stderr, /private-payments-processor/);
+    assert.doesNotMatch(result.stderr, /payments/);
   });
 
   test('shell policy directly blocks clean-room role sessions', () => {
@@ -257,6 +319,38 @@ describe('clean-room hook policy', () => {
     });
     assert.notEqual(sanitizerResult.status, 0);
     assert.match(sanitizerResult.stderr, /denied shell tool use/);
+  });
+
+  test('shell policy allows only Agent 3 in implementation roots when explicitly enabled', () => {
+    const root = tempDir('clean-room-agent3-shell');
+    const env = policyEnv(root, 'clean-qa-editor');
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+
+    let result = runHook('deny-clean-room-shell.py', { tool_name: 'Shell', tool_input: { cwd: implementation } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CLEAN_ROOM_ALLOW_AGENT3_SHELL=1 is required/);
+
+    result = runHook('deny-clean-room-shell.py', { tool_name: 'Shell', tool_input: { cwd: clean } }, {
+      ...env,
+      CLEAN_ROOM_ALLOW_AGENT3_SHELL: '1',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /outside implementation roots/);
+
+    result = runHook('deny-clean-room-shell.py', { tool_name: 'Shell', tool_input: { cwd: implementation } }, {
+      ...env,
+      CLEAN_ROOM_ALLOW_AGENT3_SHELL: '1',
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-room-shell.py', { tool_name: 'Shell', tool_input: { cwd: implementation } }, {
+      ...env,
+      CLEAN_ROOM_ROLE: 'clean-architect',
+      CLEAN_ROOM_ALLOW_AGENT3_SHELL: '1',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /denied shell tool use/);
   });
 
   test('post-write schema hook handles supported payload path variants and fails closed on bad payloads', () => {
@@ -545,14 +639,22 @@ describe('clean-room hook policy', () => {
     const root = tempDir('clean-room-schema-read');
     const env = policyEnv(root, 'clean-qa-editor');
     const schema = path.join(SCHEMA_DIR, 'behavior-spec.schema.json');
+    const implementationFile = path.join(env.CLEAN_ROOM_IMPLEMENTATION_ROOTS, 'clean-foundation.js');
     const sourceFile = path.join(env.CLEAN_ROOM_SOURCE_ROOTS, 'secret.py');
     const contaminatedFile = path.join(env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, 'coverage-ledger.json');
+    fs.writeFileSync(implementationFile, 'export const value = 1;\n');
     fs.writeFileSync(sourceFile, 'VALUE = 1\n');
     fs.writeFileSync(contaminatedFile, '{}\n');
 
     let result = runHook('deny-clean-source-read.py', {
       tool_name: 'Read',
       tool_input: { file_path: schema },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: implementationFile },
     }, env);
     assert.equal(result.status, 0, result.stderr);
 
@@ -628,6 +730,7 @@ describe('clean-room hook policy', () => {
     const root = tempDir('clean-room-write-cwd');
     const env = policyEnv(root, 'clean-architect');
     const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
     const source = env.CLEAN_ROOM_SOURCE_ROOTS;
     const contaminated = env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS;
     fs.writeFileSync(path.join(source, 'secret.py'), 'VALUE = 1\n');
@@ -652,6 +755,20 @@ describe('clean-room hook policy', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /writing source path/);
 
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: implementation, file_path: 'src/new-file.js' },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Agent 2 writing implementation path/);
+
+    const agent3Env = { ...env, CLEAN_ROOM_ROLE: 'clean-qa-editor' };
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: implementation, file_path: 'src/new-file.js' },
+    }, agent3Env);
+    assert.equal(result.status, 0, result.stderr);
+
     const contaminatedEnv = { ...env, CLEAN_ROOM_ROLE: 'contaminated-source-analyst' };
     result = runHook('deny-contaminated-clean-write.py', {
       tool_name: 'Write',
@@ -665,6 +782,13 @@ describe('clean-room hook policy', () => {
     }, contaminatedEnv);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /writing clean path/);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: contaminated, file_path: '../implementation/new-file.js' },
+    }, contaminatedEnv);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /writing implementation path/);
 
     result = runHook('deny-contaminated-clean-write.py', {
       tool_name: 'NotebookEdit',

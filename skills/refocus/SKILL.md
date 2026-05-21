@@ -9,9 +9,9 @@ disable-model-invocation: true
 
 Refocus realigns the current run to the declared scope, controller policy, artifact schemas, and clean-room boundary.
 
-Refocus does not optimize, expand, or reinterpret the task. It does not invent new requirements or add behavior beyond `task-manifest.json`, `clean-run-context.json`, ledgers, QC, and abstract delta tickets.
+Refocus does not optimize, expand, or reinterpret the task. It does not invent new requirements or add behavior beyond `task-manifest.json`, `clean-run-context.json`, ledgers, implementation plan/report, QC, and abstract delta tickets.
 
-Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the same spec-only boundary, role separation, artifact schemas, leakage rules, and hook expectations.
+Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the same clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
 ## Audit
 
@@ -20,12 +20,16 @@ Compare current artifacts to the canonical gate checklist:
 - Scope gate recorded authorization, roots, boundaries, prohibited actions, evidence handling, selected target profile, Agent 0-3 pipeline, and Agent 1.5 sanitizer role for new runs.
 - Initialization snapshot exists when init preferences were used, and reusable `init-config.json` drift is reported instead of silently applied.
 - `clean-run-context.json` exists before clean roles run and excludes source roots, contaminated roots, source index refs, and ledger paths.
+- `clean-run-context.json` records artifact-only coordination: Agent 0 does not directly steer Agent 2 or Agent 3, and Agent 3 reports to Agent 0 only at terminal status.
+- Implementation roots are recorded, separated, and not source-derived.
 - Source index preflight exists when required and remains contaminated-only.
 - Decomposition produced neutral `task-manifest.json` units.
 - Contaminated analysis wrote draft behavior specs without implementation code.
 - Agent 1.5 sanitization ran before handoff, or older artifacts clearly predate the Agent 1.5 gate and require review before reuse.
 - Handoff package excludes full `task-manifest.json`, `source-index.json`, source paths, raw diffs, copied comments, private identifiers, source-shaped pseudocode, and contaminated ledgers.
-- Clean organization produced clean-only `skeleton-manifest.json` when the run reached that gate.
+- Agent 2 produced clean-only `implementation-plan.json` when the run reached that gate.
+- Agent 3 produced `implementation-report.json` when the run reached implementation.
+- Non-terminal Agent 3 implementation reports were not used as Agent 0 feedback or guidance.
 - QC produced `qc-report.json` with schema, leakage, coverage, and abstract delta ticket status when the run reached that gate.
 - Contaminated verification returned only abstract delta tickets.
 
@@ -41,6 +45,8 @@ Emit missed-gate findings only:
 - Invalid or stale handoff hash.
 - Boundary violation or unproven root separation.
 - Stale handoff compared with latest QC or ledger state.
+- Stale implementation plan compared with latest clean handoff.
+- Stale implementation report compared with latest implementation plan.
 - Controller policy not preserved.
 
 Do not suggest speculative improvements. Do not change source scope, target profile, public API, or implementation plan.

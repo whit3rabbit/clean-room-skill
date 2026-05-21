@@ -74,6 +74,7 @@ def allowed_roots_for_role(role: str) -> list[Path]:
     if role in CLEAN_ROLES:
         return (
             env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+            + env_roots("CLEAN_ROOM_IMPLEMENTATION_ROOTS")
             + env_roots(ADDITIONAL_CLEAN_READ_ROOTS)
             + env_roots(SCHEMA_READ_ROOTS)
         )

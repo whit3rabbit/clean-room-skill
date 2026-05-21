@@ -23,6 +23,8 @@ Use them to seed tests, docs, or dry runs:
 - `minimal-spec-package/behavior-spec.json`
 - `minimal-spec-package/handoff-package.json`
 - `minimal-spec-package/skeleton-manifest.json`
+- `minimal-spec-package/implementation-plan.json`
+- `minimal-spec-package/implementation-report.json`
 - `minimal-spec-package/qc-report.json`
 - `minimal-spec-package/contamination-incident.json`
 - `valid-handoff-package/behavior-spec.json`

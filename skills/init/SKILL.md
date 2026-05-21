@@ -11,14 +11,14 @@ disable-model-invocation: true
 
 Initialize or revise durable Clean Room run preferences before source analysis starts. The output is an `init-config.json` controller artifact and an `initialization_snapshot` copied into each new `task-manifest.json`.
 
-Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the spec-only boundary, role separation, artifact schemas, leakage rules, and hook expectations.
+Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
 ## Gather
 
 Collect only setup decisions that affect correctness, safety, resumability, or output shape:
 
 - Requester authorization, allowed actions, prohibited actions, and evidence handling.
-- Source roots, contaminated artifact root, clean root, quarantine root, and approved public or destination reference roots.
+- Source roots, contaminated artifact root, clean artifact root, clean implementation roots, quarantine root, and approved public or destination reference roots.
 - Artifact base root. Default to `~/Documents/CleanRoom/<task-id>/`, never to the source workspace or a temporary directory unless the user explicitly chooses it. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.
 - Default model plus optional overrides for contaminated roles, clean roles, or individual roles. Keep model ids as runtime-specific strings.
@@ -28,9 +28,9 @@ Collect only setup decisions that affect correctness, safety, resumability, or o
 
 Before writing active artifacts:
 
-- Confirm source roots, contaminated artifact roots, clean roots, approved public reference roots, and schema directory are separated.
-- Confirm contaminated artifact roots and clean roots do not contain source-derived path names. Treat matches against source root basenames or meaningful non-generic source-name tokens as contamination risk.
-- Confirm Agent 2 and Agent 3 will launch from the clean root, not from the source workspace.
+- Confirm source roots, contaminated artifact roots, clean artifact roots, clean implementation roots, approved public reference roots, and schema directory are separated.
+- Confirm contaminated artifact roots, clean artifact roots, and clean implementation roots do not contain source-derived path names. Treat matches against source root basenames or meaningful non-generic source-name tokens as contamination risk.
+- Confirm Agent 2 and Agent 3 will launch in the clean domain, not from the source workspace.
 - Set clean isolation to `clean-workspace`; Docker or other containers are out of scope for v1.
 - Treat root changes, model policy changes, target profile changes, and rule reclassification as safety-sensitive. Require explicit confirmation before changing an existing run.
 - Do not move or delete old artifacts in place. Root changes must start a new generation or use `start-over`.
@@ -41,7 +41,7 @@ Create or update these artifacts:
 
 - `init-config.json`: reusable controller-side preferences. This may contain source roots and contaminated-only rules, so do not place it in clean-role readable roots.
 - `task-manifest.json` `initialization_snapshot`: immutable per-run copy of the effective init choices used for resume and drift checks.
-- `clean-run-context.json`: sanitized clean-side context for Agent 2 and Agent 3. It contains only clean artifact paths, the target profile, approved public refs, model preferences, and clean-safe rules. It must not include source roots, contaminated roots, source index refs, coverage ledgers, evidence ledgers, or the full task manifest.
+- `clean-run-context.json`: sanitized clean-side context for Agent 2 and Agent 3. It contains only clean artifact paths, implementation root environment references, the target profile, approved public refs, model preferences, and clean-safe rules. It must not include source roots, contaminated roots, source index refs, coverage ledgers, evidence ledgers, or the full task manifest.
 
 ## Resume
 

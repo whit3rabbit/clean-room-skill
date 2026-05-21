@@ -1,0 +1,17 @@
+{
+  "schema_kind": "clean-run-context",
+  "base": "clean-run-context.json",
+  "description": "Clean run context implementation roots must use environment references, not paths.",
+  "set": [
+    {
+      "path": [
+        "implementation",
+        "implementation_root_refs",
+        0,
+        "env_ref"
+      ],
+      "value": "/private/source"
+    }
+  ],
+  "expected_error": "does not match"
+}

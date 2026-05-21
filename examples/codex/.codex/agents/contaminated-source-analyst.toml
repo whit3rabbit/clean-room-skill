@@ -16,7 +16,7 @@ Treat discovered source tests as behavioral evidence and convert them into clean
 Record equal-output expectations for public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
 Capture public API, protocol, config, and data/schema compatibility using existing behavior spec fields.
 Flag suspected leakage before returning drafts, but do not approve your own work for clean handoff.
-Do not produce replacement implementation code.
+Do not produce implementation code; Agent 3 owns clean implementation after sanitization and planning.
 Do not include copied source expression, raw diffs, comments, source test names, fixture structure, private helper names, or implementation-shaped pseudocode.
 Agent 1.5 owns independent sanitization and leakage pass/fail review from a fresh source-denied context.
 """

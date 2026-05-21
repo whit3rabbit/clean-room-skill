@@ -13,6 +13,8 @@ Use these canonical artifact names unless the surrounding project already has a 
 - `handoff-package.json`
 - `behavior-spec.json`
 - `skeleton-manifest.json`
+- `implementation-plan.json`
+- `implementation-report.json`
 - `qc-report.json`
 - `contamination-incident.json`
 
@@ -44,6 +46,8 @@ Capture:
 - Agent 0-3 pipeline responsibilities, Agent 1.5 sanitizer role, and handoff rules
 - artifact paths and retention policy
 - contaminated artifact roots for `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`
+- clean implementation roots for `CLEAN_ROOM_IMPLEMENTATION_ROOTS`
+- implementation status, plan refs, and report refs
 - optional `source_index_ref` for contaminated controller preflight output
 - prohibited actions
 - role assignments
@@ -64,19 +68,19 @@ Use neutral ids such as `unit-auth-flow` or `unit-config-loading`. Avoid source 
 
 Default artifact roots live under `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not use the source folder name as the task ID.
 
-Clean and contaminated artifact roots must not contain source root basenames or meaningful non-generic tokens from those basenames. The environment preflight enforces this for `CLEAN_ROOM_CLEAN_ROOTS` and `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+Clean artifact, contaminated artifact, and implementation roots must not contain source root basenames or meaningful non-generic tokens from those basenames. The environment preflight enforces this for `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, and `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 
 Capture:
 
 - artifact base root, defaulting to `~/Documents/CleanRoom/<task-id>/` with a neutral task ID
-- source roots, contaminated artifact root, clean root, quarantine root, and approved public references
+- source roots, contaminated artifact root, clean artifact root, clean implementation roots, quarantine root, and approved public references
 - target profile
 - default model plus optional clean, contaminated, or per-role overrides
 - clean isolation mode `clean-workspace`
 - user rules split into `clean_safe` and `contaminated_only`
 - reconfiguration policy requiring confirmation for root, schema, and model changes
 
-`clean-run-context.json` is the only run context Agent 2 and Agent 3 should read. It may contain clean artifact paths, target profile, native artifact expectations, approved public references, clean-safe rules, and clean-side model preferences. It must not contain source roots, contaminated artifact roots, source index refs, coverage ledgers, evidence ledgers, contaminated-only rules, or the full `task-manifest.json`.
+`clean-run-context.json` is the only run context Agent 2 and Agent 3 should read. It may contain clean artifact paths, implementation root environment references, target profile, native artifact expectations, approved public references, clean-safe rules, clean-side model preferences, and the artifact-only coordination boundary. It must not contain source roots, contaminated artifact roots, source index refs, coverage ledgers, evidence ledgers, contaminated-only rules, or the full `task-manifest.json`.
 
 ## Source Index Content
 
@@ -102,7 +106,7 @@ Do not send `source-index.json`, file paths, import/export listings, dependency 
 
 `run_state` is optional for compatibility with older manifests. When present, it records `generation`, `started_at`, optional `previous_generation_ref`, and `restart_reason`. Valid restart reasons are `user-requested`, `contamination`, `scope-change`, and `invalid-state`.
 
-Agent zero generates the durable tasklist as `task-manifest.json` `units`. It may use `source-index.json` batches to keep assigned source-reading context small while preserving source relationships. It tracks source-side progress in `coverage-ledger.json` `source_units`, source-side evidence in `evidence-ledger.json`, clean-side feedback in `qc-report.json`, and loop-back work as abstract delta tickets. Do not use prior chat history as the source of truth for the next iteration.
+Agent zero generates the durable tasklist as `task-manifest.json` `units`. It may use `source-index.json` batches to keep assigned source-reading context small while preserving source relationships. It tracks source-side progress in `coverage-ledger.json` `source_units`, source-side evidence in `evidence-ledger.json`, terminal clean-side feedback in `implementation-report.json` and `qc-report.json`, and loop-back work as abstract delta tickets. Do not use prior chat history or live clean-role feedback as the source of truth for the next iteration.
 
 ## Format Selection
 
@@ -119,14 +123,14 @@ Every real task must record the user's actual target profile. Do not default sil
 
 `task-manifest.json` records the required Agent 0-3 handoff contract. New manifests should also include optional schema field `agent_1_5` for the source-denied sanitizer:
 
-- Agent 0: `contaminated-manager-verifier`; controller, scope manager, coverage verifier, and receiver of Agent 3's final report.
+- Agent 0: `contaminated-manager-verifier`; controller, scope manager, coverage verifier, and receiver of Agent 3's terminal report.
 - Agent 1: `contaminated-source-analyst`; source reader and neutral draft task/spec generator.
 - Agent 1.5: `contaminated-handoff-sanitizer`; source-denied contaminated reviewer that sanitizes draft specs before clean handoff.
-- Agent 2: `clean-architect`; clean-domain schema base and merge manager using only approved handoff artifacts.
-- Agent 3: `clean-qa-editor`; final schema, leakage, coverage, and testability QC reporter.
+- Agent 2: `clean-architect`; clean-domain implementation planner using approved handoff artifacts and clean implementation roots.
+- Agent 3: `clean-qa-editor`; clean implementer/verifier that writes code only under implementation roots and emits one terminal report for Agent 0.
 
 Agent 1.5 may read only Agent 0's neutral sanitizer brief, assigned draft artifacts, schema assets, and explicit public or destination reference roots. Do not give it source roots, `source-index.json`, evidence ledger contents, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
-Agent 2 and Agent 3 must start from the clean workspace and read `clean-run-context.json`, approved clean artifacts, schemas, and approved public references only. They must not read source roots, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`. Agent 3 reports final QC back to Agent 0 with abstract findings or delta tickets only.
+Agent 2 and Agent 3 must start in the clean domain and read `clean-run-context.json`, approved clean artifacts, schemas, approved public references, and clean implementation roots only. They must not read source roots, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`. Agent 0 may influence them only through schema-valid durable sanitized artifacts. Agent 3 reports back to Agent 0 only after the plan or task is complete, blocked, or quarantined, with abstract findings or delta tickets only.
 
 ## Behavior Spec Content
 
@@ -150,7 +154,7 @@ Capture behavior rather than source structure:
 - API, protocol, config, and data/schema compatibility requirements
 - leakage review status
 
-Do not include code blocks that implement the behavior. Use declarative requirements.
+Do not include source-shaped code blocks in behavior specs. Use declarative requirements. Clean implementation code belongs only in `CLEAN_ROOM_IMPLEMENTATION_ROOTS` after Agent 2 has produced `implementation-plan.json`.
 
 Use `evidence_refs` values such as `evidence-ledger:item-001`. They must point to contaminated-side evidence ledger entries and must not carry source text into the clean artifact.
 
@@ -174,7 +178,7 @@ Capture:
 - contaminated evidence descriptions that do not include source text in clean handoffs
 - abstract source-test parity status and equal-output coverage gaps
 
-`handoff-package.json` describes contaminated-to-clean transfer only. It may list `clean-run-context`, Agent 1.5-approved behavior specs, coverage-ledger summaries, open questions, test plans, and abstract delta tickets. Do not list full task manifests, source indexes, clean-produced skeleton manifests, or QC reports in that handoff.
+`handoff-package.json` describes contaminated-to-clean transfer only. It may list `clean-run-context`, Agent 1.5-approved behavior specs, coverage-ledger summaries, open questions, test plans, and abstract delta tickets. Do not list full task manifests, source indexes, clean-produced skeleton manifests, implementation plans, implementation reports, or QC reports in that handoff.
 
 ## Skeleton Manifest Content
 
@@ -194,6 +198,36 @@ Map clean behavior specs to eventual implementation areas without imposing a sou
 Keep target language generic unless the user provides one.
 
 Map API, protocol, config, and data/schema compatibility into `public_contracts` and area-level `public_contract_refs`. Map source-test-derived scenarios and equal-output requirements into `test_mapping` and `test_obligations`. Do not add schema fields for parity unless the artifact schema is intentionally versioned.
+
+## Implementation Plan Content
+
+`implementation-plan.json` is Agent 2's primary output for code-development runs. Capture:
+
+- clean implementation root refs such as `CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]`
+- clean source artifacts used for planning
+- destination foundation summary
+- work items with relative target paths and test paths
+- local clean-project patterns and dependency constraints
+- public contract refs and spec ids
+- verification commands with cwd set to implementation root refs
+- risks, acceptance criteria, and open decisions
+- forbidden implementation material
+
+Use only relative destination paths. Do not include source roots, contaminated roots, source paths, private identifiers, raw diffs, copied comments, or source-shaped pseudocode.
+
+## Implementation Report Content
+
+`implementation-report.json` is Agent 3's implementation status artifact. Capture:
+
+- implementation status
+- completed and blocked work items
+- changed relative paths and file kinds
+- verification command results and concise output summaries
+- implementation or verification findings
+- Agent 0 reporting state, with interim updates disallowed
+- abstract delta tickets for Agent 0
+
+Do not include raw source excerpts, contaminated evidence, or source stack traces. Agent 3 does not declare source coverage complete, does not report progress to Agent 0, and does not request Agent 0 guidance during implementation. Agent 0 verifies coverage from the contaminated side after the terminal report.
 
 ## QC Report Content
 
