@@ -72,6 +72,11 @@
 - Publishing is triggered by pushing a `v*` tag.
 - The release tag must match `package.json` after stripping a leading `v`.
 - Publish workflow uses npm trusted publishing and runs `npm publish`.
+- npm trusted publishing is configured for GitHub Actions, repository `whit3rabbit/clean-room-skill`, workflow filename `publish.yml`.
+- Keep `permissions.id-token: write` in `publish.yml`; it is required for OIDC trusted publishing.
+- Release builds use Node 24 and `package-manager-cache: false`; do not re-enable npm caching in the publish job.
+- Do not use `npm publish --provenance` here. Trusted publishing provides provenance with plain `npm publish`.
+- GitHub Releases are informational for this repo. They do not trigger npm publishing.
 
 ## High-Risk Areas
 
