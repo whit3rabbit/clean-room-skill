@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 TRUTHY = {"1", "true", "yes", "on", "strict"}
+DEFAULT_HOOK_TIMEOUT_SECONDS = 10
 CLEAN_ROOM_ENV_NAMES = {
     "CLEAN_ROOM_ROLE",
     "CLEAN_ROOM_SOURCE_ROOTS",
@@ -20,6 +21,13 @@ CLEAN_ROOM_ENV_NAMES = {
     "CLEAN_ROOM_ALLOWED_READ_ROOTS",
     "CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST",
 }
+
+
+def positive_int_env(name: str, default: int) -> int:
+    value = os.environ.get(name, "")
+    if value.isdecimal() and int(value) > 0:
+        return int(value)
+    return default
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,6 +73,12 @@ def main() -> int:
         return 1
 
     payload = sys.stdin.buffer.read()
+    timeout = positive_int_env("CLEAN_ROOM_HOOK_CHECK_TIMEOUT_SECONDS", DEFAULT_HOOK_TIMEOUT_SECONDS)
+    child_env = {
+        **os.environ,
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
     script_dir = Path(__file__).resolve().parent
     for check in args.check:
         try:
@@ -72,13 +86,30 @@ def main() -> int:
         except (FileNotFoundError, ValueError) as exc:
             print(f"clean-room hook configuration failed: {exc}", file=sys.stderr)
             return 1
-        result = subprocess.run(
-            [sys.executable, str(script)],
-            input=payload,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    "-c",
+                    (
+                        "import runpy, sys; "
+                        "sys.path.insert(0, sys.argv[1]); "
+                        "runpy.run_path(sys.argv[2], run_name='__main__')"
+                    ),
+                    str(script_dir),
+                    str(script),
+                ],
+                input=payload,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                check=False,
+                timeout=timeout,
+                env=child_env,
+            )
+        except subprocess.TimeoutExpired:
+            print(f"clean-room hook check timed out after {timeout}s: {script.name}", file=sys.stderr)
+            return 1
         if result.returncode != 0:
             return result.returncode
     return 0

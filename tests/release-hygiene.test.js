@@ -4,10 +4,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { describe, test } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { spawnSync: nodeSpawnSync } = require('node:child_process');
 const { TextDecoder } = require('node:util');
 
 const ROOT = path.resolve(__dirname, '..');
+const TEST_TIMEOUT_MS = 60_000;
 const BLOCKED_PATTERNS = [
   { name: 'macOS file URL', pattern: /file:\/\/\/Users\// },
   { name: 'macOS user path', pattern: /\/Users\/[A-Za-z0-9._-]+/ },
@@ -21,6 +22,13 @@ const BLOCKED_PATTERNS = [
   { name: 'private key block', pattern: /BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY/ },
   { name: 'retained citation token', pattern: /cite|turn[0-9]+(?:view|search)[0-9]+/ },
 ];
+
+function spawnSync(command, args, options) {
+  if (!Array.isArray(args)) {
+    return nodeSpawnSync(command, { timeout: TEST_TIMEOUT_MS, ...(args || {}) });
+  }
+  return nodeSpawnSync(command, args, { timeout: TEST_TIMEOUT_MS, ...(options || {}) });
+}
 
 function packagedFiles() {
   const result = spawnSync('npm', ['pack', '--dry-run', '--json'], {
@@ -45,6 +53,7 @@ function readUtf8IfText(filePath) {
 describe('release hygiene', () => {
   test('research memo is not included in npm package contents', () => {
     assert.equal(packagedFiles().includes('docs/research-skill-spec.md'), false);
+    assert.equal(packagedFiles().includes('docs/research/archive/ARCHIVED-research-skill-spec.md'), false);
   });
 
   test('packaged text does not include local paths, secrets, or stale citation tokens', () => {

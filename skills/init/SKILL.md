@@ -41,7 +41,8 @@ Before writing active artifacts:
 - Confirm source roots, contaminated artifact roots, clean artifact roots, clean implementation roots, approved public reference roots, and schema directory are separated.
 - Confirm contaminated artifact roots, clean artifact roots, and clean implementation roots do not contain source-derived path names. Treat matches against source root basenames or meaningful non-generic source-name tokens as contamination risk.
 - Confirm Agent 2 and Agent 3 will launch in the clean domain, not from the source workspace.
-- Set clean isolation to `clean-workspace`; Docker or other containers are out of scope for v1.
+- Set clean isolation to `clean-workspace`. Docker or Podman may be recorded only as an optional Agent 3 verification backend; source and contaminated artifact roots must remain unmounted from clean verification containers.
+- If container verification is selected, record `execution_policy` with `backend`, `preferred_container_profile`, `network_policy`, `dependency_install_policy`, `allow_native_toolchain`, and bounded `resource_limits`. Use `network_policy: off` and `dependency_install_policy: offline` or `locked` for the first milestone.
 - Treat root changes, model policy changes, target profile changes, and rule reclassification as safety-sensitive. Require explicit confirmation before changing an existing run.
 - Do not move or delete old artifacts in place. Root changes must start a new generation or use `start-over`.
 

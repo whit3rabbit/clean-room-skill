@@ -22,8 +22,9 @@ AGENT3_ROLE = "clean-qa-editor"
 ALLOW_AGENT3_SHELL_ENV = "CLEAN_ROOM_ALLOW_AGENT3_SHELL"
 RUNNER_NAME = "agent3-verification-runner.py"
 SHELL_META_CHARS = ("|", "&", ";", "<", ">", "`", "$", "\n", "\r")
-RUNNER_FLAGS_WITH_VALUE = {"--plan", "--command-index", "--timeout"}
+RUNNER_FLAGS_WITH_VALUE = {"--plan", "--command-index", "--timeout", "--backend"}
 RUNNER_FLAGS_WITHOUT_VALUE = {"--all"}
+RUNNER_BACKENDS = {"host", "docker", "podman"}
 
 
 def tool_input_for(payload: dict) -> dict:
@@ -103,6 +104,9 @@ def validate_runner_args(argv: list[str], cwd: Path, blocked_roots: list[Path]) 
                 if seen_selector:
                     return False, "set exactly one runner command selector"
                 seen_selector = True
+        elif arg == "--backend":
+            if value not in RUNNER_BACKENDS:
+                return False, "--backend must be host, docker, or podman"
         index += 2
     if not seen_selector:
         return False, "Agent 3 verification runner requires --command-index or --all"

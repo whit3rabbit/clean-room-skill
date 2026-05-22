@@ -1,0 +1,18 @@
+{
+  "verification_strategy": [
+    {
+      "command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "cwd": "CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]",
+      "purpose": "Run Go tests.",
+      "run_type": "verify",
+      "container_profile": "go126",
+      "network": "off",
+      "dependency_mode": "locked",
+      "timeout_seconds": 120
+    }
+  ]
+}

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { describe, test } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { spawnSync: nodeSpawnSync } = require('node:child_process');
 const {
   AGENT3_RUNNER,
   assertNoPrivateLeak,
@@ -25,6 +25,31 @@ const {
   writeImplementationPlan,
   writeProbeTool,
 } = require('./helpers/hook-policy.cjs');
+
+const TEST_TIMEOUT_MS = 30_000;
+
+function spawnSync(command, args, options) {
+  if (!Array.isArray(args)) {
+    return nodeSpawnSync(command, { timeout: TEST_TIMEOUT_MS, ...(args || {}) });
+  }
+  return nodeSpawnSync(command, args, { timeout: TEST_TIMEOUT_MS, ...(options || {}) });
+}
+
+function writeFakeContainerBackend(binDir, name, argvPath) {
+  const toolPath = path.join(binDir, name);
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(toolPath, [
+    '#!/bin/sh',
+    `: > ${shellQuote(argvPath)}`,
+    'for arg in "$@"; do',
+    `  printf '%s\\n' "$arg" >> ${shellQuote(argvPath)}`,
+    'done',
+    'printf fake-container-ok\\n',
+    '',
+  ].join('\n'));
+  fs.chmodSync(toolPath, 0o755);
+  return toolPath;
+}
 
 describe('clean-room shell hook policy', () => {
   test('shell policy directly blocks clean-room role sessions', () => {
@@ -49,6 +74,7 @@ describe('clean-room shell hook policy', () => {
     const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
     const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
     const runnerCommand = `python3 ${shellQuote(AGENT3_RUNNER)} --command-index 0`;
+    const dockerRunnerCommand = `${runnerCommand} --backend docker`;
 
     let result = runHook('deny-clean-room-shell.py', { tool_name: 'Shell', tool_input: { cwd: implementation } }, env);
     assert.notEqual(result.status, 0);
@@ -79,6 +105,25 @@ describe('clean-room shell hook policy', () => {
       CLEAN_ROOM_ALLOW_AGENT3_SHELL: '1',
     });
     assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-room-shell.py', {
+      tool_name: 'Shell',
+      tool_input: { cwd: implementation, command: dockerRunnerCommand },
+    }, {
+      ...env,
+      CLEAN_ROOM_ALLOW_AGENT3_SHELL: '1',
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-room-shell.py', {
+      tool_name: 'Shell',
+      tool_input: { cwd: implementation, command: `${runnerCommand} --backend remote` },
+    }, {
+      ...env,
+      CLEAN_ROOM_ALLOW_AGENT3_SHELL: '1',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /--backend must be host, docker, or podman/);
 
     result = runHook('deny-clean-room-shell.py', {
       tool_name: 'Shell',
@@ -193,5 +238,93 @@ describe('clean-room shell hook policy', () => {
     });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /blocked root/);
+  });
+
+  test('Agent 3 verification runner builds hardened container argv without blocked mounts', () => {
+    const root = tempDir('clean-room-agent3-container-runner');
+    const env = {
+      ...policyEnv(root, 'clean-qa-editor'),
+      CLEAN_ROOM_ALLOW_AGENT3_SHELL: '1',
+    };
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const source = env.CLEAN_ROOM_SOURCE_ROOTS;
+    const contaminated = env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS;
+    const allowedRefs = env.CLEAN_ROOM_ALLOWED_READ_ROOTS;
+    const implementationResolved = fs.realpathSync(implementation);
+    const cleanResolved = fs.realpathSync(clean);
+    const sourceResolved = fs.realpathSync(source);
+    const contaminatedResolved = fs.realpathSync(contaminated);
+    const allowedRefsResolved = fs.realpathSync(allowedRefs);
+    const schemaResolved = fs.realpathSync(SCHEMA_DIR);
+    fs.writeFileSync(path.join(clean, 'clean-run-context.json'), JSON.stringify({
+      execution_policy: {
+        backend: 'docker',
+        preferred_container_profile: 'node22',
+        network_policy: 'off',
+        dependency_install_policy: 'locked',
+        allow_native_toolchain: false,
+        resource_limits: {
+          cpus: 2,
+          memory_mb: 2048,
+          timeout_seconds: 120,
+        },
+      },
+    }));
+    const plan = writeImplementationPlan(clean, ['npm', 'test'], {
+      run_type: 'verify',
+      dependency_mode: 'locked',
+    });
+    const binDir = path.join(root, 'bin');
+    const argvPath = path.join(root, 'docker-argv.txt');
+    writeFakeContainerBackend(binDir, 'docker', argvPath);
+
+    let result = spawnSync('python3', [AGENT3_RUNNER, '--backend', 'docker', '--plan', plan, '--command-index', '0'], {
+      cwd: ROOT,
+      env: { ...process.env, ...env, PATH: `${binDir}${path.delimiter}${process.env.PATH || ''}` },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /fake-container-ok/);
+
+    const args = fs.readFileSync(argvPath, 'utf8').trim().split('\n');
+    const argAfter = (flag) => args[args.indexOf(flag) + 1];
+    assert.deepEqual(args.slice(0, 2), ['run', '--rm']);
+    assert.equal(argAfter('--network'), 'off');
+    assert.equal(argAfter('--cap-drop'), 'ALL');
+    assert.equal(argAfter('--security-opt'), 'no-new-privileges');
+    assert.equal(argAfter('--pids-limit'), '512');
+    assert.equal(argAfter('--memory'), '2048m');
+    assert.equal(argAfter('--cpus'), '2');
+    assert.equal(argAfter('--user'), '1000:1000');
+    assert.equal(argAfter('--workdir'), '/work');
+    assert.ok(args.includes('--read-only'));
+    assert.ok(args.includes('/tmp:rw,noexec,nosuid,size=512m'));
+    assert.ok(args.includes(`${implementationResolved}:/work:rw`));
+    assert.ok(args.includes(`${cleanResolved}:/clean:ro`));
+    assert.ok(args.includes(`${schemaResolved}:/schemas:ro`));
+    assert.ok(args.includes(`${allowedRefsResolved}:/refs/0:ro`));
+    assert.ok(args.includes('clean-room-skill/node22:local'));
+    assert.deepEqual(args.slice(-2), ['npm', 'test']);
+
+    const serialized = args.join('\n');
+    assert.equal(serialized.includes(sourceResolved), false);
+    assert.equal(serialized.includes(contaminatedResolved), false);
+    assert.equal(serialized.includes('CLEAN_ROOM_SOURCE_ROOTS'), false);
+    assert.equal(serialized.includes('CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS'), false);
+
+    const unsafePlan = writeImplementationPlan(clean, ['npm', 'test'], {
+      run_type: 'verify',
+      container_profile: 'node22',
+      network: 'on',
+      dependency_mode: 'locked',
+    });
+    result = spawnSync('python3', [AGENT3_RUNNER, '--backend', 'docker', '--plan', unsafePlan, '--command-index', '0'], {
+      cwd: ROOT,
+      env: { ...process.env, ...env, PATH: `${binDir}${path.delimiter}${process.env.PATH || ''}` },
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /network=off only/);
   });
 });

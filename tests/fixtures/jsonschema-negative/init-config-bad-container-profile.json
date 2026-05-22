@@ -1,0 +1,15 @@
+{
+  "schema_kind": "init-config",
+  "base": "init-config.json",
+  "description": "Initialization execution policy must use a supported first-phase container profile.",
+  "set": [
+    {
+      "path": [
+        "execution_policy",
+        "preferred_container_profile"
+      ],
+      "value": "node20"
+    }
+  ],
+  "expected_error": "is not one of"
+}

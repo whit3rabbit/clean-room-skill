@@ -64,7 +64,7 @@ npx clean-room-skill@latest --cursor --global --yes
 npx clean-room-skill@latest --all --global --yes
 ```
 
-Interactive mode prompts for install or uninstall, global or local scope, runtime selection, and hook mode. The runtime prompt shows detected install status for each target root and accepts names, numbers, ranges, `all`, or `installed` for uninstall defaults.
+Interactive mode uses an Ink TUI for install or uninstall, global or local scope, runtime selection, and hook mode. The runtime screen shows detected install status for each target root, supports multi-select, and preselects detected installs for uninstall.
 
 Runtime support tiers:
 
@@ -434,6 +434,8 @@ Set it to path-separated, line-oriented files containing private source package,
 
 Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the default Agent 3 profile. If Agent 3 verification needs a terminal, use an isolated verification home with strict hooks and `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, then invoke only the installed `agent3-verification-runner.py` from an implementation-root cwd. The runner reads argv-array verification commands from `implementation-plan.json`, applies a small allowlist, strips clean-room root env values, and executes with `shell=False`. Shell access still does not replace OS/profile isolation for untrusted test code.
 
+Agent 3 verification may optionally run through `--backend docker` or `--backend podman`. Container backends are verification-only in this milestone. They mount the selected implementation root read/write, clean artifact roots read-only, schemas read-only, and approved public/reference roots read-only. They never mount source roots or contaminated artifact roots. Only `network: "off"` and `dependency_mode: "offline"` or `"locked"` are supported until dependency cache policy is implemented. First-phase profiles are `node22`, `python312`, `go126`, and `rust-stable`; template Dockerfiles live under `templates/docker/`.
+
 For multi-file scopes, run `skills/clean-room/scripts/build_source_index.py` as source-index controller preflight before clean-room role sessions. Store `source-index.json` under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, or pass `--contaminated-artifact-root` explicitly. The script refuses `--output` outside those roots. It is contaminated-only and must not be included in clean handoff packages or shown to Agent 1.5.
 
 `source-index.json` includes bounded `skipped_entries` when the indexer intentionally or unavoidably omits input. Expected reasons include ignored directories, file count and byte caps, total byte caps, binary files, file stat/read errors, post-read size changes, files that changed during read, symlinks that resolve outside the source root, and directory traversal errors. After a global file or byte cap is reached, traversal is pruned and represented by an aggregate `remaining-files-skipped-after-limit:*` entry instead of enumerating the rest of a large tree. Treat skipped entries as coverage metadata: inspect them before deciding that a source index fully represents the authorized root.
@@ -524,10 +526,11 @@ Agent/tool hook scaffolding lives in `hooks/`. Security enforcement uses install
 
 The generated hook configs route through `hooks/clean-room-hook.py`. In safe mode, the wrapper exits successfully until clean-room init/onboarding launches role sessions with the required clean-room environment block. `CLEAN_ROOM_HOOK_ENFORCE=1` is still supported for explicit smoke tests. In strict mode, it runs the configured checks immediately and fails closed when required role or path configuration is missing. Prefer strict mode for dedicated Codex or Claude clean-room homes.
 
-After install, run a smoke check:
+After install, run a smoke check. Add `--coverage` to print the managed matcher/check matrix and the host surfaces that still depend on runtime hook event emission:
 
 ```bash
 clean-room-skill doctor --runtime codex --hooks=strict
+clean-room-skill doctor --runtime codex --hooks=strict --coverage
 ```
 
 Use `--runtime claude` for Claude Code, and add `--config-dir <path>` when testing an alternate config root.
@@ -541,7 +544,7 @@ Expanded matcher coverage applies only to tool events the host runtime actually 
 It does not verify every runtime tool event, every matcher name emitted by the host, host-side hook enablement outside the config file, legal clean-room sufficiency, or full JSON Schema conformance. Treat it as an install smoke test, not a complete enforcement proof.
 
 - `clean-room-hook.py`: safe/strict dispatch wrapper for the policy checks below.
-- `agent3-verification-runner.py`: runs Agent 3 argv-array verification commands with `shell=False`, a small allowlist, sanitized env, bounded output, timeout, and root traversal checks.
+- `agent3-verification-runner.py`: runs Agent 3 argv-array verification commands with `shell=False`, a small allowlist, sanitized env, bounded output, timeout, root traversal checks, and optional Docker/Podman verification containers.
 - `require-clean-room-env.py`: fails closed when required role and root environment is missing.
 - `deny-clean-room-shell.py`: denies shell-style tools for clean-room role sessions except installed Agent 3 verification-runner invocations explicitly allowed under implementation roots.
 - `deny-clean-source-read.py`: denies clean and source-denied role reads from source roots and unapproved paths.
@@ -560,7 +563,7 @@ For release-quality schema assurance, run a full JSON Schema validator in additi
 | --- | --- | --- |
 | `python3 is required to install clean-room hooks` | Python missing or not on `PATH` | Install Python 3 or use `--hooks=copy-only` |
 | `safe hooks are installed; clean-room init/onboarding must set role environment variables` | Safe mode default | Start the clean-room init/onboarding flow so role sessions receive the clean-room environment block, or reinstall with `--hooks=strict` in a dedicated profile |
-| `install lock is held` | Another install or uninstall is mutating the same target root, or a prior process died while holding `.clean-room-install.lock` | Wait for the other process to finish; inspect and remove the lock only after confirming no installer is active |
+| `install lock is held` | Another install or uninstall is mutating the same target root, or a fresh/live `.clean-room-install.lock` exists | Wait for the other process to finish; old dead locks are renamed aside automatically only after conservative stale-lock checks |
 | Hook config write failed after files copied | Partial installer state; manifest records `hook_registration.status: "failed"` when possible | Fix the filesystem error, then re-run the same installer command to repair hook registration |
 | Install manifest write failed after files copied | Manifest may be absent or left at `phase: "installing"` | Re-run the same installer command before relying on uninstall tracking |
 | `phase` remains `installing` in `clean-room-install-manifest.json` | The previous install did not complete hook config or manifest finalization | Re-run the same installer command for that runtime and target root |

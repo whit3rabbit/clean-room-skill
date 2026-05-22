@@ -295,6 +295,9 @@
         }
       }
     },
+    "execution_policy": {
+      "$ref": "#/$defs/execution_policy"
+    },
     "controller_policy": {
       "type": "object",
       "additionalProperties": false,
@@ -388,6 +391,81 @@
     }
   ],
   "$defs": {
+    "execution_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend",
+        "preferred_container_profile",
+        "network_policy",
+        "dependency_install_policy",
+        "allow_native_toolchain",
+        "resource_limits"
+      ],
+      "properties": {
+        "backend": {
+          "enum": [
+            "host",
+            "docker",
+            "podman"
+          ]
+        },
+        "preferred_container_profile": {
+          "enum": [
+            "node22",
+            "python312",
+            "go126",
+            "rust-stable"
+          ]
+        },
+        "network_policy": {
+          "enum": [
+            "off",
+            "deps-only",
+            "on"
+          ]
+        },
+        "dependency_install_policy": {
+          "enum": [
+            "offline",
+            "locked",
+            "allow-new"
+          ]
+        },
+        "allow_native_toolchain": {
+          "type": "boolean"
+        },
+        "resource_limits": {
+          "$ref": "#/$defs/resource_limits"
+        }
+      }
+    },
+    "resource_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cpus",
+        "memory_mb",
+        "timeout_seconds"
+      ],
+      "properties": {
+        "cpus": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "memory_mb": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 65536
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        }
+      }
+    },
     "code_hygiene_policy": {
       "type": "object",
       "additionalProperties": false,

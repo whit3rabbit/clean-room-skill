@@ -1,0 +1,3 @@
+FROM rust:1-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+
+WORKDIR /work

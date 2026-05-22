@@ -1,0 +1,17 @@
+{
+  "verification_strategy": [
+    {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "cwd": "CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]",
+      "purpose": "Run Node/TypeScript tests.",
+      "run_type": "verify",
+      "container_profile": "node22",
+      "network": "off",
+      "dependency_mode": "locked",
+      "timeout_seconds": 120
+    }
+  ]
+}

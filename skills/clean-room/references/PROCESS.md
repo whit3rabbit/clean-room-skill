@@ -51,6 +51,8 @@ Optional guardrail value:
 
 Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the default Agent 3 profile. Agent 3 terminal verification may use shell-style tools only when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, strict hooks are installed, the command cwd is under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and the command invokes the installed `agent3-verification-runner.py`. Shell access still does not replace OS/profile isolation for untrusted test code.
 
+Agent 3 verification may use `--backend docker` or `--backend podman` only for verification/build commands from `implementation-plan.json`. Container backends mount the selected implementation root read/write, clean artifact roots read-only, schemas read-only, and approved public/reference roots read-only. They must not mount `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, a Docker socket, or privileged host paths. For the first Docker milestone, use `network: "off"` and `dependency_mode: "offline"` or `"locked"`; reject networked dependency installation.
+
 Create or validate `preflight-goal.json` before source discovery, source indexing, Agent 0 decomposition, attended execution, or unattended execution. Treat it as controller/contaminated-side only. It may contain source license notes and output roots, so it must not cross to Agent 1.5, clean roles, or clean handoff packages. Clean roles receive only clean-safe goal fields and `code_hygiene_policy` through `clean-run-context.json`.
 
 Run `scripts/build_source_index.py` only as source-index controller preflight before clean-room role sessions. Treat `source-index.json` as contaminated-only: it may record source paths, private import/export identifiers, file metrics, skipped-entry coverage gaps, large-file line spans, optional AST/indexing tool status, and dependency relationships. The indexer enforces file and byte limits after read, records files that change during read as skipped, reports directory walk errors, and prunes traversal after global limits with an aggregate skipped entry. Agent 0 may consume it to create neutral `task-manifest.json` units, but it must not cross to Agent 1.5, clean roles, or clean handoff packages.
@@ -171,7 +173,7 @@ Clean implementer/verifier:
    - Set clean isolation mode to `clean-workspace` and record separate implementation roots.
 3. Scope gate:
    - Record requester, target identifier, authorization text, source scope, clean output scope, prohibited actions, and evidence handling.
-   - Record the user's selected `format_selection.target_profile` and native artifact expectations from `docs/research-skill-spec.md`.
+   - Record the user's selected `format_selection.target_profile` and native artifact expectations. The archived reference `docs/research/archive/ARCHIVED-research-skill-spec.md` is historical guidance only, not active contract documentation.
    - Record `preflight_goal_ref`, `preflight_goal_sha256`, and `controller_policy` from preflight when the task should run in explicit attended or bounded unattended mode.
    - Record `run_state` with generation, start timestamp, and restart reason.
    - Record `initialization_snapshot` when init preferences exist.

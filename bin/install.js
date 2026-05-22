@@ -7,6 +7,7 @@ const readline = require('node:readline/promises');
 const { spawnSync } = require('node:child_process');
 
 const { runInit } = require('../lib/bootstrap.cjs');
+const { withDirectoryLock } = require('../lib/dir-lock.cjs');
 const { runDoctor } = require('../lib/doctor.cjs');
 const { assertManagedPath } = require('../lib/fs-utils.cjs');
 const { parsePreflightArgs, runPreflight } = require('../lib/preflight.cjs');
@@ -35,13 +36,16 @@ const {
 
 const HOOK_MODES = new Set(['safe', 'copy-only', 'strict']);
 const INSTALL_LOCK_NAME = '.clean-room-install.lock';
-const INSTALL_LOCK_WAIT_MS = 30_000;
+const INSTALL_LOCK_WAIT_MS = envPositiveInteger('CLEAN_ROOM_INSTALL_LOCK_WAIT_MS', 30_000);
 const INSTALL_LOCK_POLL_MS = 100;
+const PYTHON_PROBE_TIMEOUT_MS = envPositiveInteger('CLEAN_ROOM_INSTALL_PYTHON_TIMEOUT_MS', 10_000);
 
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+function envPositiveInteger(name, fallback) {
+  const value = process.env[name];
+  if (value === undefined || value === '') {
+    return fallback;
+  }
+  return /^[1-9][0-9]*$/.test(value) ? Number(value) : fallback;
 }
 
 async function withTargetInstallLock(targetRoot, dryRun, fn) {
@@ -51,39 +55,12 @@ async function withTargetInstallLock(targetRoot, dryRun, fn) {
 
   fs.mkdirSync(targetRoot, { recursive: true });
   const lockPath = assertManagedPath(targetRoot, INSTALL_LOCK_NAME);
-  const deadline = Date.now() + INSTALL_LOCK_WAIT_MS;
-  let locked = false;
-
-  while (!locked) {
-    try {
-      fs.mkdirSync(lockPath);
-      try {
-        fs.writeFileSync(
-          path.join(lockPath, 'owner.json'),
-          `${JSON.stringify({ pid: process.pid, created_at: new Date().toISOString() }, null, 2)}\n`,
-          'utf8'
-        );
-      } catch (err) {
-        fs.rmSync(lockPath, { recursive: true, force: true });
-        throw err;
-      }
-      locked = true;
-    } catch (err) {
-      if (err?.code !== 'EEXIST') {
-        throw err;
-      }
-      if (Date.now() >= deadline) {
-        throw new Error(`install lock is held: ${lockPath}`);
-      }
-      await sleep(INSTALL_LOCK_POLL_MS);
-    }
-  }
-
-  try {
-    return await fn();
-  } finally {
-    fs.rmSync(lockPath, { recursive: true, force: true });
-  }
+  return withDirectoryLock({
+    lockPath,
+    waitMs: INSTALL_LOCK_WAIT_MS,
+    pollMs: INSTALL_LOCK_POLL_MS,
+    label: 'install lock',
+  }, fn);
 }
 
 function parseArgs(argv) {
@@ -202,64 +179,169 @@ async function resolveInteractiveOptions(options) {
   if (!process.stdin.isTTY || options.yes) {
     throw new Error('specify runtime and scope flags when running non-interactively');
   }
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    let promptedRuntimes = false;
-    if (options.runtimes.length === 0 && !options.uninstall) {
-      options.uninstall = await promptInstallAction(rl);
-    }
-    if (!options.scope) {
-      const answer = await rl.question('Scope [global/local]: ');
-      const scope = answer.trim().toLowerCase() || 'global';
-      if (scope !== 'global' && scope !== 'local') {
-        throw new Error(`unsupported scope: ${answer}`);
-      }
-      options.scope = scope;
-    }
-    if (options.runtimes.length === 0) {
-      promptedRuntimes = true;
-      const statuses = runtimeInstallStatuses(options.scope, options.configDir);
-      printRuntimeChoices(statuses);
-      const action = options.uninstall ? 'uninstall' : 'install';
-      const defaultLabel = defaultRuntimeSelectionLabel(statuses, action);
-      const answer = await rl.question(`Runtimes to ${action} [${defaultLabel}; numbers/names/all]: `);
-      options.runtimes = parseRuntimeSelection(answer, statuses, action);
-    }
-    if (options.uninstall && promptedRuntimes) {
-      await confirmInteractiveUninstall(rl, options.runtimes);
-    }
-    if (!options.uninstall && !options.hookModeSpecified) {
-      const answer = await rl.question('Hook mode [safe/copy-only/strict]: ');
-      const hookMode = answer.trim().toLowerCase() || 'safe';
-      if (!HOOK_MODES.has(hookMode)) {
-        throw new Error(`unsupported hook mode: ${answer}`);
-      }
-      options.hookMode = hookMode;
-    }
-    return options;
-  } finally {
-    rl.close();
-  }
+  return runInstallerTui(options);
 }
 
-async function promptInstallAction(rl) {
-  const answer = await rl.question('Action [install/uninstall]: ');
-  const action = answer.trim().toLowerCase() || 'install';
-  if (['install', 'i'].includes(action)) {
-    return false;
-  }
-  if (['uninstall', 'remove', 'u'].includes(action)) {
-    return true;
-  }
-  throw new Error(`unsupported action: ${answer}`);
+async function runInstallerTui(options) {
+  const React = await import('react');
+  const ink = await import('ink');
+  const h = React.createElement;
+
+  return new Promise((resolve, reject) => {
+    let result = null;
+    let error = null;
+    let instance = null;
+
+    function complete(nextOptions) {
+      result = nextOptions;
+    }
+
+    function abort(err) {
+      error = err;
+    }
+
+    function App() {
+      return h(InstallerTui, {
+        React,
+        ink,
+        h,
+        initialOptions: options,
+        onComplete: complete,
+        onAbort: abort,
+      });
+    }
+
+    instance = ink.render(h(App), {
+      stdin: process.stdin,
+      stdout: process.stdout,
+      stderr: process.stderr,
+      exitOnCtrlC: false,
+    });
+
+    instance.waitUntilExit().then(() => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(result || options);
+    }, reject);
+  });
 }
 
-async function confirmInteractiveUninstall(rl, runtimes) {
-  console.log(`Selected runtimes to uninstall: ${runtimes.join(', ')}`);
-  const answer = await rl.question('Type uninstall to continue: ');
-  if (answer.trim().toLowerCase() !== 'uninstall') {
-    throw new Error('aborted by user');
+function InstallerTui({ React, ink, h, initialOptions, onComplete, onAbort }) {
+  const { Box, Text, useApp, useInput } = ink;
+  const { useMemo, useState } = React;
+  const { exit } = useApp();
+  const initialFlags = useMemo(() => ({
+    actionResolved: !(initialOptions.runtimes.length === 0 && !initialOptions.uninstall),
+    promptedRuntimes: false,
+    uninstallConfirmed: true,
+  }), [initialOptions]);
+  const [draft, setDraft] = useState(() => ({
+    ...initialOptions,
+    runtimes: [...initialOptions.runtimes],
+  }));
+  const [flags, setFlags] = useState(initialFlags);
+  const [stage, setStage] = useState(() => nextTuiStage(initialOptions, initialFlags));
+
+  function fail(message) {
+    onAbort(new Error(message));
+    exit();
   }
+
+  useInput((input, key) => {
+    if (key.ctrl && input === 'c') {
+      fail('aborted by user');
+    }
+  });
+
+  function advance(nextDraft, nextFlags = {}) {
+    const mergedFlags = { ...flags, ...nextFlags };
+    const nextStage = nextTuiStage(nextDraft, mergedFlags);
+    setDraft(nextDraft);
+    setFlags(mergedFlags);
+    if (nextStage === 'complete') {
+      onComplete(nextDraft);
+      exit();
+      return;
+    }
+    setStage(nextStage);
+  }
+
+  const isUninstall = draft.uninstall;
+  const action = isUninstall ? 'uninstall' : 'install';
+
+  return h(Box, { flexDirection: 'column', gap: 1 },
+    h(Box, { flexDirection: 'column' },
+      h(Text, { bold: true }, 'clean-room-skill installer'),
+      h(Text, { dimColor: true }, 'Use arrows or j/k to move. Enter selects. Ctrl+C cancels.')
+    ),
+    stage === 'action' && h(SingleChoice, {
+      React,
+      Box,
+      Text,
+      useInput,
+      h,
+      title: 'Action',
+      items: [
+        { label: 'Install', value: false, detail: 'add or repair runtime files' },
+        { label: 'Uninstall', value: true, detail: 'remove managed files and generated hooks' },
+      ],
+      onSubmit: (item) => advance({ ...draft, uninstall: item.value }, {
+        actionResolved: true,
+        uninstallConfirmed: !item.value,
+      }),
+    }),
+    stage === 'scope' && h(SingleChoice, {
+      React,
+      Box,
+      Text,
+      useInput,
+      h,
+      title: 'Scope',
+      items: [
+        { label: 'Global', value: 'global', detail: 'runtime user config' },
+        { label: 'Local', value: 'local', detail: 'current project config' },
+      ],
+      onSubmit: (item) => advance({ ...draft, scope: item.value }),
+    }),
+    stage === 'runtimes' && h(RuntimeMultiSelect, {
+      React,
+      Box,
+      Text,
+      useInput,
+      h,
+      action,
+      statuses: runtimeInstallStatuses(draft.scope, draft.configDir),
+      onSubmit: (runtimes) => advance({ ...draft, runtimes }, {
+        promptedRuntimes: true,
+        uninstallConfirmed: !draft.uninstall,
+      }),
+    }),
+    stage === 'confirm-uninstall' && h(ConfirmUninstall, {
+      React,
+      Box,
+      Text,
+      useInput,
+      h,
+      runtimes: draft.runtimes,
+      onSubmit: () => advance(draft, { uninstallConfirmed: true }),
+    }),
+    stage === 'hooks' && h(SingleChoice, {
+      React,
+      Box,
+      Text,
+      useInput,
+      h,
+      title: 'Hook mode',
+      items: [
+        { label: 'Safe', value: 'safe', detail: 'enforces during clean-room role sessions' },
+        { label: 'Copy-only', value: 'copy-only', detail: 'copy scripts without host hook registration' },
+        { label: 'Strict', value: 'strict', detail: 'fail closed in dedicated Codex or Claude homes' },
+      ],
+      onSubmit: (item) => advance({ ...draft, hookMode: item.value, hookModeSpecified: true }),
+    })
+  );
 }
 
 function runtimeInstallStatuses(scope, configDir) {
@@ -323,22 +405,29 @@ function printRuntimeChoices(statuses) {
   statuses.forEach((status, index) => {
     const number = String(index + 1).padStart(2, ' ');
     const runtime = status.runtime.padEnd(12, ' ');
-    console.log(`  ${number}. ${runtime} ${status.detail} (${status.targetRoot})`);
+    console.log(`  ${number}. ${runtime} ${status.detail} (${displayPath(status.targetRoot)})`);
   });
 }
 
 function defaultRuntimeSelectionLabel(statuses, action) {
-  if (action === 'uninstall' && statuses.some((status) => isInstalledStatus(status))) {
+  if (action === 'uninstall' && defaultRuntimeSelections(statuses, action).length > 0) {
     return 'installed';
   }
   return 'codex';
+}
+
+function defaultRuntimeSelections(statuses, action = 'install') {
+  if (action === 'uninstall') {
+    return statuses.filter((status) => isInstalledStatus(status)).map((status) => status.runtime);
+  }
+  return ['codex'];
 }
 
 function parseRuntimeSelection(answer, statuses, action = 'install') {
   const text = answer.trim().toLowerCase();
   if (text === '') {
     if (action === 'uninstall') {
-      const installed = statuses.filter((status) => isInstalledStatus(status)).map((status) => status.runtime);
+      const installed = defaultRuntimeSelections(statuses, action);
       if (installed.length === 0) {
         throw new Error('no installed runtimes detected; select a runtime explicitly');
       }
@@ -398,6 +487,157 @@ function isInstalledStatus(status) {
   return status.state === 'installed' || status.state === 'hooks-only';
 }
 
+function nextTuiStage(options, flags) {
+  if (!flags.actionResolved) {
+    return 'action';
+  }
+  if (!options.scope) {
+    return 'scope';
+  }
+  if (options.runtimes.length === 0) {
+    return 'runtimes';
+  }
+  if (options.uninstall && flags.promptedRuntimes && !flags.uninstallConfirmed) {
+    return 'confirm-uninstall';
+  }
+  if (!options.uninstall && !options.hookModeSpecified) {
+    return 'hooks';
+  }
+  return 'complete';
+}
+
+function SingleChoice({ React, Box, Text, useInput, h, title, items, onSubmit }) {
+  const [index, setIndex] = React.useState(0);
+  useInput((input, key) => {
+    if (key.upArrow || input === 'k') {
+      setIndex((current) => Math.max(0, current - 1));
+    } else if (key.downArrow || input === 'j') {
+      setIndex((current) => Math.min(items.length - 1, current + 1));
+    } else if (key.home) {
+      setIndex(0);
+    } else if (key.end) {
+      setIndex(items.length - 1);
+    } else if (key.return || /[\r\n]/.test(input)) {
+      onSubmit(items[index]);
+    }
+  });
+
+  return h(Box, { flexDirection: 'column' },
+    h(Text, { bold: true }, title),
+    ...items.map((item, itemIndex) => h(Text, {
+      key: item.value,
+      color: itemIndex === index ? 'cyan' : undefined,
+    }, `${itemIndex === index ? '>' : ' '} ${item.label.padEnd(10)} ${item.detail}`))
+  );
+}
+
+function RuntimeMultiSelect({ React, Box, Text, useInput, h, action, statuses, onSubmit }) {
+  const initialSelected = React.useMemo(() => new Set(defaultRuntimeSelections(statuses, action)), [statuses, action]);
+  const [index, setIndex] = React.useState(0);
+  const [selected, setSelected] = React.useState(initialSelected);
+  const [error, setError] = React.useState('');
+
+  function toggle(runtime) {
+    setError('');
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(runtime)) {
+        next.delete(runtime);
+      } else {
+        next.add(runtime);
+      }
+      return next;
+    });
+  }
+
+  useInput((input, key) => {
+    if (key.upArrow || input === 'k') {
+      setIndex((current) => Math.max(0, current - 1));
+    } else if (key.downArrow || input === 'j') {
+      setIndex((current) => Math.min(statuses.length - 1, current + 1));
+    } else if (key.home) {
+      setIndex(0);
+    } else if (key.end) {
+      setIndex(statuses.length - 1);
+    } else if (input === ' ') {
+      toggle(statuses[index].runtime);
+    } else if (input === 'a') {
+      setError('');
+      setSelected(new Set(RUNTIMES));
+    } else if (input === 'i') {
+      setError('');
+      setSelected(new Set(defaultRuntimeSelections(statuses, 'uninstall')));
+    } else if (key.return || /[\r\n]/.test(input)) {
+      const runtimes = RUNTIMES.filter((runtime) => selected.has(runtime));
+      if (runtimes.length === 0) {
+        setError('Select at least one runtime.');
+        return;
+      }
+      onSubmit(runtimes);
+    }
+  });
+
+  return h(Box, { flexDirection: 'column' },
+    h(Text, { bold: true }, `Runtimes to ${action}`),
+    h(Text, { dimColor: true }, 'Space toggles. a selects all. i selects detected installs. Enter continues.'),
+    ...statuses.map((status, itemIndex) => {
+      const checked = selected.has(status.runtime) ? '[x]' : '[ ]';
+      const cursor = itemIndex === index ? '>' : ' ';
+      return h(Text, {
+        key: status.runtime,
+        color: itemIndex === index ? 'cyan' : undefined,
+      }, `${cursor} ${checked} ${status.runtime.padEnd(12)} ${status.detail} (${displayPath(status.targetRoot)})`);
+    }),
+    error ? h(Text, { color: 'red' }, error) : null
+  );
+}
+
+function ConfirmUninstall({ React, Box, Text, useInput, h, runtimes, onSubmit }) {
+  const [text, setText] = React.useState('');
+  const [error, setError] = React.useState('');
+
+  useInput((input, key) => {
+    const submit = key.return || /[\r\n]/.test(input);
+    if (submit) {
+      const printable = input.replace(/[^\x20-\x7E]/g, '');
+      const nextText = `${text}${printable}`;
+      if (nextText.trim().toLowerCase() === 'uninstall') {
+        onSubmit();
+        return;
+      }
+      setError('Type uninstall to continue.');
+    } else if (key.backspace || key.delete) {
+      setError('');
+      setText((current) => current.slice(0, -1));
+    } else if (!key.ctrl && input) {
+      const printable = input.replace(/[^\x20-\x7E]/g, '');
+      if (printable) {
+        setError('');
+        setText((current) => `${current}${printable}`);
+      }
+    }
+  });
+
+  return h(Box, { flexDirection: 'column' },
+    h(Text, { bold: true, color: 'yellow' }, 'Confirm uninstall'),
+    h(Text, null, `Selected runtimes: ${runtimes.join(', ')}`),
+    h(Text, { dimColor: true }, 'Only manifest-managed files and generated clean-room hook entries are removed.'),
+    h(Text, null, `Type uninstall: ${text}`),
+    error ? h(Text, { color: 'red' }, error) : null
+  );
+}
+
+function displayPath(filePath) {
+  const home = process.env.HOME;
+  if (home && filePath === home) {
+    return '~';
+  }
+  if (home && filePath.startsWith(`${home}${path.sep}`)) {
+    return `~/${path.relative(home, filePath)}`;
+  }
+  return filePath;
+}
+
 function resolveTargetRoot(runtime, scope, configDir) {
   return resolveRuntimeLayout(runtime, scope, { configDir }).targetRoot;
 }
@@ -431,6 +671,7 @@ function resolvePython3() {
   const result = spawnSync('python3', ['-c', 'import sys; print(sys.executable)'], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: PYTHON_PROBE_TIMEOUT_MS,
   });
   if (result.status !== 0) {
     throw new Error('python3 is required to install clean-room hooks');

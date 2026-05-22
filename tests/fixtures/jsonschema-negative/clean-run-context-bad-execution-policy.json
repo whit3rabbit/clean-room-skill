@@ -1,0 +1,16 @@
+{
+  "schema_kind": "clean-run-context",
+  "base": "clean-run-context.json",
+  "description": "Clean run context execution policy must keep bounded resource limits.",
+  "set": [
+    {
+      "path": [
+        "execution_policy",
+        "resource_limits",
+        "timeout_seconds"
+      ],
+      "value": 1200
+    }
+  ],
+  "expected_error": "is greater than the maximum"
+}

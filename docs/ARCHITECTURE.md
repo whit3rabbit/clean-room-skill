@@ -25,6 +25,8 @@ To maintain compliance and mitigate leakage risks, the workflow utilizes strictl
 > [!IMPORTANT]
 > Prompt instructions alone do not form a boundary. The system enforces safety using OS-level path separation, role-specific sessions, agent/tool hook checks, JSON schema validation, and strict artifact quarantine.
 
+Optional Docker or Podman support is limited to Agent 3 verification containers. These containers are selected by execution policy and per-command metadata, run argv-array commands through the installed verification runner, and never mount source roots or contaminated artifact roots. The first supported profiles are `node22`, `python312`, `go126`, and `rust-stable`.
+
 ### Path Naming Guards
 
 Artifact roots must not disclose private source names. New runs default to `~/Documents/CleanRoom/<task-id>/`; when no explicitly approved neutral task ID is provided, the controller generates `task-` plus 8 lowercase hex characters instead of using the source folder name.
@@ -251,7 +253,7 @@ Note: Even though clean and source-denied roles (such as Agent 1.5, 2, and 3) ar
 
 The architecture relies on agent/tool hook scaffolding located in `hooks/` to enforce boundary rules dynamically during agent sessions. Use installer-generated Codex or Claude hook configs with absolute wrapper paths. Static cwd-relative plugin hook declarations are not treated as an enforcement boundary. Use strict hooks for dedicated Codex or Claude clean-room homes; safe hooks are compatibility-only between runs and begin enforcing when init/onboarding launches role sessions with clean-room environment variables.
 
-Matcher coverage depends on the host runtime emitting hook events for the tool invocation. Hosts that do not emit a pre/post tool event for a file, terminal, or resource tool are not protected by adding that tool name to the generated hook config. Run `clean-room-skill doctor --runtime codex --hooks=strict` or the Claude equivalent after install.
+Matcher coverage depends on the host runtime emitting hook events for the tool invocation. Hosts that do not emit a pre/post tool event for a file, terminal, or resource tool are not protected by adding that tool name to the generated hook config. Run `clean-room-skill doctor --runtime codex --hooks=strict --coverage` or the Claude equivalent after install.
 
 Post-write hook failures are deny-by-default and redacted. If an artifact disappears, becomes unreadable, is replaced between `stat` and read, or a referenced handoff artifact cannot be hashed, the hook reports a controlled validation failure instead of a Python traceback. `doctor` is only an install smoke test, but its failures include spawn status, signal/error, and bounded stdout/stderr snippets to make hook command problems diagnosable.
 

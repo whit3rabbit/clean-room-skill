@@ -1,0 +1,16 @@
+{
+  "schema_kind": "implementation-plan",
+  "base": "implementation-plan.json",
+  "description": "Implementation plan verification commands must use supported container profiles.",
+  "set": [
+    {
+      "path": [
+        "verification_strategy",
+        0,
+        "container_profile"
+      ],
+      "value": "go123"
+    }
+  ],
+  "expected_error": "is not one of"
+}

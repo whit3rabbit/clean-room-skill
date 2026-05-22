@@ -1,0 +1,15 @@
+{
+  "schema_kind": "preflight-goal",
+  "base": "preflight-goal.json",
+  "description": "Preflight execution policy must use a supported backend.",
+  "set": [
+    {
+      "path": [
+        "execution_policy",
+        "backend"
+      ],
+      "value": "remote-docker"
+    }
+  ],
+  "expected_error": "is not one of"
+}

@@ -35,6 +35,18 @@
     "source_mounted": false,
     "notes": "Clean agents start from the clean root and do not receive source mounts."
   },
+  "execution_policy": {
+    "backend": "host",
+    "preferred_container_profile": "node22",
+    "network_policy": "off",
+    "dependency_install_policy": "locked",
+    "allow_native_toolchain": false,
+    "resource_limits": {
+      "cpus": 2,
+      "memory_mb": 2048,
+      "timeout_seconds": 300
+    }
+  },
   "user_rules": {
     "clean_safe": [
       "Use concise acceptance criteria."

@@ -259,6 +259,39 @@
         "purpose": {
           "type": "string",
           "minLength": 1
+        },
+        "run_type": {
+          "enum": [
+            "verify",
+            "package"
+          ]
+        },
+        "container_profile": {
+          "enum": [
+            "node22",
+            "python312",
+            "go126",
+            "rust-stable"
+          ]
+        },
+        "network": {
+          "enum": [
+            "off",
+            "deps-only",
+            "on"
+          ]
+        },
+        "dependency_mode": {
+          "enum": [
+            "offline",
+            "locked",
+            "allow-new"
+          ]
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
         }
       }
     },

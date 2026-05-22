@@ -79,6 +79,7 @@ Capture:
 - compatibility/exactness policy, with exactness limited to public observable surfaces
 - feature preserve/remove/add lists and non-goals
 - code hygiene limits
+- optional execution policy: `host`, `docker`, or `podman`; one first-phase container profile; network and dependency install policy; native toolchain flag; and bounded CPU, memory, and timeout limits
 - output policy
 - controller mode and open questions
 
@@ -157,7 +158,7 @@ Agent zero generates the durable tasklist as `task-manifest.json` `units`. It ma
 - `speckit-feature-folder`: Spec Kit `.specify/` constitution plus `specs/<feature-id>/` artifacts.
 - `kiro-spec-folder`: Kiro `.kiro/specs/<slug>/` requirements, design, and tasks.
 
-Every real task must record the user's actual target profile. Do not default silently. Populate `native_artifacts` and `formatting_rules` with short path and formatting notes from `docs/research-skill-spec.md`.
+Every real task must record the user's actual target profile. Do not default silently. Populate `native_artifacts` and `formatting_rules` from the user's selected profile and current workflow. The archived reference `docs/research/archive/ARCHIVED-research-skill-spec.md` is historical guidance only, not active contract documentation.
 
 ## Agent Pipeline
 
@@ -253,10 +254,13 @@ Map API, protocol, config, and data/schema compatibility into `public_contracts`
 - local clean-project patterns and dependency constraints
 - public contract refs and spec ids
 - argv-array verification commands with cwd set to implementation root refs
+- optional per-command container metadata: `run_type`, `container_profile`, `network`, `dependency_mode`, and `timeout_seconds`
 - risks, acceptance criteria, and open decisions
 - forbidden implementation material
 
 Use only relative destination paths. Do not include source roots, contaminated roots, source paths, private identifiers, raw diffs, copied comments, or source-shaped pseudocode.
+
+Container metadata is declarative policy, not a shell escape hatch. Clean verification containers must not receive source roots or contaminated artifact roots.
 
 ## Implementation Report Content
 

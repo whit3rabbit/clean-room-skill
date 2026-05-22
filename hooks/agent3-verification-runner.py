@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,18 @@ MAX_TIMEOUT_SECONDS = 600
 MAX_OUTPUT_CHARS = 40_000
 IMPLEMENTATION_REF = re.compile(r"^CLEAN_ROOM_IMPLEMENTATION_ROOTS\[([0-9]+)\]$")
 SHELL_TOKEN_RE = re.compile(r"[|&;<>`$]|\$\(|\$\{|\r|\n")
+BACKENDS = {"host", "docker", "podman"}
+CONTAINER_PROFILES = {
+    "node22": "clean-room-skill/node22:local",
+    "python312": "clean-room-skill/python312:local",
+    "go126": "clean-room-skill/go126:local",
+    "rust-stable": "clean-room-skill/rust-stable:local",
+}
+RUN_TYPES = {"verify", "package"}
+NETWORK_POLICIES = {"off", "deps-only", "on"}
+DEPENDENCY_MODES = {"offline", "locked", "allow-new"}
+DEFAULT_CPUS = 2
+DEFAULT_MEMORY_MB = 2048
 SAFE_ENV_NAMES = {
     "CI",
     "HOME",
@@ -51,6 +64,14 @@ ALLOWED_ARGV_PREFIXES = (
     ("go", "test"),
     ("zig", "build", "test"),
 )
+CONTAINER_ENV_NAMES = {
+    "CI",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "NO_COLOR",
+    "TERM",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,6 +79,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--plan", help="Path to clean implementation-plan.json")
     parser.add_argument("--command-index", type=int, help="Zero-based verification command index")
     parser.add_argument("--all", action="store_true", help="Run all verification commands")
+    parser.add_argument("--backend", choices=sorted(BACKENDS), default="host")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     args = parser.parse_args()
     if args.all == (args.command_index is not None):
@@ -110,6 +132,45 @@ def resolve_plan_path(raw_plan: str | None, blocked_roots: list[Path]) -> Path:
     return path
 
 
+def schema_root() -> Path:
+    roots = env_roots("CLEAN_ROOM_SCHEMA_DIR")
+    if not roots:
+        raise ValueError("CLEAN_ROOM_SCHEMA_DIR has no configured roots")
+    return roots[0]
+
+
+def assert_not_blocked_root(root: Path, blocked_roots: list[Path], label: str) -> None:
+    for blocked in blocked_roots:
+        if paths_overlap(root, blocked):
+            raise ValueError(f"{label} overlaps blocked root: {describe_path(root)}")
+
+
+def validate_container_mount_roots(cwd: Path, blocked_roots: list[Path]) -> tuple[list[Path], Path, list[Path]]:
+    clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+    if not clean_roots:
+        raise ValueError("CLEAN_ROOM_CLEAN_ROOTS has no configured roots")
+    refs = env_roots("CLEAN_ROOM_ALLOWED_READ_ROOTS")
+    schemas = schema_root()
+    for index, root in enumerate(clean_roots):
+        assert_not_blocked_root(root, blocked_roots, f"clean root {index}")
+    for index, root in enumerate(refs):
+        assert_not_blocked_root(root, blocked_roots, f"allowed reference root {index}")
+    assert_not_blocked_root(schemas, blocked_roots, "schema root")
+    assert_not_blocked_root(cwd, blocked_roots, "implementation root")
+    return clean_roots, schemas, refs
+
+
+def load_clean_run_context(clean_roots: list[Path], blocked_roots: list[Path]) -> dict[str, Any]:
+    for root in clean_roots:
+        path = (root / "clean-run-context.json").resolve()
+        if any(path_is_under(path, blocked) for blocked in blocked_roots):
+            raise ValueError("clean-run-context path is under a blocked root")
+        if path.is_file():
+            data = load_json(path)
+            return data if isinstance(data, dict) else {}
+    return {}
+
+
 def flatten_verification_commands(plan: dict[str, Any]) -> list[dict[str, Any]]:
     commands: list[dict[str, Any]] = []
     for item in plan.get("verification_strategy", []):
@@ -147,6 +208,55 @@ def command_argv(command: dict[str, Any]) -> list[str]:
             raise ValueError("verification command argv entries must be non-empty strings")
         argv.append(item)
     return argv
+
+
+def optional_string_field(command: dict[str, Any], field: str, allowed: set[str]) -> str | None:
+    value = command.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str) or value not in allowed:
+        raise ValueError(f"verification command {field} is not supported")
+    return value
+
+
+def command_timeout(command: dict[str, Any], fallback: int) -> int:
+    value = command.get("timeout_seconds")
+    if value is None:
+        return fallback
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1 or value > MAX_TIMEOUT_SECONDS:
+        raise ValueError(f"verification command timeout_seconds must be between 1 and {MAX_TIMEOUT_SECONDS}")
+    return value
+
+
+def execution_policy(context: dict[str, Any]) -> dict[str, Any]:
+    policy = context.get("execution_policy")
+    return policy if isinstance(policy, dict) else {}
+
+
+def execution_resource_limits(policy: dict[str, Any]) -> dict[str, Any]:
+    limits = policy.get("resource_limits")
+    return limits if isinstance(limits, dict) else {}
+
+
+def policy_string(policy: dict[str, Any], field: str, allowed: set[str], default: str) -> str:
+    value = policy.get(field, default)
+    if not isinstance(value, str) or value not in allowed:
+        raise ValueError(f"execution_policy.{field} is not supported")
+    return value
+
+
+def policy_positive_number(policy: dict[str, Any], field: str, default: int | float, upper: int) -> int | float:
+    value = policy.get(field, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 1 or value > upper:
+        raise ValueError(f"execution_policy.resource_limits.{field} must be between 1 and {upper}")
+    return value
+
+
+def policy_timeout(limits: dict[str, Any], fallback: int) -> int:
+    value = limits.get("timeout_seconds", fallback)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1 or value > MAX_TIMEOUT_SECONDS:
+        raise ValueError(f"execution_policy.resource_limits.timeout_seconds must be between 1 and {MAX_TIMEOUT_SECONDS}")
+    return value
 
 
 def executable_name(value: str) -> str:
@@ -200,6 +310,119 @@ def sanitized_env(blocked_roots: list[Path]) -> dict[str, str]:
     return env
 
 
+def container_env_values(blocked_roots: list[Path]) -> dict[str, str]:
+    env = {name: os.environ[name] for name in CONTAINER_ENV_NAMES if name in os.environ}
+    for name, value in env.items():
+        if has_blocked_substring(value, blocked_roots):
+            raise ValueError(f"container environment variable {name} references a blocked root")
+    env["CLEAN_ROOM_AGENT3_VERIFY"] = "1"
+    env["HOME"] = "/tmp"
+    env["TMPDIR"] = "/tmp"
+    return env
+
+
+def bind_mount_arg(source: Path, target: str, mode: str) -> str:
+    return f"{source}:{target}:{mode}"
+
+
+def container_command_settings(
+    command: dict[str, Any],
+    context: dict[str, Any],
+    fallback_timeout: int,
+) -> tuple[str, str, str, str, int, float, int]:
+    policy = execution_policy(context)
+    limits = execution_resource_limits(policy)
+    optional_string_field(command, "run_type", RUN_TYPES)
+    profile = command.get("container_profile")
+    if profile is None:
+        profile = policy_string(policy, "preferred_container_profile", set(CONTAINER_PROFILES), "")
+    if not isinstance(profile, str) or profile not in CONTAINER_PROFILES:
+        raise ValueError("verification command container_profile is required for container backend")
+    network = command.get("network")
+    if network is None:
+        network = policy_string(policy, "network_policy", NETWORK_POLICIES, "off")
+    if not isinstance(network, str) or network not in NETWORK_POLICIES:
+        raise ValueError("verification command network is not supported")
+    dependency_mode = command.get("dependency_mode")
+    if dependency_mode is None:
+        dependency_mode = policy_string(policy, "dependency_install_policy", DEPENDENCY_MODES, "offline")
+    if not isinstance(dependency_mode, str) or dependency_mode not in DEPENDENCY_MODES:
+        raise ValueError("verification command dependency_mode is not supported")
+    if network != "off":
+        raise ValueError("container verification currently supports network=off only")
+    if dependency_mode == "allow-new":
+        raise ValueError("container verification currently rejects dependency_mode=allow-new")
+    timeout = command_timeout(command, policy_timeout(limits, fallback_timeout))
+    cpus = policy_positive_number(limits, "cpus", DEFAULT_CPUS, 16)
+    memory_mb = policy_positive_number(limits, "memory_mb", DEFAULT_MEMORY_MB, 65536)
+    if not isinstance(memory_mb, int):
+        raise ValueError("execution_policy.resource_limits.memory_mb must be an integer")
+    return profile, CONTAINER_PROFILES[profile], network, dependency_mode, timeout, cpus, memory_mb
+
+
+def container_executable(backend: str) -> str:
+    resolved = shutil.which(backend)
+    if not resolved:
+        raise ValueError(f"{backend} executable was not found")
+    return resolved
+
+
+def build_container_argv(
+    backend: str,
+    command: dict[str, Any],
+    argv: list[str],
+    cwd: Path,
+    clean_roots: list[Path],
+    schema_dir: Path,
+    refs: list[Path],
+    blocked_roots: list[Path],
+    context: dict[str, Any],
+    fallback_timeout: int,
+) -> tuple[list[str], int]:
+    profile, image, network, _dependency_mode, timeout, cpus, memory_mb = container_command_settings(
+        command,
+        context,
+        fallback_timeout,
+    )
+    validate_container_mount_roots(cwd, blocked_roots)
+    container_argv = [
+        container_executable(backend),
+        "run",
+        "--rm",
+        "--network",
+        network,
+        "--read-only",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--pids-limit",
+        "512",
+        "--memory",
+        f"{memory_mb}m",
+        "--cpus",
+        str(cpus),
+        "--user",
+        "1000:1000",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=512m",
+        "--workdir",
+        "/work",
+        "--volume",
+        bind_mount_arg(cwd, "/work", "rw"),
+    ]
+    for index, root in enumerate(clean_roots):
+        target = "/clean" if index == 0 else f"/clean-{index}"
+        container_argv.extend(["--volume", bind_mount_arg(root, target, "ro")])
+    container_argv.extend(["--volume", bind_mount_arg(schema_dir, "/schemas", "ro")])
+    for index, root in enumerate(refs):
+        container_argv.extend(["--volume", bind_mount_arg(root, f"/refs/{index}", "ro")])
+    for name, value in container_env_values(blocked_roots).items():
+        container_argv.extend(["--env", f"{name}={value}"])
+    container_argv.extend(["--label", f"clean-room.container-profile={profile}", image, *argv])
+    return container_argv, timeout
+
+
 def print_bounded(label: str, text: str) -> None:
     if not text:
         return
@@ -209,21 +432,46 @@ def print_bounded(label: str, text: str) -> None:
     print(text, end="" if text.endswith("\n") else "\n", file=stream)
 
 
-def run_command(command: dict[str, Any], implementation_roots: list[Path], blocked_roots: list[Path], timeout: int) -> int:
+def run_command(
+    command: dict[str, Any],
+    implementation_roots: list[Path],
+    blocked_roots: list[Path],
+    backend: str,
+    timeout: int,
+    context: dict[str, Any],
+) -> int:
     cwd = command_cwd(command, implementation_roots)
     argv = command_argv(command)
     if not allowed_prefix(argv):
         raise ValueError("verification command is not in the allowlist")
     validate_arg_paths(argv, cwd, blocked_roots)
+    effective_timeout = command_timeout(command, timeout)
+    run_argv = argv
+    run_cwd = cwd
+    if backend != "host":
+        clean_roots, schemas, refs = validate_container_mount_roots(cwd, blocked_roots)
+        run_argv, effective_timeout = build_container_argv(
+            backend,
+            command,
+            argv,
+            cwd,
+            clean_roots,
+            schemas,
+            refs,
+            blocked_roots,
+            context,
+            timeout,
+        )
+        run_cwd = Path.cwd().resolve()
     result = subprocess.run(
-        argv,
-        cwd=str(cwd),
+        run_argv,
+        cwd=str(run_cwd),
         env=sanitized_env(blocked_roots),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        timeout=timeout,
+        timeout=effective_timeout,
         shell=False,
         check=False,
     )
@@ -244,6 +492,8 @@ def main() -> int:
         if not commands:
             return fail("implementation plan has no verification commands")
         selected = commands if args.all else [commands[args.command_index]]
+        clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+        context = load_clean_run_context(clean_roots, blocked_roots) if args.backend != "host" else {}
     except IndexError:
         return fail("verification command index is out of range")
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -252,7 +502,7 @@ def main() -> int:
     status = 0
     for command in selected:
         try:
-            status |= run_command(command, implementation_roots, blocked_roots, args.timeout)
+            status |= run_command(command, implementation_roots, blocked_roots, args.backend, args.timeout, context)
         except subprocess.TimeoutExpired:
             return fail("verification command timed out")
         except (OSError, ValueError) as exc:

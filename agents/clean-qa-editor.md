@@ -12,7 +12,7 @@ Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMP
 
 Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-qa-editor`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, and `CLEAN_ROOM_SCHEMA_DIR`. Treat missing environment as a stop condition.
 
-This default profile has no shell-style tools. If terminal verification is required, use an isolated verification home where strict hooks are installed, `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` is intentional, and the only allowed terminal command invokes the installed `agent3-verification-runner.py`.
+This default profile has no shell-style tools. If terminal verification is required, use an isolated verification home where strict hooks are installed, `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` is intentional, and the only allowed terminal command invokes the installed `agent3-verification-runner.py`. Docker or Podman verification is allowed only through that runner with clean-safe mounts.
 
 ## Required Handoff Inputs
 
@@ -34,7 +34,7 @@ Responsibilities:
 - Enforce the code hygiene policy and record violations as `code-hygiene` findings in `qc-report.json`.
 - Follow destination project conventions discovered from clean implementation files; do not import source-derived structure, names, comments, or pseudocode.
 - Add or update tests required by the implementation plan.
-- Record planned verification commands as argv arrays. Run them only through the installed Agent 3 verification runner.
+- Record planned verification commands as argv arrays. Run them only through the installed Agent 3 verification runner. When container metadata is present, use only `network: "off"` and `dependency_mode: "offline"` or `"locked"` unless a later policy explicitly expands this.
 - In unattended inner-loop mode, execute only work items that belong to the selected spec slice and current clean-room unit.
 - If the plan expands beyond that slice or cannot complete in one fresh clean implementation context, mark the unit blocked with `spec-delta-required` or `split-required`.
 - Loop over selected-slice work items until they are complete, blocked, or quarantined.

@@ -5,13 +5,21 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { afterEach, describe, test } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { spawnSync: nodeSpawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const INSTALL = path.join(ROOT, 'bin', 'install.js');
 const TASK_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'task-manifest.json');
 const PREFLIGHT_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json');
+const TEST_TIMEOUT_MS = 30_000;
 const TMP_DIRS = [];
+
+function spawnSync(command, args, options) {
+  if (!Array.isArray(args)) {
+    return nodeSpawnSync(command, { timeout: TEST_TIMEOUT_MS, ...(args || {}) });
+  }
+  return nodeSpawnSync(command, args, { timeout: TEST_TIMEOUT_MS, ...(options || {}) });
+}
 
 function tempDir(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `${name}-`));
@@ -229,6 +237,60 @@ fs.writeFileSync(path.join(clean, 'qc-report.json'), JSON.stringify({
   return script;
 }
 
+function writeQcReport(clean, reviewedAt) {
+  writeJson(path.join(clean, 'qc-report.json'), {
+    report_id: 'qc-timestamp',
+    reviewer_role: 'clean-qa-editor',
+    reviewed_at: reviewedAt,
+    reviewed_artifacts: ['implementation-report.json'],
+    artifact_hashes: [],
+    schema_validator_version: 'test',
+    schema_status: 'passed',
+    leakage_status: 'passed',
+    leakage_scan_summary: 'No blocked markers in test.',
+    coverage_status: 'partial',
+    required_rerun: true,
+    contamination_incidents: [],
+    findings: [],
+    abstract_delta_tickets: [],
+    final_status: 'passed-with-gaps',
+  });
+}
+
+function writeTimestampOnlyQcScript(root) {
+  const script = path.join(root, 'timestamp-only-qc.js');
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+const path = require('node:path');
+const clean = process.env.CLEAN_ROOM_CLEAN_ROOTS.split(path.delimiter)[0];
+const qcPath = path.join(clean, 'qc-report.json');
+const qc = JSON.parse(fs.readFileSync(qcPath, 'utf8'));
+qc.reviewed_at = '2025-01-01T00:00:00Z';
+fs.writeFileSync(qcPath, JSON.stringify(qc, null, 2) + '\\n');
+`);
+  return script;
+}
+
+function writeImplementationChangeScript(root) {
+  const script = path.join(root, 'write-implementation.js');
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+const path = require('node:path');
+const implementation = process.env.CLEAN_ROOM_IMPLEMENTATION_ROOTS.split(path.delimiter)[0];
+fs.writeFileSync(path.join(implementation, 'generated.txt'), 'implemented\\n');
+`);
+  return script;
+}
+
+function writeLock(lockPath, pid, createdAt) {
+  fs.mkdirSync(lockPath, { recursive: true });
+  fs.writeFileSync(path.join(lockPath, 'owner.json'), `${JSON.stringify({
+    pid,
+    created_at: createdAt.toISOString(),
+  }, null, 2)}\n`);
+  fs.utimesSync(lockPath, createdAt, createdAt);
+}
+
 describe('clean-room run command', () => {
   test('dry-run validates nested loop context and selects one unit without writes', () => {
     const workspace = baseWorkspace('clean-room-run-dry');
@@ -305,6 +367,46 @@ describe('clean-room run command', () => {
     assert.match(result.stderr, /must include contaminated-coverage-verify/);
   });
 
+  test('validates task manifest schema before deriving roots', () => {
+    const workspace = baseWorkspace('clean-room-run-manifest-schema-first');
+    const manifest = readJson(workspace.manifestPath);
+    manifest.artifact_paths.implementation_roots = workspace.implementation;
+    writeJson(workspace.manifestPath, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /schema check failed/);
+  });
+
+  test('rejects phase cwd and source-root argv boundaries', () => {
+    const workspace = baseWorkspace('clean-room-run-command-boundaries');
+    let config = commandConfig(path.join(workspace.root, 'commands-bad-cwd.json'), [
+      noOpStage('clean-plan', 'clean-architect', workspace.source),
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+    ]);
+
+    let result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config, '--once']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /cwd must not be under source roots/);
+
+    const sourceTool = path.join(workspace.source, 'tool.js');
+    fs.writeFileSync(sourceTool, 'process.exit(0)\n');
+    config = commandConfig(path.join(workspace.root, 'commands-bad-argv.json'), [
+      {
+        phase: 'clean-plan',
+        role: 'clean-architect',
+        cwd: workspace.clean,
+        argv: [sourceTool],
+      },
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+    ]);
+
+    result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config, '--once']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /argv\[0\] must not resolve under source roots/);
+  });
+
   test('inner loop cannot select units outside approved scope refs', () => {
     const workspace = baseWorkspace('clean-room-run-scope');
     const manifest = readJson(workspace.manifestPath);
@@ -333,6 +435,101 @@ describe('clean-room run command', () => {
     assert.equal(ledger.iterations[0].stop_reason, 'no-progress-detected');
   });
 
+  test('run lock recovers stale locks and preserves fresh locks', () => {
+    const staleWorkspace = baseWorkspace('clean-room-run-stale-lock');
+    const staleLock = path.join(staleWorkspace.contaminated, '.clean-room-run.lock');
+    writeLock(staleLock, 2147483647, new Date(Date.now() - 120_000));
+    let config = commandConfig(path.join(staleWorkspace.root, 'commands.json'), [
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', staleWorkspace.root),
+    ]);
+
+    let result = runCli(['run', '--task-manifest', staleWorkspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      fs.readdirSync(staleWorkspace.contaminated).some((name) => name.startsWith('.clean-room-run.lock.stale.')),
+      true
+    );
+
+    const freshWorkspace = baseWorkspace('clean-room-run-fresh-lock');
+    const freshLock = path.join(freshWorkspace.contaminated, '.clean-room-run.lock');
+    writeLock(freshLock, process.pid, new Date());
+    config = commandConfig(path.join(freshWorkspace.root, 'commands.json'), [
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', freshWorkspace.root),
+    ]);
+
+    result = runCli([
+      'run',
+      '--task-manifest',
+      freshWorkspace.manifestPath,
+      '--agent-commands',
+      config,
+    ], ROOT, {
+      CLEAN_ROOM_RUN_LOCK_WAIT_MS: '50',
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room run lock is held/);
+    assert.equal(fs.existsSync(freshLock), true);
+  });
+
+  test('timestamp-only artifact changes do not count as progress', () => {
+    const workspace = baseWorkspace('clean-room-run-timestamp-only');
+    writeQcReport(workspace.clean, '2024-01-01T00:00:00Z');
+    const script = writeTimestampOnlyQcScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      coverageStage(workspace.contaminated, script),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations[0].progress_detected, false);
+    assert.equal(ledger.iterations[0].stop_reason, 'no-progress-detected');
+  });
+
+  test('implementation-root changes count as progress', () => {
+    const workspace = baseWorkspace('clean-room-run-implementation-progress');
+    const script = writeImplementationChangeScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      coverageStage(workspace.root, script),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config, '--once']);
+
+    assert.equal(result.status, 0, result.stderr);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations[0].progress_detected, true);
+    assert.equal(fs.readFileSync(path.join(workspace.implementation, 'generated.txt'), 'utf8'), 'implemented\n');
+    const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
+    assert.equal(runResult.result, 'iteration-limit-reached');
+  });
+
+  test('between stages validates only changed artifacts', () => {
+    const workspace = baseWorkspace('clean-room-run-touched-validation');
+    const capturePath = path.join(workspace.root, 'hook-env.jsonl');
+    const hookShim = writeHookCaptureShim(workspace.root, capturePath);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      noOpStage('contaminated-analysis', 'contaminated-source-analyst', workspace.root),
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.root),
+    ]);
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--agent-commands',
+      config,
+      '--python',
+      hookShim,
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const captures = readJsonLines(capturePath);
+    assert.ok(captures.length < 27);
+  });
+
   test('passes only allowlisted parent and hook-only env to validation hooks', () => {
     const workspace = baseWorkspace('clean-room-run-hook-env');
     const capturePath = path.join(workspace.root, 'hook-env.jsonl');
@@ -354,7 +551,7 @@ describe('clean-room run command', () => {
     });
 
     assert.equal(result.status, 0, result.stderr);
-    const captures = readJsonLines(capturePath);
+    const captures = readJsonLines(capturePath).filter((item) => item.env.CLEAN_ROOM_ROLE);
     assert.ok(captures.length > 0);
     for (const item of captures) {
       assert.equal(item.env.SECRET_TOKEN, undefined);

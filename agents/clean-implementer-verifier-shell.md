@@ -12,7 +12,7 @@ Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMP
 
 Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-qa-editor`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`. Treat missing environment as a stop condition.
 
-Use `Bash` only for bounded verification commands from `implementation-plan.json`, through the installed `agent3-verification-runner.py`, with the command working directory inside `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Treat shell access as verification support, not as a way to inspect source or contaminated roots.
+Use `Bash` only for bounded verification commands from `implementation-plan.json`, through the installed `agent3-verification-runner.py`, with the command working directory inside `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Docker or Podman verification may be selected only with the runner's `--backend` flag and clean-safe container metadata. Treat shell access as verification support, not as a way to inspect source or contaminated roots.
 
 Responsibilities:
 

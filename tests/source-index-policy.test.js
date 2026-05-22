@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { describe, test } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { spawnSync: nodeSpawnSync } = require('node:child_process');
 const {
   AGENT3_RUNNER,
   assertNoPrivateLeak,
@@ -25,6 +25,15 @@ const {
   writeImplementationPlan,
   writeProbeTool,
 } = require('./helpers/hook-policy.cjs');
+
+const TEST_TIMEOUT_MS = 30_000;
+
+function spawnSync(command, args, options) {
+  if (!Array.isArray(args)) {
+    return nodeSpawnSync(command, { timeout: TEST_TIMEOUT_MS, ...(args || {}) });
+  }
+  return nodeSpawnSync(command, args, { timeout: TEST_TIMEOUT_MS, ...(options || {}) });
+}
 
 describe('clean-room source-index policy', () => {
   test('source-index builder refuses output outside contaminated artifact roots', () => {

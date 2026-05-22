@@ -119,6 +119,18 @@
     "clean_agents_start_cwd": "clean_root",
     "source_mounted": false
   },
+  "execution_policy": {
+    "backend": "host",
+    "preferred_container_profile": "node22",
+    "network_policy": "off",
+    "dependency_install_policy": "locked",
+    "allow_native_toolchain": false,
+    "resource_limits": {
+      "cpus": 2,
+      "memory_mb": 2048,
+      "timeout_seconds": 300
+    }
+  },
   "model_preferences": {
     "default_model": "runtime-default",
     "domain_overrides": {

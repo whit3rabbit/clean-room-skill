@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { describe, test } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { spawnSync: nodeSpawnSync } = require('node:child_process');
 const {
   applyInstall,
   applyUninstall,
@@ -31,6 +31,15 @@ const {
   runInstall,
   tempDir,
 } = require('./helpers/install.cjs');
+
+const TEST_TIMEOUT_MS = 30_000;
+
+function spawnSync(command, args, options) {
+  if (!Array.isArray(args)) {
+    return nodeSpawnSync(command, { timeout: TEST_TIMEOUT_MS, ...(args || {}) });
+  }
+  return nodeSpawnSync(command, args, { timeout: TEST_TIMEOUT_MS, ...(options || {}) });
+}
 
 function managedHookCommands(value) {
   const table = hookTable(value);
@@ -100,6 +109,15 @@ fs.renameSync = function renameSyncWithInjectedFailure(source, destination) {
 };
 `);
   return preload;
+}
+
+function writeLock(lockPath, pid, createdAt) {
+  fs.mkdirSync(lockPath, { recursive: true });
+  fs.writeFileSync(path.join(lockPath, 'owner.json'), `${JSON.stringify({
+    pid,
+    created_at: createdAt.toISOString(),
+  }, null, 2)}\n`);
+  fs.utimesSync(lockPath, createdAt, createdAt);
 }
 
 describe('clean-room-skill installer', () => {
@@ -619,6 +637,33 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(geminiHome), false);
   });
 
+  test('install lock recovers stale locks and preserves fresh locks', () => {
+    const staleHome = tempDir('clean-room-install-stale-lock');
+    const staleLock = path.join(staleHome, '.clean-room-install.lock');
+    writeLock(staleLock, 2147483647, new Date(Date.now() - 120_000));
+
+    let result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: staleHome });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      fs.readdirSync(staleHome).some((name) => name.startsWith('.clean-room-install.lock.stale.')),
+      true
+    );
+
+    const freshHome = tempDir('clean-room-install-fresh-lock');
+    const freshLock = path.join(freshHome, '.clean-room-install.lock');
+    writeLock(freshLock, process.pid, new Date());
+
+    result = runInstall(['--codex', '--global', '--yes'], {
+      CODEX_HOME: freshHome,
+      CLEAN_ROOM_INSTALL_LOCK_WAIT_MS: '50',
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /install lock is held/);
+    assert.equal(fs.existsSync(freshLock), true);
+  });
+
   test('installed safe hooks warn, no-op without env, and fail closed when enforced', () => {
     const codexHome = tempDir('clean-room-installed-safe-hook');
     const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
@@ -672,12 +717,45 @@ describe('clean-room-skill installer', () => {
     result = runInstall(['doctor', '--runtime', 'codex', '--hooks=safe', '--config-dir', codexHome]);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /clean-room doctor passed for codex/);
+    result = runInstall(['doctor', '--runtime', 'codex', '--hooks=safe', '--coverage', '--config-dir', codexHome]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /clean-room hook coverage:/);
+    assert.match(result.stdout, /unsupported surfaces:/);
 
     result = runInstall(['--claude', '--global', '--hooks=strict', '--yes'], { CLAUDE_CONFIG_DIR: claudeHome });
     assert.equal(result.status, 0, result.stderr);
     result = runInstall(['doctor', '--runtime=claude', '--hooks=strict', '--config-dir', claudeHome]);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /clean-room doctor passed for claude/);
+  });
+
+  test('doctor rejects managed hook commands with shell suffixes', () => {
+    const codexHome = tempDir('clean-room-doctor-shell-suffix');
+    let result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
+    assert.equal(result.status, 0, result.stderr);
+
+    const configPath = path.join(codexHome, 'hooks.json');
+    const config = readJson(configPath);
+    let changed = false;
+    for (const entries of Object.values(hookTable(config))) {
+      if (changed || !Array.isArray(entries)) continue;
+      for (const entry of entries) {
+        if (changed) break;
+        for (const hook of entry.hooks || []) {
+          if (typeof hook.command === 'string' && hook.command.includes('clean-room-hook.py')) {
+            hook.command = `${hook.command} ; echo bypass`;
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+    assert.equal(changed, true);
+    fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+    result = runInstall(['doctor', '--runtime', 'codex', '--hooks=safe', '--config-dir', codexHome]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unexpected arguments|invalid check name/);
   });
 
   test('doctor includes spawn diagnostics when a hook command fails', () => {

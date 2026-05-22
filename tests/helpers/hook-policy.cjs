@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { afterEach } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { spawnSync: nodeSpawnSync } = require('node:child_process');
 const crypto = require('node:crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -16,7 +16,15 @@ const SCHEMA_DIR = path.join(ROOT, 'skills', 'clean-room', 'assets');
 const SOURCE_INDEX = path.join(ROOT, 'skills', 'clean-room', 'scripts', 'build_source_index.py');
 const TOOL_MANAGER = path.join(ROOT, 'skills', 'clean-room', 'scripts', 'clean_room_tool_manager.py');
 const AGENT3_RUNNER = path.join(HOOKS, 'agent3-verification-runner.py');
+const TEST_TIMEOUT_MS = 30_000;
 const TMP_DIRS = [];
+
+function spawnSync(command, args, options) {
+  if (!Array.isArray(args)) {
+    return nodeSpawnSync(command, { timeout: TEST_TIMEOUT_MS, ...(args || {}) });
+  }
+  return nodeSpawnSync(command, args, { timeout: TEST_TIMEOUT_MS, ...(options || {}) });
+}
 
 function tempDir(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `${name}-`));
@@ -129,7 +137,7 @@ function writeProbeTool(dir, name) {
   return { toolPath, marker };
 }
 
-function writeImplementationPlan(cleanRoot, command) {
+function writeImplementationPlan(cleanRoot, command, commandExtra = {}) {
   const planPath = path.join(cleanRoot, 'implementation-plan.json');
   fs.writeFileSync(planPath, JSON.stringify({
     plan_id: 'plan-test',
@@ -143,6 +151,7 @@ function writeImplementationPlan(cleanRoot, command) {
         command,
         cwd: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
         purpose: 'test',
+        ...commandExtra,
       },
     ],
     implementation_forbidden_material: ['source_excerpt'],

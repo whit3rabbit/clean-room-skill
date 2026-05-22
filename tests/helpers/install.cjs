@@ -5,12 +5,20 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { afterEach } = require('node:test');
-const { spawnSync } = require('node:child_process');
+const { spawnSync: nodeSpawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const INSTALL = path.join(ROOT, 'bin', 'install.js');
 const HOOK = path.join(ROOT, 'hooks', 'clean-room-hook.py');
+const TEST_TIMEOUT_MS = 30_000;
 const TMP_DIRS = [];
+
+function spawnSync(command, args, options) {
+  if (!Array.isArray(args)) {
+    return nodeSpawnSync(command, { timeout: TEST_TIMEOUT_MS, ...(args || {}) });
+  }
+  return nodeSpawnSync(command, args, { timeout: TEST_TIMEOUT_MS, ...(options || {}) });
+}
 
 function tempDir(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `${name}-`));
