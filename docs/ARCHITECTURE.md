@@ -19,8 +19,8 @@ The Clean Room workflow acts as an engineering risk-reduction process by establi
 To maintain compliance and mitigate leakage risks, the workflow utilizes strictly separated workspaces, worktrees, repositories, or profiles for contaminated and clean work:
 
 *   **Contaminated Source Workspace**: Source-readable, read-only where practical. Contains the codebase under analysis.
-*   **Contaminated Artifact Workspace**: Holds intermediate outputs like preflight goals, init configs, source indexes, task manifests, coverage ledgers, evidence ledgers, draft specs, and abstract delta tickets. Configure via `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
-*   **Clean Artifact Workspace**: Houses sanitized clean run contexts, approved behavioral specifications, handoff packages, skeleton manifests, implementation plans, implementation reports, QC reports, and test plans. Configure via `CLEAN_ROOM_CLEAN_ROOTS`.
+*   **Contaminated Artifact Workspace**: Holds intermediate outputs like preflight goals, init configs, source indexes, task manifests, controller status, coverage ledgers, evidence ledgers, draft specs, contaminated-role session briefs, and abstract delta tickets. Configure via `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+*   **Clean Artifact Workspace**: Houses sanitized clean run contexts, approved behavioral specifications, handoff packages, clean-role session briefs, skeleton manifests, implementation plans, implementation reports, QC reports, and test plans. Configure via `CLEAN_ROOM_CLEAN_ROOTS`.
 *   **Clean Implementation Workspace**: Houses clean destination code and tests. Configure via `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 *   **Clean Allowed Reference Workspace**: Public documentation, specifications, or destination constraints explicitly approved for clean and source-denied role reads. Configure via `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
 
@@ -254,6 +254,8 @@ Every clean-room role session requires a populated environment block before any 
 *   `CLEAN_ROOM_IMPLEMENTATION_ROOTS`: Target write directory for Agent 3 clean implementation code and tests.
 *   `CLEAN_ROOM_ALLOWED_READ_ROOTS`: Approved reference docs or constraints readable by clean and source-denied roles.
 *   `CLEAN_ROOM_SCHEMA_DIR`: Path to the directory containing JSON schema assets.
+
+When context management is enabled, role sessions also receive `CLEAN_ROOM_SESSION_BRIEF_PATH`, `CLEAN_ROOM_ROLE_SESSION_ID`, and, in strict mode, `CLEAN_ROOM_FRESH_CONTEXT_REQUIRED=1`. The brief is the low-context launch packet: compact status, next action, allowed artifact refs with SHA-256, and forbidden inputs. `controller-status.json` stays contaminated-side and is not clean input.
 
 Note: Even though clean and source-denied roles (such as Agent 1.5, 2, and 3) are restricted from accessing contaminated or source workspaces, they must still be configured with the full environment block. The hook guardrails require these paths to validate that tool inputs do not cross-pollinate or violate boundary constraints.
 

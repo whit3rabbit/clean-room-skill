@@ -1,0 +1,14 @@
+{
+  "schema_kind": "controller-status",
+  "base": "controller-status.json",
+  "description": "Controller status must be updated by Agent 0.",
+  "set": [
+    {
+      "path": [
+        "updated_by_role"
+      ],
+      "value": "clean-architect"
+    }
+  ],
+  "expected_error": "contaminated-manager-verifier"
+}

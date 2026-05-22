@@ -18,6 +18,7 @@ This default profile has no shell-style tools. If terminal verification is requi
 
 Before editing code, verify:
 
+- `CLEAN_ROOM_SESSION_BRIEF_PATH`, when context management is enabled.
 - `clean-run-context.json` is present and valid.
 - `implementation-plan.json` is present and valid.
 - both artifacts carry the preflight-derived `code_hygiene_policy`.
@@ -28,6 +29,7 @@ Stop if asked to infer product goals from source, full `task-manifest.json`, ful
 Responsibilities:
 
 - Validate clean artifacts against the schema assets.
+- When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the allowed artifact refs named there, plus implementation-root files permitted by this role. Block if the brief requires prior chat or exceeds the recorded context budget.
 - Validate `clean-run-context.json` before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
 - Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
 - Read `implementation-plan.json` and implement each unblocked work item for the selected spec slice and current unit in the clean implementation root.

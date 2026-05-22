@@ -64,6 +64,8 @@ Agent 2 cannot start until Agent 1.5 writes a passed handoff package, approved b
 
 Agent 3 cannot start until Agent 2 writes `implementation-plan.json` with relative paths, argv-array verification commands, target stack, and code hygiene policy from preflight.
 
+When `context_management.enforcement` is `strict`, no role can start until Agent 0 writes a valid `role-session-brief.json` for that role, phase, unit, and spec slice. The brief must fit the recorded budgets and must not contain prior chat, copied artifact bodies, source paths, or contaminated ledgers.
+
 ## Recovery
 
 `resume` and `refocus` must stop when new-run artifacts lack `preflight_goal_ref`, `preflight_goal_sha256`, or a complete `handoff_sequence`. Report this as legacy or incomplete preflight state; do not infer intent from prior chat or source.

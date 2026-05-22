@@ -37,7 +37,9 @@ The inner loop owns one approved spec slice:
 
 - Reload durable artifacts each iteration.
 - Validate the trust boundary and schemas.
+- Refresh contaminated-side controller status when needed.
 - Select at most one pending or gap unit inside the approved slice.
+- Create one low-context role session brief for each role launch when context management is enabled.
 - Run contaminated analysis.
 - Run source-denied handoff sanitization.
 - Run clean planning.
@@ -92,6 +94,8 @@ Expected durable artifacts include:
 - `clean-room-result.json`
 
 The runner records controller state in contaminated-side `controller-run-ledger.json`. That ledger is controller memory, not clean input.
+
+`controller-status.json` is compact Agent 0 resume state, not workflow progress by itself. Status-only updates must not keep an unattended loop alive. `role-session-brief.json` is the launch packet for one fresh role context; it should contain refs and hashes, not copied artifact contents.
 
 ## Unit Sizing
 

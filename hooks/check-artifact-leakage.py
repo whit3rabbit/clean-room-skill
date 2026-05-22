@@ -85,6 +85,8 @@ DENYLIST_ONLY_JSON_STRING_KEYS = {
     "reviewed_artifacts",
     "root_id",
     "scenario_id",
+    "session_brief_ref",
+    "spec_slice_ref",
     "sha256",
     "source_hash",
     "source_index_ref",
@@ -101,6 +103,9 @@ DENYLIST_ONLY_JSON_STRING_KEYS = {
     "work_item_id",
     "work_item_ids",
     "workspace_id",
+    "brief_id",
+    "role_session_id",
+    "status_id",
 }
 SCAN_LIGHT_JSON_STRING_KEYS = {
     "action",

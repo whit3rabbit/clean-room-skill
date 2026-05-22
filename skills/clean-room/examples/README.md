@@ -6,6 +6,8 @@ The `minimal-spec-package` directory contains clean-side artifact shapes only. I
 
 The `contaminated-side` directory contains controller and contaminated-side artifact shapes. Do not copy it into a clean workspace.
 
+`role-session-brief.json` is a compact launch packet for one fresh role context. `controller-status.json` is Agent 0 contaminated-side resume state and must not be copied into a clean workspace.
+
 The `valid-handoff-package` directory is the positive handoff-integrity fixture. It references an existing clean artifact with its real SHA-256 checksum.
 
 The minimal `task-manifest.json` uses `speckit-feature-folder` as a non-normative example. Real tasks must record the user's actual `format_selection.target_profile` from OpenSpec, GSD, Spec Kit, or Kiro before agents start work.
@@ -19,6 +21,7 @@ Use them to seed tests, docs, or dry runs:
 - `minimal-spec-package/clean-run-context.json`
 - `minimal-spec-package/behavior-spec.json`
 - `minimal-spec-package/handoff-package.json`
+- `minimal-spec-package/role-session-brief.json`
 - `minimal-spec-package/skeleton-manifest.json`
 - `minimal-spec-package/implementation-plan.json`
 - `minimal-spec-package/implementation-report.json`
@@ -31,5 +34,6 @@ Use them to seed tests, docs, or dry runs:
 - `contaminated-side/source-index.json`
 - `contaminated-side/evidence-ledger.json`
 - `contaminated-side/coverage-ledger.json`
+- `contaminated-side/controller-status.json`
 - `valid-handoff-package/behavior-spec.json`
 - `valid-handoff-package/handoff-package.json`

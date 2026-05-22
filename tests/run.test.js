@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -46,6 +47,10 @@ function readJson(filePath) {
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function fileSha256(filePath) {
+  return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
 function runCli(args, cwd = ROOT, env = {}) {
@@ -205,6 +210,47 @@ fs.writeFileSync(${JSON.stringify(capturePath)}, JSON.stringify(process.env, nul
   return script;
 }
 
+function enableStrictContext(workspace, budgets = {}) {
+  const manifest = readJson(workspace.manifestPath);
+  manifest.context_management = {
+    mode: 'role-session-briefs',
+    enforcement: 'strict',
+    fresh_context_required: true,
+    budgets: {
+      max_prompt_chars: 1200,
+      max_brief_chars: 4000,
+      max_artifact_refs: 8,
+      max_referenced_artifact_bytes: 20000,
+      ...budgets,
+    },
+  };
+  writeJson(workspace.manifestPath, manifest);
+}
+
+function writeRoleSessionBrief(workspace, filePath, role, phase, overrides = {}) {
+  writeJson(filePath, {
+    brief_id: `brief-${phase}`,
+    task_id: 'task-example',
+    created_at: '2024-01-01T00:00:00Z',
+    role,
+    phase,
+    unit_id: 'unit-example-flow',
+    spec_slice_ref: 'behavior-spec:unit-example-flow',
+    fresh_context_required: true,
+    compact_status: 'Run the configured test stage from durable artifacts.',
+    next_action: 'Execute the configured stage and write only permitted artifacts.',
+    allowed_artifacts: [],
+    forbidden_inputs: [
+      'prior chat history',
+      'source-index.json',
+      'task-manifest.json',
+    ],
+    blockers: [],
+    ...overrides,
+  });
+  return filePath;
+}
+
 function writeDeltaScript(root) {
   const script = path.join(root, 'write-delta.js');
   fs.writeFileSync(script, `
@@ -278,6 +324,31 @@ const fs = require('node:fs');
 const path = require('node:path');
 const implementation = process.env.CLEAN_ROOM_IMPLEMENTATION_ROOTS.split(path.delimiter)[0];
 fs.writeFileSync(path.join(implementation, 'generated.txt'), 'implemented\\n');
+`);
+  return script;
+}
+
+function writeControllerStatusScript(root) {
+  const script = path.join(root, 'write-controller-status.js');
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+const path = require('node:path');
+const contaminated = process.env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.split(path.delimiter)[0];
+fs.writeFileSync(path.join(contaminated, 'controller-status.json'), JSON.stringify({
+  status_id: 'status-test',
+  task_id: 'task-example',
+  updated_at: '2024-01-01T00:00:00Z',
+  updated_by_role: 'contaminated-manager-verifier',
+  current_gate: 'contaminated-coverage-verify',
+  selected_unit_id: 'unit-example-flow',
+  spec_slice_ref: 'behavior-spec:unit-example-flow',
+  coverage_state: 'partial',
+  implementation_state: 'not-started',
+  qc_state: 'not-run',
+  blockers: [],
+  latest_artifact_refs: [],
+  next_safe_action: 'Create the next role-session brief.'
+}, null, 2) + '\\n');
 `);
   return script;
 }
@@ -597,6 +668,200 @@ describe('clean-room run command', () => {
     assert.equal(env.CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST, undefined);
     assert.equal(env.CLEAN_ROOM_ROLE, 'contaminated-manager-verifier');
     assert.equal(env.CLEAN_ROOM_SELECTED_UNIT_ID, 'unit-example-flow');
+  });
+
+  test('strict context management requires fresh role-session briefs', () => {
+    const workspace = baseWorkspace('clean-room-run-strict-context-required');
+    enableStrictContext(workspace);
+    let config = commandConfig(path.join(workspace.root, 'commands-missing-context.json'), [
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+    ]);
+
+    let result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /must provide context/);
+
+    config = commandConfig(path.join(workspace.root, 'commands-missing-brief.json'), [
+      {
+        ...noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+        context: {
+          fresh_session: true,
+          brief_path: path.join(workspace.contaminated, 'missing-role-session-brief.json'),
+        },
+      },
+    ]);
+
+    result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /role-session brief not found/);
+  });
+
+  test('strict context management rejects mismatched and over-budget briefs', () => {
+    const workspace = baseWorkspace('clean-room-run-strict-context-invalid');
+    enableStrictContext(workspace, { max_brief_chars: 2000 });
+    const briefPath = writeRoleSessionBrief(
+      workspace,
+      path.join(workspace.contaminated, 'role-session-brief.json'),
+      'clean-architect',
+      'contaminated-coverage-verify'
+    );
+    let config = commandConfig(path.join(workspace.root, 'commands-wrong-role.json'), [
+      {
+        ...noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+        context: {
+          fresh_session: true,
+          brief_path: briefPath,
+        },
+      },
+    ]);
+
+    let result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /brief role does not match/);
+
+    enableStrictContext(workspace, { max_brief_chars: 80 });
+    writeRoleSessionBrief(
+      workspace,
+      briefPath,
+      'contaminated-manager-verifier',
+      'contaminated-coverage-verify'
+    );
+    config = commandConfig(path.join(workspace.root, 'commands-over-budget.json'), [
+      {
+        ...noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+        context: {
+          fresh_session: true,
+          brief_path: briefPath,
+        },
+      },
+    ]);
+
+    result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /exceeds max_brief_chars/);
+  });
+
+  test('strict context management rejects brief paths outside role artifact roots', () => {
+    const workspace = baseWorkspace('clean-room-run-strict-context-brief-root');
+    enableStrictContext(workspace);
+    const briefPath = writeRoleSessionBrief(
+      workspace,
+      path.join(workspace.root, 'role-session-brief.json'),
+      'contaminated-manager-verifier',
+      'contaminated-coverage-verify'
+    );
+    const config = commandConfig(path.join(workspace.root, 'commands-bad-brief-root.json'), [
+      {
+        ...noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+        context: {
+          fresh_session: true,
+          brief_path: briefPath,
+        },
+      },
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /context\.brief_path/);
+  });
+
+  test('strict context management rejects source-denied briefs with blocked artifacts', () => {
+    const workspace = baseWorkspace('clean-room-run-strict-context-source-denied');
+    enableStrictContext(workspace);
+    const briefPath = writeRoleSessionBrief(
+      workspace,
+      path.join(workspace.contaminated, 'sanitize-role-session-brief.json'),
+      'contaminated-handoff-sanitizer',
+      'sanitize-handoff',
+      {
+        allowed_artifacts: [
+          {
+            artifact_id: 'source-index',
+            artifact_type: 'other',
+            path: 'source-index.json',
+            sha256: '0000000000000000000000000000000000000000000000000000000000000000',
+          },
+        ],
+      }
+    );
+    const coverageBriefPath = writeRoleSessionBrief(
+      workspace,
+      path.join(workspace.contaminated, 'coverage-role-session-brief.json'),
+      'contaminated-manager-verifier',
+      'contaminated-coverage-verify'
+    );
+    const config = commandConfig(path.join(workspace.root, 'commands-source-denied.json'), [
+      {
+        ...noOpStage('sanitize-handoff', 'contaminated-handoff-sanitizer', workspace.contaminated),
+        context: {
+          fresh_session: true,
+          brief_path: briefPath,
+        },
+      },
+      {
+        ...noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+        context: {
+          fresh_session: true,
+          brief_path: coverageBriefPath,
+        },
+      },
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /forbidden for source-denied phase/);
+  });
+
+  test('strict context management exports brief env and records brief hashes only', () => {
+    const workspace = baseWorkspace('clean-room-run-strict-context-env');
+    enableStrictContext(workspace);
+    const capturePath = path.join(workspace.root, 'stage-env.json');
+    const stageScript = writeStageEnvCaptureScript(workspace.root, capturePath);
+    const briefPath = writeRoleSessionBrief(
+      workspace,
+      path.join(workspace.contaminated, 'role-session-brief.json'),
+      'contaminated-manager-verifier',
+      'contaminated-coverage-verify'
+    );
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      {
+        ...coverageStage(workspace.contaminated, stageScript),
+        context: {
+          fresh_session: true,
+          brief_path: briefPath,
+        },
+      },
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const env = readJson(capturePath);
+    assert.equal(env.CLEAN_ROOM_SESSION_BRIEF_PATH, briefPath);
+    assert.equal(env.CLEAN_ROOM_FRESH_CONTEXT_REQUIRED, '1');
+    assert.match(env.CLEAN_ROOM_ROLE_SESSION_ID, /^[0-9a-f-]{36}$/);
+
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    const phase = ledger.iterations[0].phases[0];
+    assert.equal(phase.session_brief_ref, briefPath);
+    assert.equal(phase.session_brief_sha256, fileSha256(briefPath));
+    assert.equal(JSON.stringify(phase).includes('Run the configured test stage'), false);
+  });
+
+  test('controller-status updates do not count as progress', () => {
+    const workspace = baseWorkspace('clean-room-run-status-only');
+    const script = writeControllerStatusScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      coverageStage(workspace.contaminated, script),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations[0].progress_detected, false);
+    assert.equal(ledger.iterations[0].stop_reason, 'no-progress-detected');
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-status.json')), true);
   });
 
   test('repeated unit selection stops after prior no-progress iteration', () => {

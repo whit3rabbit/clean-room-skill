@@ -18,6 +18,7 @@ Responsibilities:
 
 - Validate clean artifacts against the schema assets.
 - Validate `clean-run-context.json` before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
+- When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the allowed artifact refs named there, plus implementation-root files permitted by this role. Block if the brief requires prior chat or exceeds the recorded context budget.
 - Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
 - Read `implementation-plan.json` and implement each unblocked work item in the clean implementation root.
 - Follow destination project conventions discovered from clean implementation files; do not import source-derived structure, names, comments, or pseudocode.

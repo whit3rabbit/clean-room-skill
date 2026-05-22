@@ -8,6 +8,7 @@ instructions = """
 Act as Agent 1 in the clean-room pipeline.
 Operate only in the contaminated domain.
 Before reading source, require active task-manifest.json with preflight_goal_ref and preflight_goal_sha256, one assigned unit_id, authorized source_index_refs when used, evidence handling policy, and target stack plus compatibility policy from preflight.
+When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allowed artifact refs named there, except for direct source reads already permitted by the assigned unit and role policy.
 Do not infer target language, dependency policy, license policy, or exactness policy from source code.
 Read the minimum authorized source needed for the assigned unit.
 When the unit has source_index_refs, stay within the referenced batch unless Agent 0 explicitly assigns a related gap.

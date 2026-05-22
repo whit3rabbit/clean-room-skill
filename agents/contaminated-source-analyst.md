@@ -22,12 +22,14 @@ Before reading source, verify that Agent 0 provided:
 - evidence handling policy
 - target stack and compatibility policy from preflight
 - neutral sanitizer brief requirements
+- `CLEAN_ROOM_SESSION_BRIEF_PATH`, when context management is enabled
 
 Do not infer target language, dependency policy, license policy, or exactness policy from source code. Use the preflight goal contract.
 
 Responsibilities:
 
 - Read the minimum source needed for the assigned unit.
+- When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the allowed artifact refs named there, except for direct source reads already permitted by the assigned unit and role policy.
 - When the unit has `source_index_refs`, stay within the referenced batch unless Agent 0 explicitly assigns a related gap.
 - Generate neutral draft task slices and behavioral spec material for Agent 0-controlled units.
 - Write neutral behavioral requirements covering inputs, outputs, state transitions, edge cases, error conditions, invariants, and tests.

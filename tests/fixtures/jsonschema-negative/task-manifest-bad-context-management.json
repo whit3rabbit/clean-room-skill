@@ -1,0 +1,24 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Context management enforcement must be advisory or strict.",
+  "set": [
+    {
+      "path": [
+        "context_management"
+      ],
+      "value": {
+        "mode": "role-session-briefs",
+        "enforcement": "optional",
+        "fresh_context_required": true,
+        "budgets": {
+          "max_prompt_chars": 1200,
+          "max_brief_chars": 4000,
+          "max_artifact_refs": 8,
+          "max_referenced_artifact_bytes": 20000
+        }
+      }
+    }
+  ],
+  "expected_error": "advisory"
+}

@@ -39,6 +39,8 @@ SCHEMA_BY_ARTIFACT = {
     "source-index": "source-index.schema.json",
     "handoff-package": "handoff-package.schema.json",
     "contamination-incident": "contamination-incident.schema.json",
+    "role-session-brief": "role-session-brief.schema.json",
+    "controller-status": "controller-status.schema.json",
 }
 CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV = "CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST"
 FORBIDDEN_CLEAN_CONTEXT_ARTIFACT_NAMES = {
@@ -48,6 +50,7 @@ FORBIDDEN_CLEAN_CONTEXT_ARTIFACT_NAMES = {
     "task-manifest.json",
     "init-config.json",
     "preflight-goal.json",
+    "controller-status.json",
 }
 TASK_MANIFEST_HANDOFF_SEQUENCE = [
     "preflight",
@@ -98,6 +101,10 @@ def artifact_kind(path: Path, data: dict) -> str | None:
         return "handoff-package"
     if "incident_id" in data:
         return "contamination-incident"
+    if "brief_id" in data and "fresh_context_required" in data:
+        return "role-session-brief"
+    if "status_id" in data and data.get("updated_by_role") == "contaminated-manager-verifier":
+        return "controller-status"
     if "index_id" in data and data.get("domain") == "contaminated" and "recommended_batches" in data:
         return "source-index"
     if "ledger_id" in data:
@@ -237,6 +244,51 @@ def clean_context_path_errors(data: dict[str, Any]) -> list[str]:
             for resolved in resolved_paths:
                 if any(path_is_under(resolved, root) for root in blocked_roots):
                     add_error(errors, f"{label}: clean-run-context path resolves into a source or contaminated root")
+                    break
+        if error_limit_reached(errors):
+            return errors
+    return errors
+
+
+def role_session_brief_path_values(data: dict[str, Any]) -> list[tuple[tuple[str | int, ...], str]]:
+    values: list[tuple[tuple[str | int, ...], str]] = []
+    artifacts = data.get("allowed_artifacts")
+    if not isinstance(artifacts, list):
+        return values
+    for index, artifact in enumerate(artifacts):
+        if isinstance(artifact, dict) and isinstance(artifact.get("path"), str):
+            values.append((("allowed_artifacts", index, "path"), artifact["path"]))
+    return values
+
+
+def role_session_brief_path_errors(data: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+    blocked_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS") + env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
+    for location, raw_path in role_session_brief_path_values(data):
+        label = path_label(location)
+        posix = PurePosixPath(raw_path)
+        windows = PureWindowsPath(raw_path)
+        parts = path_parts(raw_path)
+        lowered_parts = {part.lower() for part in parts}
+        if raw_path.startswith("~"):
+            add_error(errors, f"{label}: role-session-brief artifact path must not use home expansion")
+        if posix.is_absolute() or windows.is_absolute() or windows.drive:
+            add_error(errors, f"{label}: role-session-brief artifact path must be relative")
+        if ".." in parts:
+            add_error(errors, f"{label}: role-session-brief artifact path must not contain '..'")
+        forbidden = sorted(lowered_parts & FORBIDDEN_CLEAN_CONTEXT_ARTIFACT_NAMES)
+        if forbidden:
+            add_error(errors, f"{label}: forbidden role-session-brief artifact path {forbidden[0]!r}")
+        if clean_roots and blocked_roots:
+            try:
+                resolved_paths = [(root / raw_path).resolve() for root in clean_roots]
+            except OSError as exc:
+                add_error(errors, f"{label}: invalid role-session-brief artifact path {raw_path!r}: {exc}")
+                continue
+            for resolved in resolved_paths:
+                if any(path_is_under(resolved, root) for root in blocked_roots):
+                    add_error(errors, f"{label}: role-session-brief artifact path resolves into a source or contaminated root")
                     break
         if error_limit_reached(errors):
             return errors
@@ -424,6 +476,9 @@ def validate_value(value: Any, schema: dict, root_schema: dict, path: tuple[str 
         min_length = schema.get("minLength")
         if isinstance(min_length, int) and len(value) < min_length:
             add_error(errors, f"{path_label(path)}: shorter than minLength {min_length}")
+        max_length = schema.get("maxLength")
+        if isinstance(max_length, int) and len(value) > max_length:
+            add_error(errors, f"{path_label(path)}: longer than maxLength {max_length}")
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and re.search(pattern, value) is None:
             add_error(errors, f"{path_label(path)}: does not match pattern {pattern!r}")
@@ -481,7 +536,7 @@ def main() -> int:
                 print_repair_hint()
                 return 1
             continue
-        if in_clean_root and kind in {"source-index", "init-config", "preflight-goal"}:
+        if in_clean_root and kind in {"source-index", "init-config", "preflight-goal", "controller-status"}:
             print(
                 f"clean-room schema check failed for {describe_path(path)}: {kind}.json is not a clean-role artifact",
                 file=sys.stderr,
@@ -501,6 +556,8 @@ def main() -> int:
         errors = validate_value(data, schema, schema)
         if kind == "clean-run-context":
             extend_errors(errors, clean_context_path_errors(data))
+        if kind == "role-session-brief" and in_clean_root:
+            extend_errors(errors, role_session_brief_path_errors(data))
         if kind == "task-manifest" and is_clean_room_task_manifest_schema(schema):
             extend_errors(errors, task_manifest_handoff_sequence_errors(data))
         if errors:

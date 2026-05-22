@@ -23,6 +23,7 @@ Compare current artifacts to the canonical gate checklist:
 - Initialization snapshot exists when init preferences were used, and reusable `init-config.json` drift is reported instead of silently applied.
 - `clean-run-context.json` exists before clean roles run and excludes source roots, contaminated roots, source index refs, and ledger paths.
 - `clean-run-context.json` records artifact-only coordination: Agent 0 does not directly steer Agent 2 or Agent 3, and Agent 3 reports to Agent 0 only at terminal status.
+- When context management is enabled, the next role launch can be driven by a fresh `role-session-brief.json` inside the recorded budgets. `controller-status.json` remains contaminated-side only.
 - Implementation roots are recorded, separated, and not source-derived.
 - Source index preflight exists when required and remains contaminated-only.
 - Decomposition produced neutral `task-manifest.json` units.

@@ -44,6 +44,8 @@ SCHEMA_BY_ARTIFACT = {
     "source-index": "source-index.schema.json",
     "handoff-package": "handoff-package.schema.json",
     "contamination-incident": "contamination-incident.schema.json",
+    "role-session-brief": "role-session-brief.schema.json",
+    "controller-status": "controller-status.schema.json",
 }
 
 

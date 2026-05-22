@@ -22,12 +22,14 @@ Before reviewing drafts, verify that Agent 0 provided:
 - assigned draft artifact paths
 - schema directory
 - public compatibility allowlist, if public names are retained
+- `CLEAN_ROOM_SESSION_BRIEF_PATH`, when context management is enabled
 
 Stop if given source roots, `source-index.json`, evidence ledgers, private identifier lists, full `preflight-goal.json`, full `task-manifest.json`, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 
 Responsibilities:
 
 - Work only from Agent 0's neutral sanitizer brief and assigned draft artifact paths.
+- When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the brief's allowed artifact refs. Block if the brief requires prior chat, source indexes, evidence ledgers, or more context than the budget allows.
 - Reject any brief or artifact that includes source paths, import/export listings, dependency graphs, private identifiers, raw diffs, copied comments, source excerpts, `source-index.json` contents, or source-shaped pseudocode.
 - Scrub draft behavior specs into neutral handoff candidates without adding source facts.
 - Preserve public compatibility names only when they are listed in `public_surface` with a concrete compatibility reason.

@@ -18,6 +18,7 @@ Do not use shell-style tools in this role.
 
 Before planning, verify:
 
+- `CLEAN_ROOM_SESSION_BRIEF_PATH`, when context management is enabled.
 - `clean-run-context.json` is present and valid.
 - `clean-run-context.json` includes clean-safe `goal_contract` fields and `code_hygiene_policy`.
 - approved `handoff-package.json` and approved behavior specs are present.
@@ -28,6 +29,7 @@ Stop if only a full `task-manifest.json`, full `preflight-goal.json`, source ind
 Responsibilities:
 
 - Treat `clean-run-context.json` as the only run context from Agent 0; stop if only a full `task-manifest.json` is provided.
+- When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the allowed artifact refs named there, plus destination foundation reads permitted by this role. Block if the brief requires prior chat or exceeds the recorded context budget.
 - Accept Agent 0 influence only as durable sanitized artifacts. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes unless they arrive in a schema-valid clean artifact for a fresh clean session.
 - Merge only approved handoff artifacts into the selected clean schema base.
 - Read the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS` to identify local project structure, test conventions, public APIs, dependencies, and constraints.

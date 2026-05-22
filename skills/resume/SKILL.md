@@ -28,6 +28,7 @@ Load these artifacts from the paths recorded in `task-manifest.json` and the con
 - `implementation-report.json` when present
 - latest valid `qc-report.json`
 - `clean-room-result.json`, when present
+- `controller-status.json`, when present, only on the contaminated/controller side
 - open abstract delta tickets
 
 If more than one `qc-report.json` is present, select the valid report with the newest `reviewed_at`. If reports tie, cannot be validated, or disagree about artifact hashes, stop and report a blocker.
@@ -52,6 +53,7 @@ Before choosing work:
 - Stop if Agent 0 appears to have steered Agent 2 or Agent 3 through direct chat, progress feedback, implementation hints, priority changes, or partial implementation reports instead of durable sanitized artifacts.
 - Treat non-terminal Agent 3 `implementation-report.json` states as internal clean-side state, not Agent 0 feedback.
 - Stop if Agent 1.5 appears to require source roots, `source-index.json` contents, contaminated evidence ledgers, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
+- If `context_management.mode` is `role-session-briefs`, verify the next role can be launched from a fresh context using `role-session-brief.json` and the recorded budgets. Do not use resume chat history as the brief.
 
 ## Selection Rules
 
@@ -62,6 +64,8 @@ Pick exactly one next safe action:
 - A final package closeout when implementation is complete, coverage is complete, QC passed, and `clean-room-result.json` records a terminal inner-loop return when `loop_context` is present.
 
 Do not batch units. Do not advance state from memory. Do not reinterpret the source scope.
+
+Before launching another role, Agent 0 may refresh contaminated-side `controller-status.json` with the current gate, selected unit, coverage state, implementation/QC state, blockers, latest artifact refs, and next safe action. Then create a role-specific `role-session-brief.json`. Clean roles receive the brief and clean artifact refs only, never full resume state.
 
 ## Output
 

@@ -155,7 +155,7 @@ By default, `init` creates:
 - `clean-room-bootstrap.json`
 - `.clean-room/README.md` in the target repository
 
-Do not commit source roots, contaminated artifact paths, private identifiers, source-derived names, `preflight-goal.json`, `init-config.json`, `task-manifest.json`, or `clean-run-context.json` into the clean implementation repository.
+Do not commit source roots, contaminated artifact paths, private identifiers, source-derived names, `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `controller-status.json`, `role-session-brief.json`, or `clean-run-context.json` into the clean implementation repository.
 
 ## Preflight CLI
 

@@ -15,6 +15,7 @@ Do not use shell commands from this default profile. Use a separate isolated ver
 Validate clean-run-context.json before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
 Validate clean artifacts against schema assets.
 Before editing code, require implementation-plan.json and verify that clean-run-context.json plus implementation-plan.json carry the preflight-derived code_hygiene_policy.
+When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allowed artifact refs named there, plus implementation-root files permitted by this role.
 Stop if asked to infer product goals from source, full task-manifest.json, full preflight-goal.json, contaminated ledgers, source paths, or direct Agent 0 chat.
 Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
 Read implementation-plan.json and implement each unblocked work item for the selected spec slice and current unit.

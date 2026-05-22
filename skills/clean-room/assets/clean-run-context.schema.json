@@ -255,6 +255,9 @@
         }
       }
     },
+    "context_management": {
+      "$ref": "#/$defs/context_management"
+    },
     "approved_public_reference_roots": {
       "type": "array",
       "items": {
@@ -305,6 +308,61 @@
     }
   },
   "$defs": {
+    "context_management": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "enforcement",
+        "fresh_context_required",
+        "budgets"
+      ],
+      "properties": {
+        "mode": {
+          "const": "role-session-briefs"
+        },
+        "enforcement": {
+          "enum": [
+            "advisory",
+            "strict"
+          ]
+        },
+        "fresh_context_required": {
+          "const": true
+        },
+        "budgets": {
+          "$ref": "#/$defs/context_budgets"
+        }
+      }
+    },
+    "context_budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_prompt_chars",
+        "max_brief_chars",
+        "max_artifact_refs",
+        "max_referenced_artifact_bytes"
+      ],
+      "properties": {
+        "max_prompt_chars": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_brief_chars": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_artifact_refs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_referenced_artifact_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
     "clean_path": {
       "type": "string",
       "minLength": 1,

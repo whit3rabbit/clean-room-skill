@@ -1,0 +1,14 @@
+{
+  "schema_kind": "role-session-brief",
+  "base": "role-session-brief.json",
+  "description": "Role session briefs must require fresh context.",
+  "set": [
+    {
+      "path": [
+        "fresh_context_required"
+      ],
+      "value": false
+    }
+  ],
+  "expected_error": "True"
+}

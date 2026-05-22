@@ -55,7 +55,7 @@ Create or update these artifacts:
 - `init-config.json`: reusable controller-side preferences. This may contain source roots and contaminated-only rules, so do not place it in clean-role readable roots.
 - `preflight-goal.json`: controller-side intent contract. This may contain source license notes and output roots, so do not place it in clean-role readable roots.
 - `task-manifest.json` `initialization_snapshot`: immutable per-run copy of the effective init choices used for resume and drift checks.
-- `clean-run-context.json`: sanitized clean-side context for Agent 2 and Agent 3. It contains only clean artifact paths, implementation root environment references, the target profile, clean-safe goal contract fields, code hygiene policy, approved public refs, model preferences, and clean-safe rules. It must not include source roots, contaminated roots, source index refs, coverage ledgers, evidence ledgers, `preflight-goal.json`, or the full task manifest.
+- `clean-run-context.json`: sanitized clean-side context for Agent 2 and Agent 3. It contains only clean artifact paths, implementation root environment references, the target profile, clean-safe goal contract fields, code hygiene policy, approved public refs, model preferences, clean-safe rules, and optional context-management budgets. It must not include source roots, contaminated roots, source index refs, coverage ledgers, evidence ledgers, `preflight-goal.json`, `controller-status.json`, or the full task manifest.
 
 ## Resume
 

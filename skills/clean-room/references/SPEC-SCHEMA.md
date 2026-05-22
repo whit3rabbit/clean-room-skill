@@ -12,6 +12,8 @@ Use these canonical artifact names unless the surrounding project already has a 
 - `coverage-ledger.json`
 - `evidence-ledger.json`
 - `handoff-package.json`
+- `role-session-brief.json`
+- `controller-status.json`
 - `behavior-spec.json`
 - `skeleton-manifest.json`
 - `implementation-plan.json`
@@ -105,6 +107,8 @@ Capture:
 
 `clean-run-context.json` is the only run context Agent 2 and Agent 3 should read. It may contain clean artifact paths, implementation root environment references, target profile, native artifact expectations, clean-safe goal contract fields, code hygiene policy, approved public references, clean-safe rules, clean-side model preferences, and the artifact-only coordination boundary. It must not contain source roots, contaminated artifact roots, source index refs, coverage ledgers, evidence ledgers, contaminated-only rules, full `preflight-goal.json`, or the full `task-manifest.json`.
 
+`context_management` is optional on `task-manifest.json` and `clean-run-context.json`. When present with `mode: "role-session-briefs"`, it records advisory or strict enforcement plus budgets for prompt characters, brief characters, artifact refs, and referenced artifact bytes. Strict mode requires a fresh role session and a valid `role-session-brief.json` for each stage.
+
 ## Source Index Content
 
 `source-index.json` is a contaminated-only planning artifact generated before clean-room role sessions. Keep it under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
@@ -149,6 +153,8 @@ The inner loop may select only units named by `approved_scope_refs`. If a needed
 
 Agent zero generates the durable tasklist as `task-manifest.json` `units`. It may use `source-index.json` batches to keep assigned source-reading context small while preserving source relationships. It tracks source-side progress in `coverage-ledger.json` `source_units`, source-side evidence in `evidence-ledger.json`, terminal clean-side feedback in `implementation-report.json` and `qc-report.json`, and loop-back work as abstract delta tickets. Do not use prior chat history or live clean-role feedback as the source of truth for the next iteration.
 
+Agent zero may also maintain `controller-status.json` as compact contaminated-side resume state. It records only current gate, selected unit, coverage state, implementation state, QC state, blockers, latest artifact refs, and next safe action. It must not be placed in clean roots or used as clean-role input.
+
 ## Format Selection
 
 `task-manifest.json` records the user's output choice in `format_selection`. Use one canonical source model plus one target profile:
@@ -172,6 +178,8 @@ Every real task must record the user's actual target profile. Do not default sil
 
 Agent 1.5 may read only Agent 0's neutral sanitizer brief, assigned draft artifacts, schema assets, and explicit public or destination reference roots. Do not give it source roots, `source-index.json`, evidence ledger contents, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 Agent 2 and Agent 3 must start in the clean domain and read `clean-run-context.json`, approved clean artifacts, schemas, approved public references, and clean implementation roots only. They must not read source roots, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`. Agent 0 may influence them only through schema-valid durable sanitized artifacts. Agent 3 reports back to Agent 0 only after the plan or task is complete, blocked, or quarantined, with abstract findings or delta tickets only.
+
+When context management is enabled, each role starts by reading `CLEAN_ROOM_SESSION_BRIEF_PATH`. The brief carries role, phase, unit, spec slice, fresh-context requirement, compact status, next action, allowed artifact refs with SHA-256, and forbidden inputs. Roles may load only the named artifact refs unless their role policy already permits direct source or destination inspection. If more context is needed than the brief budget permits, split the unit or return an abstract delta.
 
 `handoff_sequence` must record these stages in order: `preflight`, `source-destination-discovery`, `agent-0-decomposition`, `agent-1-analysis`, `agent-1-5-sanitization`, `clean-handoff`, `clean-planning`, `clean-implementation-qc`, and `agent-0-coverage-verification`.
 

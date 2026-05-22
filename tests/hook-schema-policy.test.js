@@ -221,6 +221,29 @@ describe('clean-room schema hook policy', () => {
     assert.match(result.stderr, /expected exactly one matching oneOf schema/);
   });
 
+  test('schema hook enforces maxLength', () => {
+    const root = tempDir('clean-room-max-length');
+    const env = policyEnv(root, 'clean-architect');
+    const schemaDir = path.join(root, 'schemas');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    fs.writeFileSync(path.join(schemaDir, 'task-manifest.schema.json'), JSON.stringify({
+      type: 'object',
+      additionalProperties: false,
+      required: ['name'],
+      properties: {
+        name: { type: 'string', maxLength: 4 },
+      },
+    }));
+    const artifact = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'task-manifest.json');
+    const schemaEnv = { ...env, CLEAN_ROOM_SCHEMA_DIR: schemaDir };
+
+    fs.writeFileSync(artifact, JSON.stringify({ name: 'short' }));
+    const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /longer than maxLength 4/);
+  });
+
   test('source-index JSON is rejected under clean roots', () => {
     const root = tempDir('clean-room-source-index-clean');
     const env = policyEnv(root, 'clean-architect');
@@ -249,6 +272,16 @@ describe('clean-room schema hook policy', () => {
     const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: preflightGoal } }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /preflight-goal\.json is not a clean-role artifact/);
+  });
+
+  test('controller-status JSON is rejected under clean roots', () => {
+    const root = tempDir('clean-room-controller-status-clean');
+    const env = policyEnv(root, 'clean-architect');
+    const status = copyExample('controller-status.json', env.CLEAN_ROOM_CLEAN_ROOTS);
+
+    const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: status } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /controller-status\.json is not a clean-role artifact/);
   });
 
   test('schema hook does not infer task manifest from arbitrary task_id JSON', () => {
@@ -330,6 +363,23 @@ describe('clean-room schema hook policy', () => {
     });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /resolves into a source or contaminated root/);
+  });
+
+  test('clean role-session-brief rejects unsafe artifact paths', () => {
+    const root = tempDir('clean-room-brief-paths');
+    const env = policyEnv(root, 'clean-architect');
+    const brief = copyExample('role-session-brief.json', env.CLEAN_ROOM_CLEAN_ROOTS);
+    const data = JSON.parse(fs.readFileSync(brief, 'utf8'));
+    data.allowed_artifacts[0].path = '../contaminated/source-index.json';
+    fs.writeFileSync(brief, JSON.stringify(data));
+
+    const result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: brief },
+    }, env);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /role-session-brief artifact path must not contain '\.\.'/);
   });
 
   test('handoff integrity verifies referenced artifact path and sha256', () => {
