@@ -132,7 +132,8 @@ function claudePluginSource() {
 }
 
 function createClaudeStub(root, initial = {}) {
-  const binDir = path.join(root, 'bin');
+  const homeDir = path.join(root, 'home');
+  const binDir = path.join(homeDir, '.local', 'bin');
   const statePath = path.join(root, 'claude-plugin-state.json');
   fs.mkdirSync(binDir, { recursive: true });
   fs.writeFileSync(statePath, `${JSON.stringify({
@@ -142,7 +143,7 @@ function createClaudeStub(root, initial = {}) {
   }, null, 2)}\n`);
 
   const stubPath = path.join(binDir, 'claude');
-  fs.writeFileSync(stubPath, `#!/usr/bin/env node
+  fs.writeFileSync(stubPath, `#!${process.execPath}
 'use strict';
 
 const fs = require('node:fs');
@@ -259,8 +260,11 @@ process.exit(2);
   fs.chmodSync(stubPath, 0o755);
 
   return {
+    binDir,
+    homeDir,
     statePath,
     env: {
+      HOME: homeDir,
       PATH: `${binDir}${path.delimiter}${process.env.PATH || ''}`,
       CLEAN_ROOM_CLAUDE_STUB_STATE: statePath,
     },
@@ -269,6 +273,20 @@ process.exit(2);
 
 function readClaudeStubCalls(stub) {
   return readJson(stub.statePath).calls.map((call) => call.args.join(' '));
+}
+
+function writeClaudeHijack(binDir, markerPath) {
+  fs.mkdirSync(binDir, { recursive: true });
+  const stubPath = path.join(binDir, 'claude');
+  fs.writeFileSync(stubPath, `#!/bin/sh
+printf '%s\\n' "$*" > "${markerPath}"
+case " $* " in
+  *" --json"*) printf '[]\\n' ;;
+esac
+exit 0
+`);
+  fs.chmodSync(stubPath, 0o755);
+  return stubPath;
 }
 
 function writeLegacyClaudeStandaloneInstall(claudeHome) {
@@ -767,6 +785,71 @@ describe('clean-room-skill installer', () => {
     assert.deepEqual(readClaudeStubCalls(stub).filter((call) => call.includes('plugin install')), [
       `plugin install ${CLAUDE_PLUGIN_ID} --scope user`,
     ]);
+  });
+
+  test('Claude plugin commands skip untrusted PATH entries', () => {
+    const root = tempDir('clean-room-claude-path-skip');
+    const cases = [
+      {
+        name: 'cwd',
+        cwd: path.join(root, 'cwd'),
+        binDir: path.join(root, 'cwd'),
+      },
+      {
+        name: 'repo-local',
+        cwd: path.join(root, 'repo'),
+        binDir: path.join(root, 'repo', 'bin'),
+      },
+      {
+        name: 'node-modules-bin',
+        cwd: path.join(root, 'repo-node-modules'),
+        binDir: path.join(root, 'repo-node-modules', 'node_modules', '.bin'),
+      },
+      {
+        name: 'arbitrary-temp',
+        cwd: root,
+        binDir: path.join(root, 'tmp-bin'),
+      },
+    ];
+
+    for (const item of cases) {
+      const stub = createClaudeStub(path.join(root, `${item.name}-stub`));
+      const marker = path.join(root, `${item.name}-marker.txt`);
+      const claudeHome = path.join(root, `${item.name}-config`);
+      fs.mkdirSync(item.cwd, { recursive: true });
+      writeClaudeHijack(item.binDir, marker);
+
+      const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+        ...stub.env,
+        PATH: `${item.binDir}${path.delimiter}${stub.binDir}${path.delimiter}${process.env.PATH || ''}`,
+        CLAUDE_CONFIG_DIR: claudeHome,
+      }, item.cwd);
+
+      assert.equal(result.status, 0, `${item.name}: ${result.stderr}`);
+      assert.equal(fs.existsSync(marker), false, item.name);
+      assert.ok(readClaudeStubCalls(stub).includes(`plugin install ${CLAUDE_PLUGIN_ID} --scope user`), item.name);
+    }
+  });
+
+  test('Claude plugin commands fail closed without a trusted PATH entry', () => {
+    const root = tempDir('clean-room-claude-path-empty');
+    const cwd = path.join(root, 'cwd');
+    const marker = path.join(root, 'marker.txt');
+    const claudeHome = path.join(root, 'config');
+    const home = path.join(root, 'home');
+    fs.mkdirSync(cwd, { recursive: true });
+    fs.mkdirSync(home, { recursive: true });
+    writeClaudeHijack(cwd, marker);
+
+    const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      HOME: home,
+      PATH: cwd,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    }, cwd);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /non-empty trusted PATH/);
+    assert.equal(fs.existsSync(marker), false);
   });
 
   test('runtime plugin manifests do not declare cwd-fragile static hooks', () => {

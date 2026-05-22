@@ -751,23 +751,89 @@ function truncateCommandOutput(value) {
   return `${text.slice(0, 2000)}...`;
 }
 
+function pathIsUnder(candidate, root) {
+  return candidate === root || candidate.startsWith(`${root}${path.sep}`);
+}
+
+function trustedClaudeRoots() {
+  const roots = [
+    '/opt/homebrew',
+    '/usr/local',
+    '/usr/bin',
+    '/bin',
+  ];
+  if (process.env.HOME) {
+    roots.push(
+      path.join(process.env.HOME, '.local', 'bin'),
+      path.join(process.env.HOME, '.local', 'share', 'claude', 'versions')
+    );
+  }
+  const resolvedRoots = [];
+  for (const root of roots) {
+    const resolved = path.resolve(root);
+    resolvedRoots.push(resolved);
+    try {
+      const real = fs.realpathSync.native(resolved);
+      if (!resolvedRoots.includes(real)) resolvedRoots.push(real);
+    } catch {
+      // Missing optional roots are still allowed when they appear later.
+    }
+  }
+  return resolvedRoots;
+}
+
+function trustedClaudePath(filePath) {
+  const resolved = path.resolve(filePath);
+  const roots = trustedClaudeRoots();
+  if (!roots.some((root) => pathIsUnder(resolved, root))) return false;
+  try {
+    const real = fs.realpathSync.native(resolved);
+    return roots.some((root) => pathIsUnder(real, root));
+  } catch {
+    return false;
+  }
+}
+
 function sanitizePathForClaude(value) {
   const entries = String(value || '').split(path.delimiter).filter(Boolean);
   const cwd = process.cwd();
+  const roots = trustedClaudeRoots();
   const safeEntries = entries.filter((entry) => {
     if (!path.isAbsolute(entry)) return false;
     const normalized = path.resolve(entry);
     if (normalized === cwd || normalized.startsWith(`${cwd}${path.sep}`)) return false;
     if (normalized.includes(`${path.sep}node_modules${path.sep}.bin`)) return false;
+    if (!roots.some((root) => pathIsUnder(normalized, root))) return false;
     return true;
   });
+  if (safeEntries.length === 0) {
+    throw new Error('Claude plugin command requires a non-empty trusted PATH');
+  }
   return safeEntries.join(path.delimiter);
 }
 
-function claudePluginEnv(layout) {
+function resolveClaudeExecutable() {
+  const searchPath = sanitizePathForClaude(process.env.PATH);
+  for (const entry of searchPath.split(path.delimiter)) {
+    const candidate = path.join(entry, 'claude');
+    if (!trustedClaudePath(candidate)) continue;
+    try {
+      const stat = fs.statSync(candidate);
+      fs.accessSync(candidate, fs.constants.X_OK);
+      if (stat.isFile()) {
+        return { executable: candidate, searchPath };
+      }
+    } catch {
+      // Keep searching trusted PATH entries.
+    }
+  }
+  throw new Error('Claude plugin command requires a trusted claude executable on PATH');
+}
+
+function claudePluginEnv(layout, searchPath) {
   return {
     ...process.env,
-    PATH: sanitizePathForClaude(process.env.PATH),
+    PATH: searchPath,
     CLAUDE_CONFIG_DIR: layout.targetRoot,
   };
 }
@@ -795,13 +861,14 @@ function claudePluginCommandFailure(command, args, result) {
 }
 
 function runClaudePluginCommand(layout, args, options = {}) {
-  const claudeExecutable = 'claude';
+  const { executable: claudeExecutable, searchPath } = resolveClaudeExecutable();
   const result = spawnSync(claudeExecutable, args, {
     encoding: 'utf8',
-    env: claudePluginEnv(layout),
+    env: claudePluginEnv(layout, searchPath),
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: CLAUDE_PLUGIN_TIMEOUT_MS,
   });
+  result.command = claudeExecutable;
   if (result.error || result.status !== 0) {
     throw new Error(claudePluginCommandFailure(claudeExecutable, args, result));
   }
@@ -819,7 +886,7 @@ function readClaudePluginJson(layout, args) {
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     throw new Error(
-      `Claude plugin command returned invalid JSON: ${claudeCommandLabel('claude', args)}; ` +
+      `Claude plugin command returned invalid JSON: ${claudeCommandLabel(result.command || 'claude', args)}; ` +
       `stdout: ${truncateCommandOutput(result.stdout)}; ${err.message}`
     );
   }
