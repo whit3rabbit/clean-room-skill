@@ -92,7 +92,7 @@ describe('clean-room leakage hook policy', () => {
           summary: 'Run validate() and check() before publishing.',
         },
       ],
-      notes: 'Use docs.example.com for public docs and set logging.level.default in config.',
+      notes: 'Use docs.example.com for public docs and set conservative logging defaults in config.',
     }));
 
     const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
@@ -106,6 +106,11 @@ describe('clean-room leakage hook policy', () => {
       {
         name: 'reverse-dns',
         data: { summary: 'Keep com.example.product compatible with the public contract.' },
+        message: /package_or_module_identifier|source_like_scoped_identifier/,
+      },
+      {
+        name: 'lowercase-private-module',
+        data: { summary: 'Coordinate with private.module.secret before publishing.' },
         message: /package_or_module_identifier|source_like_scoped_identifier/,
       },
       {
