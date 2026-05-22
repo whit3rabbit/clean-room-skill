@@ -251,7 +251,7 @@ def scoped_identifier_is_finding(value: str) -> bool:
 def identifier_match_is_finding(name: str, text: str, match: re.Match[str]) -> bool:
     value = match.group(0)
     if name == "package_or_module_identifier":
-        return dotted_identifier_is_finding(value)
+        return value.split(".")[-1] not in PUBLIC_HOST_TLDS
     if name == "source_like_call":
         return source_like_call_is_finding(text, match)
     if name == "source_like_scoped_identifier":
