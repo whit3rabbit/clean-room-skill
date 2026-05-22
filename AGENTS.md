@@ -69,9 +69,9 @@
 
 - `package.json` version is the npm source of truth.
 - Keep plugin metadata versions synchronized when changing package version.
-- Publishing is triggered by a published GitHub release.
+- Publishing is triggered by pushing a `v*` tag.
 - The release tag must match `package.json` after stripping a leading `v`.
-- Publish workflow runs `npm publish --provenance`.
+- Publish workflow uses npm trusted publishing and runs `npm publish`.
 
 ## High-Risk Areas
 

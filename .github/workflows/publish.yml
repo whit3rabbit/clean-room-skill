@@ -1,9 +1,9 @@
 name: Publish
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: read
@@ -25,9 +25,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22.x
-          cache: npm
+          node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -53,4 +53,4 @@ jobs:
         run: npm run verify
 
       - name: Publish package
-        run: npm publish --provenance
+        run: npm publish
