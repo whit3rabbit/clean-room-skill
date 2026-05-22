@@ -82,7 +82,15 @@
 - Keep `permissions.id-token: write` in `publish.yml`; it is required for OIDC trusted publishing.
 - Release builds use Node 24 and `package-manager-cache: false`; do not re-enable npm caching in the publish job.
 - Do not use `npm publish --provenance` here. Trusted publishing provides provenance with plain `npm publish`.
-- GitHub Releases are informational for this repo. They do not trigger npm publishing.
+- Every npm release must have a matching GitHub Release for the same `vX.Y.Z` tag. GitHub Releases are informational and do not trigger npm publishing.
+- Release flow:
+  1. Bump `package.json` and `package-lock.json`, normally with `npm version X.Y.Z --no-git-tag-version --ignore-scripts`.
+  2. Sync version fields in `plugin.json`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json`.
+  3. Run release-facing checks: `jq empty` on changed JSON metadata, `npm pack --dry-run`, and `npm run verify`.
+  4. Commit the release changes, push the branch, create an annotated tag named exactly `vX.Y.Z`, and push the tag.
+  5. Confirm the `Publish` workflow succeeds, then verify `npm view clean-room-skill version` returns `X.Y.Z`.
+  6. Create or verify the GitHub Release for `vX.Y.Z`, and confirm it is not a draft or prerelease unless intentionally releasing a prerelease.
+- Do not move, overwrite, or recreate published tags without explicit user approval. If npm publish has succeeded, fix release mistakes with a new patch version instead of republishing the same version.
 
 ## High-Risk Areas
 

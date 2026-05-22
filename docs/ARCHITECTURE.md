@@ -14,6 +14,8 @@ The Clean Room workflow acts as an engineering risk-reduction process by establi
 
 ## Operating Model
 
+![Operating Model](assets/1.png)
+
 To maintain compliance and mitigate leakage risks, the workflow utilizes strictly separated workspaces, worktrees, repositories, or profiles for contaminated and clean work:
 
 *   **Contaminated Source Workspace**: Source-readable, read-only where practical. Contains the codebase under analysis.
@@ -31,9 +33,13 @@ Optional Docker or Podman support is limited to Agent 3 verification containers.
 
 Artifact roots must not disclose private source names. New runs default to `~/Documents/CleanRoom/<task-id>/`; when no explicitly approved neutral task ID is provided, the controller generates `task-` plus 8 lowercase hex characters instead of using the source folder name.
 
+![Artifact Roots](assets/2.png)
+
 The initialization wizard and `require-clean-room-env.py` audit clean, implementation, and contaminated artifact root names. They fail closed when a path contains a source root basename or meaningful non-generic tokens from that basename, while filtering generic terms such as `src`, `app`, `test`, `repo`, and `workspace`.
 
 ### Stage 0 Goal Contract
+
+![Stage 0 Goal Contract](assets/3.png)
 
 Every new run starts with `preflight-goal.json` before source discovery, source indexing, Agent 0 decomposition, attended execution, or unattended execution. The contract records end goal, target stack, license policy, dependency policy, compatibility exactness, feature changes, code hygiene, output policy, controller mode, and open questions.
 
@@ -216,6 +222,8 @@ The architecture delegates work across five distinct custom role agents to enfor
     *   Emits one terminal report for Agent 0 only when the assigned spec slice is complete, blocked, or quarantined.
 
 ### Nested Controller Loop
+
+![Nested Controller Loop](assets/4.png)
 
 The outer loop owns spec development: scope, behavior specs, acceptance criteria, and abstract delta resolution. The inner clean-room loop owns one approved spec slice. It repeats analyze, sanitize, plan, implement, QC, and contaminated-side coverage verification until it can return `spec-slice-complete`, `spec-slice-blocked`, `spec-delta-required`, `contamination-suspected`, `iteration-limit-reached`, or `no-progress-detected`.
 

@@ -169,6 +169,7 @@ Reference files:
 
 - [docs/REFERENCE.md](docs/REFERENCE.md): CLI flags, hook modes, troubleshooting, and local verification.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): operating model, roles, environment, guardrails, and flow details.
+- [docs/HOOKS.md](docs/HOOKS.md): hook install locations, generated matchers, and per-hook behavior.
 - [skills/clean-room/references/PROCESS.md](skills/clean-room/references/PROCESS.md): detailed clean-room process.
 - [skills/clean-room/references/LEAKAGE-RULES.md](skills/clean-room/references/LEAKAGE-RULES.md): clean handoff rules.
 
