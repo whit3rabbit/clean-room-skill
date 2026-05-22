@@ -21,6 +21,8 @@ Use the canonical `clean-room` skill workflow and references in this plugin. Pre
 
 The CLI command `clean-room-skill init` may have pre-created neutral external folders and a clean-safe `.clean-room/README.md` stub in the target repository. Treat that bootstrap output as convenience scaffolding only. It does not replace this skill's initialization workflow, and it must not be treated as an active `preflight-goal.json`, `init-config.json`, `task-manifest.json`, or `clean-run-context.json`.
 
+When using an existing CLI bootstrap, check `clean-room-bootstrap.json`, `contaminated/`, `clean/`, `quarantine/`, and the target repo `.clean-room/README.md` before recording active init preferences. Stop if metadata is missing, invalid, mismatched with the task root, or any generated path is missing or the wrong type. Do not infer active workflow state from those bootstrap files.
+
 ## Gather
 
 Collect only setup decisions that affect correctness, safety, resumability, or output shape:

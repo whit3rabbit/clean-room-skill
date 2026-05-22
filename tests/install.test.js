@@ -174,8 +174,17 @@ describe('clean-room-skill installer', () => {
     assert.match(stub, /Clean Room Bootstrap/);
     assert.match(stub, /Default target profile: `speckit-feature-folder`/);
     assert.doesNotMatch(stub, /source roots:/i);
-    assert.match(result.stdout, /install safe hooks:/);
-    assert.match(result.stdout, /uninstall runtime install:/);
+    assert.match(result.stdout, /Codex:/);
+    assert.match(result.stdout, /npx clean-room-skill@latest --codex --global --hooks=safe --yes/);
+    assert.match(result.stdout, /start in Codex: invoke the init skill, then clean-room through @ or the skills UI/);
+    assert.match(result.stdout, /npx clean-room-skill@latest --codex --global --uninstall --yes/);
+    assert.match(result.stdout, /Claude Code:/);
+    assert.match(result.stdout, /npx clean-room-skill@latest --claude --global --hooks=safe --yes/);
+    assert.match(result.stdout, /start in Claude Code: \/clean-room:init, then \/clean-room or \/clean-room:attended/);
+    assert.match(result.stdout, /npx clean-room-skill@latest --claude --global --uninstall --yes/);
+    const codexStartLine = result.stdout.split('\n').find((line) => line.includes('start in Codex:'));
+    assert.ok(codexStartLine);
+    assert.doesNotMatch(codexStartLine, /\/clean-room/);
   });
 
   test('init does not overwrite existing repo stub without force', () => {
@@ -226,6 +235,30 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(artifactBase, 'task-force', 'clean-room-bootstrap.json')), true);
   });
 
+  test('init rejects existing generated task paths without force', () => {
+    const root = tempDir('clean-room-init-existing-generated');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const taskRoot = path.join(artifactBase, 'task-existing');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.mkdirSync(path.join(taskRoot, 'contaminated'), { recursive: true });
+
+    const result = runInstall([
+      'init',
+      '--target-dir',
+      targetDir,
+      '--artifact-base',
+      artifactBase,
+      '--task-id',
+      'task-existing',
+    ]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /bootstrap generated path already exists/);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'clean-room-bootstrap.json')), false);
+    assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
+  });
+
   test('init rejects invalid target profile before writing files', () => {
     const root = tempDir('clean-room-init-invalid-profile');
     const targetDir = path.join(root, 'repo');
@@ -260,6 +293,84 @@ describe('clean-room-skill installer', () => {
     assert.equal(goal.controller_policy.unattended_allowed_after_preflight, false);
     assert.equal(goal.open_questions.some((question) => question.blocking === true), true);
     assert.match(result.stdout, /Wrote preflight goal/);
+  });
+
+  test('preflight bootstrap task root writes to generated contaminated root', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-root');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const taskRoot = path.join(artifactBase, 'task-bootstrap-root');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-root']);
+    assert.equal(init.status, 0, init.stderr);
+
+    const result = runInstall(['preflight', '--template', '--bootstrap', taskRoot]);
+    const output = path.join(taskRoot, 'contaminated', 'preflight-goal.json');
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(output), true);
+    const goal = readJson(output);
+    assert.equal(goal.controller_policy.mode, 'attended');
+    assert.match(result.stdout, /Wrote preflight goal/);
+  });
+
+  test('preflight bootstrap metadata path writes to generated contaminated root', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-metadata');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const taskRoot = path.join(artifactBase, 'task-bootstrap-metadata');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-metadata']);
+    assert.equal(init.status, 0, init.stderr);
+
+    const result = runInstall([
+      'preflight',
+      '--template',
+      '--bootstrap',
+      path.join(taskRoot, 'clean-room-bootstrap.json'),
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), true);
+  });
+
+  test('preflight rejects broken bootstrap scaffold without writing', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-broken');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const taskRoot = path.join(artifactBase, 'task-bootstrap-broken');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-broken']);
+    assert.equal(init.status, 0, init.stderr);
+    fs.rmSync(path.join(taskRoot, 'clean'), { recursive: true, force: true });
+
+    const result = runInstall(['preflight', '--template', '--bootstrap', taskRoot]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /bootstrap scaffold is invalid/);
+    assert.match(result.stderr, /bootstrap clean directory missing/);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), false);
+  });
+
+  test('preflight rejects bootstrap and output together', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-output');
+    const output = path.join(root, 'preflight-goal.json');
+
+    const result = runInstall([
+      'preflight',
+      '--template',
+      '--bootstrap',
+      path.join(root, 'task-root'),
+      '--output',
+      output,
+    ]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /--bootstrap conflicts with --output/);
+    assert.equal(fs.existsSync(output), false);
   });
 
   test('preflight dry run does not write output', () => {

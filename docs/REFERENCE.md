@@ -165,6 +165,7 @@ Usage:
 ```bash
 npx clean-room-skill@latest preflight --template --output ~/Documents/CleanRoom/task-1234abcd/contaminated/preflight-goal.json
 npx clean-room-skill@latest preflight --input ./preflight-goal.json --output ~/Documents/CleanRoom/task-1234abcd/contaminated/preflight-goal.json
+npx clean-room-skill@latest preflight --template --bootstrap ~/Documents/CleanRoom/task-1234abcd
 ```
 
 Options:
@@ -174,6 +175,7 @@ Options:
 | `--template` | Write an attended draft with blocking open questions. |
 | `--input <path>` | Validate and normalize/copy a completed preflight goal. |
 | `--output <path>` | Destination `preflight-goal.json`. |
+| `--bootstrap <path>` | Generated task root or `clean-room-bootstrap.json`; writes to the generated contaminated artifact root after scaffold validation. |
 | `--mode <mode>` | `attended` or `unattended`; template supports attended only. |
 | `--dry-run` | Print actions without writing files. |
 | `--force` | Overwrite output if it already exists. |
