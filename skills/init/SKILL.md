@@ -32,6 +32,7 @@ Collect only setup decisions that affect correctness, safety, resumability, or o
 - Goal contract choices from `preflight-goal.json`, including target stack, dependency/license policy, exactness policy, feature policy, code hygiene, output policy, and controller mode.
 - Default model plus optional overrides for contaminated roles, clean roles, or individual roles. Keep model ids as runtime-specific strings.
 - Additional user rules split into `clean_safe` and `contaminated_only`. Put anything containing source paths, private identifiers, private dependency names, or source-derived specifics into `contaminated_only`.
+- Role hook environment values derived from the approved roots: `CLEAN_ROOM_ROLE`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and optional hook-only denylist paths. The controller must pass these into each role session; do not require the user to set `CLEAN_ROOM_HOOK_ENFORCE` for normal safe-hook runs.
 
 ## Validate
 

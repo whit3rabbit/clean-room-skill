@@ -53,7 +53,7 @@ Preferred direct installer:
 npx clean-room-skill@latest
 ```
 
-The installer prompts for runtime and scope when no flags are supplied. For non-interactive installs, pass the runtime and scope explicitly:
+The installer prompts for action, scope, runtime, and hook mode when no flags are supplied. For non-interactive installs, pass the runtime and scope explicitly:
 
 ```bash
 npx clean-room-skill@latest --codex --global --yes
@@ -63,6 +63,8 @@ npx clean-room-skill@latest --opencode --global --yes
 npx clean-room-skill@latest --cursor --global --yes
 npx clean-room-skill@latest --all --global --yes
 ```
+
+Interactive mode prompts for install or uninstall, global or local scope, runtime selection, and hook mode. The runtime prompt shows detected install status for each target root and accepts names, numbers, ranges, `all`, or `installed` for uninstall defaults.
 
 Runtime support tiers:
 
@@ -90,7 +92,7 @@ Local installs are available through `--local` using each runtime's project conf
 
 Hook modes:
 
-- `--hooks=safe`: default. Copies hooks and registers a wrapper that no-ops unless `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present. This is compatibility-only; use `--hooks=strict` for dedicated Codex or Claude clean-room homes.
+- `--hooks=safe`: default. Copies hooks and registers a wrapper that no-ops until clean-room init/onboarding launches role sessions with clean-room environment variables. `CLEAN_ROOM_HOOK_ENFORCE=1` remains available for explicit smoke tests. Use `--hooks=strict` for dedicated Codex or Claude clean-room homes.
 - `--hooks=copy-only` or `--no-hooks`: copies hook files but does not register Codex or Claude hook config.
 - `--hooks=strict`: registers fail-closed hooks for dedicated clean-room homes. Strict mode is supported only for Codex and Claude Code because other runtime hook payloads are not verified. Antigravity receives hook scripts in the plugin directory, but the generated plugin manifest does not enable them until an Antigravity-specific hook payload adapter exists.
 
@@ -520,7 +522,7 @@ Clean-side example artifact shapes are in `skills/clean-room/examples/minimal-sp
 
 Agent/tool hook scaffolding lives in `hooks/`. Security enforcement uses installer-generated Codex or Claude hook configs with absolute wrapper paths. Runtime plugin manifests do not declare static package hooks because cwd-relative hook commands are fragile.
 
-The generated hook configs route through `hooks/clean-room-hook.py`. In safe mode, the wrapper exits successfully unless `CLEAN_ROOM_HOOK_ENFORCE=1` or clean-room environment variables are present. Safe mode is compatibility-only until enforcement is enabled. In strict mode, it runs the configured checks immediately and fails closed when required role or path configuration is missing. Prefer strict mode for dedicated Codex or Claude clean-room homes.
+The generated hook configs route through `hooks/clean-room-hook.py`. In safe mode, the wrapper exits successfully until clean-room init/onboarding launches role sessions with the required clean-room environment block. `CLEAN_ROOM_HOOK_ENFORCE=1` is still supported for explicit smoke tests. In strict mode, it runs the configured checks immediately and fails closed when required role or path configuration is missing. Prefer strict mode for dedicated Codex or Claude clean-room homes.
 
 After install, run a smoke check:
 
@@ -557,7 +559,7 @@ For release-quality schema assurance, run a full JSON Schema validator in additi
 | Symptom | Likely cause | Recovery |
 | --- | --- | --- |
 | `python3 is required to install clean-room hooks` | Python missing or not on `PATH` | Install Python 3 or use `--hooks=copy-only` |
-| `safe hooks are installed but not enforcing` | Safe mode default | Set `CLEAN_ROOM_HOOK_ENFORCE=1`, set clean-room env vars, or reinstall with `--hooks=strict` in a dedicated profile |
+| `safe hooks are installed; clean-room init/onboarding must set role environment variables` | Safe mode default | Start the clean-room init/onboarding flow so role sessions receive the clean-room environment block, or reinstall with `--hooks=strict` in a dedicated profile |
 | `install lock is held` | Another install or uninstall is mutating the same target root, or a prior process died while holding `.clean-room-install.lock` | Wait for the other process to finish; inspect and remove the lock only after confirming no installer is active |
 | Hook config write failed after files copied | Partial installer state; manifest records `hook_registration.status: "failed"` when possible | Fix the filesystem error, then re-run the same installer command to repair hook registration |
 | Install manifest write failed after files copied | Manifest may be absent or left at `phase: "installing"` | Re-run the same installer command before relying on uninstall tracking |

@@ -14,6 +14,7 @@ const { parseRunArgs, runCleanRoom } = require('../lib/run.cjs');
 const {
   buildHookEntries,
   configPathForRuntime,
+  hasManagedHookEntries,
   mergeHookEntries,
   removeHookEntries,
 } = require('../lib/hooks.cjs');
@@ -93,6 +94,7 @@ function parseArgs(argv) {
     yes: false,
     uninstall: false,
     hookMode: 'safe',
+    hookModeSpecified: false,
     configDir: null,
   };
 
@@ -105,8 +107,10 @@ function parseArgs(argv) {
     else if (arg === '--dry-run') options.dryRun = true;
     else if (arg === '--yes') options.yes = true;
     else if (arg === '--uninstall') options.uninstall = true;
-    else if (arg === '--no-hooks') options.hookMode = 'copy-only';
-    else if (arg === '--config-dir') {
+    else if (arg === '--no-hooks') {
+      options.hookMode = 'copy-only';
+      options.hookModeSpecified = true;
+    } else if (arg === '--config-dir') {
       i += 1;
       if (i >= argv.length) throw new Error('--config-dir requires a path');
       options.configDir = argv[i];
@@ -116,8 +120,10 @@ function parseArgs(argv) {
       i += 1;
       if (i >= argv.length) throw new Error('--hooks requires safe, copy-only, or strict');
       options.hookMode = argv[i];
+      options.hookModeSpecified = true;
     } else if (arg.startsWith('--hooks=')) {
       options.hookMode = arg.slice('--hooks='.length);
+      options.hookModeSpecified = true;
     } else if (arg === '-h' || arg === '--help') {
       printHelp();
       process.exit(0);
@@ -183,6 +189,9 @@ Options:
   --dry-run            Print actions without writing files
   --yes                Non-interactive mode; unknown conflicts still abort
   --uninstall          Remove manifest-managed files and clean-room hook entries
+
+Run without runtime and scope flags for interactive install or uninstall.
+Interactive runtime selection accepts names, numbers, ranges, all, or installed.
 `);
 }
 
@@ -195,12 +204,9 @@ async function resolveInteractiveOptions(options) {
   }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
-    if (options.runtimes.length === 0) {
-      const answer = await rl.question(`Runtime [${RUNTIMES.join('/')}/all]: `);
-      const runtime = answer.trim().toLowerCase() || 'codex';
-      if (runtime === 'all') options.runtimes = [...RUNTIMES];
-      else if (RUNTIMES.includes(runtime)) options.runtimes = [runtime];
-      else throw new Error(`unsupported runtime: ${answer}`);
+    let promptedRuntimes = false;
+    if (options.runtimes.length === 0 && !options.uninstall) {
+      options.uninstall = await promptInstallAction(rl);
     }
     if (!options.scope) {
       const answer = await rl.question('Scope [global/local]: ');
@@ -210,10 +216,186 @@ async function resolveInteractiveOptions(options) {
       }
       options.scope = scope;
     }
+    if (options.runtimes.length === 0) {
+      promptedRuntimes = true;
+      const statuses = runtimeInstallStatuses(options.scope, options.configDir);
+      printRuntimeChoices(statuses);
+      const action = options.uninstall ? 'uninstall' : 'install';
+      const defaultLabel = defaultRuntimeSelectionLabel(statuses, action);
+      const answer = await rl.question(`Runtimes to ${action} [${defaultLabel}; numbers/names/all]: `);
+      options.runtimes = parseRuntimeSelection(answer, statuses, action);
+    }
+    if (options.uninstall && promptedRuntimes) {
+      await confirmInteractiveUninstall(rl, options.runtimes);
+    }
+    if (!options.uninstall && !options.hookModeSpecified) {
+      const answer = await rl.question('Hook mode [safe/copy-only/strict]: ');
+      const hookMode = answer.trim().toLowerCase() || 'safe';
+      if (!HOOK_MODES.has(hookMode)) {
+        throw new Error(`unsupported hook mode: ${answer}`);
+      }
+      options.hookMode = hookMode;
+    }
     return options;
   } finally {
     rl.close();
   }
+}
+
+async function promptInstallAction(rl) {
+  const answer = await rl.question('Action [install/uninstall]: ');
+  const action = answer.trim().toLowerCase() || 'install';
+  if (['install', 'i'].includes(action)) {
+    return false;
+  }
+  if (['uninstall', 'remove', 'u'].includes(action)) {
+    return true;
+  }
+  throw new Error(`unsupported action: ${answer}`);
+}
+
+async function confirmInteractiveUninstall(rl, runtimes) {
+  console.log(`Selected runtimes to uninstall: ${runtimes.join(', ')}`);
+  const answer = await rl.question('Type uninstall to continue: ');
+  if (answer.trim().toLowerCase() !== 'uninstall') {
+    throw new Error('aborted by user');
+  }
+}
+
+function runtimeInstallStatuses(scope, configDir) {
+  return RUNTIMES.map((runtime) => runtimeInstallStatus(runtime, scope, configDir));
+}
+
+function runtimeInstallStatus(runtime, scope, configDir) {
+  const layout = resolveRuntimeLayout(runtime, scope, { configDir });
+  const status = {
+    runtime,
+    targetRoot: layout.targetRoot,
+    state: 'not-installed',
+    detail: 'not installed',
+  };
+  try {
+    const manifest = readManifest(layout.targetRoot);
+    if (manifest) {
+      const phase = manifest.phase ? `phase ${manifest.phase}` : 'manifest present';
+      const hooksMode = manifest.hooks_mode ? `, hooks ${manifest.hooks_mode}` : '';
+      return {
+        ...status,
+        state: 'installed',
+        detail: `${phase}${hooksMode}`,
+      };
+    }
+  } catch (err) {
+    return {
+      ...status,
+      state: 'error',
+      detail: err.message,
+    };
+  }
+
+  if (!layout.supportsHookRegistration) {
+    return status;
+  }
+  const configPath = configPathForRuntime(runtime, layout.targetRoot);
+  if (!configPath) {
+    return status;
+  }
+  try {
+    if (hasManagedHookEntries(configPath)) {
+      return {
+        ...status,
+        state: 'hooks-only',
+        detail: 'managed hooks without install manifest',
+      };
+    }
+  } catch (err) {
+    return {
+      ...status,
+      state: 'error',
+      detail: err.message,
+    };
+  }
+  return status;
+}
+
+function printRuntimeChoices(statuses) {
+  console.log('Runtime choices:');
+  statuses.forEach((status, index) => {
+    const number = String(index + 1).padStart(2, ' ');
+    const runtime = status.runtime.padEnd(12, ' ');
+    console.log(`  ${number}. ${runtime} ${status.detail} (${status.targetRoot})`);
+  });
+}
+
+function defaultRuntimeSelectionLabel(statuses, action) {
+  if (action === 'uninstall' && statuses.some((status) => isInstalledStatus(status))) {
+    return 'installed';
+  }
+  return 'codex';
+}
+
+function parseRuntimeSelection(answer, statuses, action = 'install') {
+  const text = answer.trim().toLowerCase();
+  if (text === '') {
+    if (action === 'uninstall') {
+      const installed = statuses.filter((status) => isInstalledStatus(status)).map((status) => status.runtime);
+      if (installed.length === 0) {
+        throw new Error('no installed runtimes detected; select a runtime explicitly');
+      }
+      return installed;
+    }
+    return ['codex'];
+  }
+
+  const selected = [];
+  const tokens = text.split(/[,\s]+/).filter(Boolean);
+  for (const token of tokens) {
+    if (token === 'all') {
+      selected.push(...RUNTIMES);
+      continue;
+    }
+    if (token === 'installed') {
+      selected.push(...statuses.filter((status) => isInstalledStatus(status)).map((status) => status.runtime));
+      continue;
+    }
+    const rangeMatch = token.match(/^(\d+)-(\d+)$/);
+    if (rangeMatch) {
+      const start = Number(rangeMatch[1]);
+      const end = Number(rangeMatch[2]);
+      if (start > end) {
+        throw new Error(`invalid runtime range: ${token}`);
+      }
+      for (let index = start; index <= end; index += 1) {
+        selected.push(runtimeForSelectionIndex(statuses, index));
+      }
+      continue;
+    }
+    if (/^\d+$/.test(token)) {
+      selected.push(runtimeForSelectionIndex(statuses, Number(token)));
+      continue;
+    }
+    if (RUNTIMES.includes(token)) {
+      selected.push(token);
+      continue;
+    }
+    throw new Error(`unsupported runtime selection: ${token}`);
+  }
+  const unique = [...new Set(selected)];
+  if (unique.length === 0) {
+    throw new Error('no runtimes selected');
+  }
+  return unique;
+}
+
+function runtimeForSelectionIndex(statuses, index) {
+  if (!Number.isInteger(index) || index < 1 || index > statuses.length) {
+    throw new Error(`runtime selection out of range: ${index}`);
+  }
+  return statuses[index - 1].runtime;
+}
+
+function isInstalledStatus(status) {
+  return status.state === 'installed' || status.state === 'hooks-only';
 }
 
 function resolveTargetRoot(runtime, scope, configDir) {
@@ -261,6 +443,9 @@ function resolvePython3() {
 }
 
 function validateRuntimeOptions(options) {
+  if (options.configDir && options.runtimes.length > 1) {
+    throw new Error('--config-dir can only be used with one runtime');
+  }
   for (const runtime of options.runtimes) {
     const layout = resolveRuntimeLayout(runtime, options.scope, { configDir: options.configDir });
     if (options.hookMode === 'strict' && !layout.supportsHookRegistration) {
@@ -400,7 +585,7 @@ async function installRuntime(runtime, options) {
       console.log('  hook registration: python3 required when applying the install');
     }
     if (options.hookMode === 'safe') {
-      console.log('  WARNING: safe hooks are installed but not enforcing until clean-room env vars, CLEAN_ROOM_HOOK_ENFORCE=1, or --hooks=strict are set');
+      console.log('  WARNING: safe hooks are installed; clean-room init/onboarding must set role environment variables before enforcement starts');
     }
     if (result) {
       try {
@@ -517,10 +702,12 @@ module.exports = {
   buildDesiredFiles,
   parseArgs,
   parsePreflightArgs,
+  parseRuntimeSelection,
   planInstall,
   parseRunArgs,
   runInit,
   runPreflight,
   runCleanRoom,
+  runtimeInstallStatus,
   resolveTargetRoot,
 };

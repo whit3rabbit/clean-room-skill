@@ -12,6 +12,10 @@ const {
   planUninstall,
 } = require('../lib/install-plan.cjs');
 const {
+  parseRuntimeSelection,
+  runtimeInstallStatus,
+} = require('../bin/install.js');
+const {
   atomicWriteFileNoOverwrite,
   listFiles,
   sha256Bytes,
@@ -539,6 +543,50 @@ describe('clean-room-skill installer', () => {
     assert.throws(() => listFiles(root, { maxFiles: 1 }), /max files 1/);
   });
 
+  test('interactive runtime selection accepts multiple values and installed defaults', () => {
+    const statuses = [
+      { runtime: 'codex', state: 'not-installed' },
+      { runtime: 'claude', state: 'installed' },
+      { runtime: 'antigravity', state: 'not-installed' },
+      { runtime: 'gemini', state: 'hooks-only' },
+    ];
+
+    assert.deepEqual(
+      parseRuntimeSelection('1, claude 3-4 claude', statuses, 'install'),
+      ['codex', 'claude', 'antigravity', 'gemini']
+    );
+    assert.deepEqual(parseRuntimeSelection('', statuses, 'install'), ['codex']);
+    assert.deepEqual(parseRuntimeSelection('', statuses, 'uninstall'), ['claude', 'gemini']);
+    assert.deepEqual(parseRuntimeSelection('installed', statuses, 'uninstall'), ['claude', 'gemini']);
+    assert.throws(() => parseRuntimeSelection('99', statuses, 'install'), /out of range/);
+  });
+
+  test('interactive install status detects manifests and hook-only installs', () => {
+    const codexHome = tempDir('clean-room-interactive-status');
+    let status = runtimeInstallStatus('codex', 'global', codexHome);
+    assert.equal(status.state, 'not-installed');
+
+    let result = runInstall(['--codex', '--global', '--config-dir', codexHome, '--yes']);
+    assert.equal(result.status, 0, result.stderr);
+    status = runtimeInstallStatus('codex', 'global', codexHome);
+    assert.equal(status.state, 'installed');
+    assert.match(status.detail, /phase complete/);
+
+    const hooksOnlyHome = tempDir('clean-room-interactive-hooks-only');
+    fs.writeFileSync(path.join(hooksOnlyHome, 'hooks.json'), JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash',
+            hooks: [{ type: 'command', command: 'python3 /tmp/hooks/clean-room-hook.py' }],
+          },
+        ],
+      },
+    }, null, 2));
+    status = runtimeInstallStatus('codex', 'global', hooksOnlyHome);
+    assert.equal(status.state, 'hooks-only');
+  });
+
   test('generates command wrappers for command-only runtimes', () => {
     const root = tempDir('clean-room-command-wrapper');
     const geminiHome = path.join(root, 'gemini');
@@ -575,7 +623,7 @@ describe('clean-room-skill installer', () => {
     const codexHome = tempDir('clean-room-installed-safe-hook');
     const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /safe hooks are installed but not enforcing/);
+    assert.match(result.stdout, /safe hooks are installed; clean-room init\/onboarding must set role environment variables/);
 
     const command = firstManagedHookCommand(path.join(codexHome, 'hooks.json'));
     let hook = spawnSync(command, {
