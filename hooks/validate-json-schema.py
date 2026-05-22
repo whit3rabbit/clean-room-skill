@@ -62,6 +62,7 @@ TASK_MANIFEST_HANDOFF_SEQUENCE = [
 ]
 MAX_REPORTED_ERRORS = 20
 MAX_VALIDATION_ERRORS = MAX_REPORTED_ERRORS + 1
+REPAIR_HINT = "Fix or update the JSON artifact to satisfy the reported schema errors, then write it again."
 
 
 def schema_dir() -> Path:
@@ -257,6 +258,10 @@ def is_clean_room_task_manifest_schema(schema: dict[str, Any]) -> bool:
     return isinstance(properties, dict) and "handoff_sequence" in properties and "agent_pipeline" in properties
 
 
+def print_repair_hint() -> None:
+    print(REPAIR_HINT, file=sys.stderr)
+
+
 def add_error(errors: list[str], message: str) -> None:
     if len(errors) < MAX_VALIDATION_ERRORS:
         errors.append(message)
@@ -450,6 +455,7 @@ def main() -> int:
             data = json.loads(text)
         except json.JSONDecodeError as exc:
             print(f"clean-room JSON parse failed for {describe_path(path)}: {redact_text(exc)}", file=sys.stderr)
+            print_repair_hint()
             return 1
         if not isinstance(data, dict):
             if in_clean_root:
@@ -457,6 +463,7 @@ def main() -> int:
                     f"clean-room schema check failed for {describe_path(path)}: clean JSON artifact must be an object",
                     file=sys.stderr,
                 )
+                print_repair_hint()
                 return 1
             continue
         kind = artifact_kind(path, data)
@@ -471,6 +478,7 @@ def main() -> int:
                     f"clean-room schema check failed for {describe_path(path)}: unrecognized clean JSON artifact",
                     file=sys.stderr,
                 )
+                print_repair_hint()
                 return 1
             continue
         if in_clean_root and kind in {"source-index", "init-config", "preflight-goal"}:
@@ -478,6 +486,7 @@ def main() -> int:
                 f"clean-room schema check failed for {describe_path(path)}: {kind}.json is not a clean-role artifact",
                 file=sys.stderr,
             )
+            print_repair_hint()
             return 1
         schema_path = schema_dir() / SCHEMA_BY_ARTIFACT[kind]
         schema_text, schema_read_error = read_artifact_text(schema_path, "schema artifact")
@@ -500,6 +509,7 @@ def main() -> int:
                 print(f"  {redact_text(error)}", file=sys.stderr)
             if len(errors) > MAX_REPORTED_ERRORS:
                 print(f"  ... validation stopped after {MAX_REPORTED_ERRORS} error(s)", file=sys.stderr)
+            print_repair_hint()
             return 1
     return 0
 

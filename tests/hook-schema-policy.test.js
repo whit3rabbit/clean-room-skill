@@ -26,6 +26,8 @@ const {
   writeProbeTool,
 } = require('./helpers/hook-policy.cjs');
 
+const REPAIR_HINT = 'Fix or update the JSON artifact to satisfy the reported schema errors, then write it again.';
+
 describe('clean-room schema hook policy', () => {
   test('post-write schema hook handles supported payload path variants and fails closed on bad payloads', () => {
     const root = tempDir('clean-room-payloads');
@@ -33,6 +35,7 @@ describe('clean-room schema hook policy', () => {
     const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
     const behavior = copyExample('behavior-spec.json', clean);
     const report = copyExample('qc-report.json', clean);
+    const badJson = path.join(clean, 'bad-json.json');
 
     const validPayloads = [
       { tool_name: 'Write', tool_input: { file_path: behavior } },
@@ -49,10 +52,18 @@ describe('clean-room schema hook policy', () => {
     let result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { content: '{}' } }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /could not determine the written path/);
+    assert.equal(result.stderr.includes(REPAIR_HINT), false);
 
     result = runHook('validate-json-schema.py', '{', env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /malformed hook JSON payload/);
+    assert.equal(result.stderr.includes(REPAIR_HINT), false);
+
+    fs.writeFileSync(badJson, '{\n');
+    result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: badJson } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /JSON parse failed/);
+    assert.ok(result.stderr.includes(REPAIR_HINT));
   });
 
   test('post-write schema hook reports missing and unreadable artifacts without traceback', () => {
@@ -161,6 +172,7 @@ describe('clean-room schema hook policy', () => {
     result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /missing required field 'then_value'/);
+    assert.ok(result.stderr.includes(REPAIR_HINT));
 
     fs.writeFileSync(artifact, JSON.stringify({ mode: 'else' }));
     result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: artifact } }, schemaEnv);
