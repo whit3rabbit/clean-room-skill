@@ -39,6 +39,11 @@ echo "Validating JSON metadata..."
 "$python_cmd" -m json.tool .codex-plugin/plugin.json >/dev/null
 "$python_cmd" -m json.tool .claude-plugin/plugin.json >/dev/null
 
+if command -v claude >/dev/null 2>&1; then
+  echo "Validating Claude plugin manifest..."
+  claude plugin validate .claude-plugin/plugin.json
+fi
+
 echo "Compiling Python hooks and scripts..."
 "$python_cmd" -m compileall -q hooks skills/clean-room/scripts
 

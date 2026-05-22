@@ -422,7 +422,9 @@ describe('clean-room-skill installer', () => {
   test('runtime plugin manifests do not declare cwd-fragile static hooks', () => {
     assert.equal(readJson(path.join(ROOT, 'plugin.json')).hooks, undefined);
     assert.equal(readJson(path.join(ROOT, '.codex-plugin', 'plugin.json')).hooks, undefined);
-    assert.equal(readJson(path.join(ROOT, '.claude-plugin', 'plugin.json')).hooks, undefined);
+    const claudeManifest = readJson(path.join(ROOT, '.claude-plugin', 'plugin.json'));
+    assert.equal(claudeManifest.hooks, undefined);
+    assert.equal(claudeManifest.agents, undefined);
     assert.equal(fs.existsSync(path.join(ROOT, 'hooks', 'hooks.json')), false);
   });
 
