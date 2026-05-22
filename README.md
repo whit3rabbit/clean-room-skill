@@ -64,7 +64,7 @@ npx clean-room-skill@latest --cursor --global --yes
 npx clean-room-skill@latest --all --global --yes
 ```
 
-Interactive mode uses an Ink TUI for install or uninstall, global or local scope, runtime selection, and hook mode. The runtime screen shows detected install status for each target root, supports multi-select, and preselects detected installs for uninstall.
+Interactive mode uses an Ink TUI for install, update, uninstall, or status, global or local scope, runtime selection, and hook mode. The runtime screen shows detected install status for each target root, supports multi-select, preselects manifest-backed installs for update, and preselects detected installs for uninstall.
 
 Runtime support tiers:
 
@@ -102,6 +102,8 @@ Execute the installer via `npx` with the following parameters:
 
 ```bash
 npx clean-room-skill@latest [runtimes] [scope] [options]
+npx clean-room-skill@latest status [runtimes] [scope] [options]
+npx clean-room-skill@latest update [runtimes] [scope] [options]
 ```
 
 | Parameter | Type | Description |
@@ -115,10 +117,17 @@ npx clean-room-skill@latest [runtimes] [scope] [options]
 | `--uninstall` | Option | Removes all manifest-managed files and hook registrations. |
 | `--yes` | Option | Non-interactive mode. Automatically accepts overwriting known files. |
 
+`status` reports each selected runtime's installed package version, current package version, manifest phase, hook registration state, missing or modified managed files, stale managed files, and unmanaged package-path conflicts. With no runtime flag, it reports all known runtime layouts.
+
+`update` refreshes installed runtime files without rerunning bootstrap or onboarding. With no runtime flag, it updates manifest-backed installs detected for the selected scope. It preserves the previous hook mode unless `--hooks=<mode>` is passed.
+
 Useful maintenance commands:
 
 ```bash
 npx clean-room-skill@latest --dry-run --all --global
+npx clean-room-skill@latest status --global
+npx clean-room-skill@latest update --global --dry-run
+npx clean-room-skill@latest update --global
 npx clean-room-skill@latest --codex --global --uninstall --yes
 npx clean-room-skill@latest doctor --runtime codex --hooks=safe
 npx clean-room-skill@latest preflight --template --output ~/Documents/CleanRoom/task-1234abcd/contaminated/preflight-goal.json

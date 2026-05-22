@@ -456,10 +456,17 @@ function defaultRuntimeSelections(statuses, action = 'install') {
   return ['codex'];
 }
 
+function detectedRuntimeSelections(statuses, action = 'install') {
+  if (action === 'update') {
+    return statuses.filter((status) => status.state === 'installed').map((status) => status.runtime);
+  }
+  return statuses.filter((status) => isInstalledStatus(status)).map((status) => status.runtime);
+}
+
 function parseRuntimeSelection(answer, statuses, action = 'install') {
   const text = answer.trim().toLowerCase();
   if (text === '') {
-    if (action === 'uninstall') {
+    if (action === 'uninstall' || action === 'update') {
       const installed = defaultRuntimeSelections(statuses, action);
       if (installed.length === 0) {
         throw new Error('no installed runtimes detected; select a runtime explicitly');
@@ -477,7 +484,7 @@ function parseRuntimeSelection(answer, statuses, action = 'install') {
       continue;
     }
     if (token === 'installed') {
-      selected.push(...statuses.filter((status) => isInstalledStatus(status)).map((status) => status.runtime));
+      selected.push(...detectedRuntimeSelections(statuses, action));
       continue;
     }
     const rangeMatch = token.match(/^(\d+)-(\d+)$/);
@@ -602,7 +609,7 @@ function RuntimeMultiSelect({ React, Box, Text, useInput, h, action, statuses, o
       setSelected(new Set(RUNTIMES));
     } else if (input === 'i') {
       setError('');
-      setSelected(new Set(defaultRuntimeSelections(statuses, 'uninstall')));
+      setSelected(new Set(detectedRuntimeSelections(statuses, action)));
     } else if (key.return || /[\r\n]/.test(input)) {
       const runtimes = RUNTIMES.filter((runtime) => selected.has(runtime));
       if (runtimes.length === 0) {
@@ -1165,6 +1172,9 @@ async function main() {
   if (argv[0] === 'status') {
     const options = parseArgs(argv.slice(1));
     options.operation = 'status';
+    if (options.configDir && options.runtimes.length === 0) {
+      throw new Error('--config-dir can only be used with one runtime');
+    }
     if (!options.scope) options.scope = 'global';
     validateRuntimeOptions(options);
     runStatus(options);
@@ -1173,6 +1183,9 @@ async function main() {
   if (argv[0] === 'update') {
     const options = parseArgs(argv.slice(1));
     options.operation = 'update';
+    if (options.configDir && options.runtimes.length === 0) {
+      throw new Error('--config-dir can only be used with one runtime');
+    }
     if (!options.scope) options.scope = 'global';
     options.runtimes = selectedUpdateRuntimes(options);
     validateRuntimeOptions(options);

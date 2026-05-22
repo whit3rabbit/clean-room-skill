@@ -575,7 +575,9 @@ describe('clean-room-skill installer', () => {
     );
     assert.deepEqual(parseRuntimeSelection('', statuses, 'install'), ['codex']);
     assert.deepEqual(parseRuntimeSelection('', statuses, 'uninstall'), ['claude', 'gemini']);
+    assert.deepEqual(parseRuntimeSelection('', statuses, 'update'), ['claude']);
     assert.deepEqual(parseRuntimeSelection('installed', statuses, 'uninstall'), ['claude', 'gemini']);
+    assert.deepEqual(parseRuntimeSelection('installed', statuses, 'update'), ['claude']);
     assert.throws(() => parseRuntimeSelection('99', statuses, 'install'), /out of range/);
   });
 
@@ -603,6 +605,52 @@ describe('clean-room-skill installer', () => {
     }, null, 2));
     status = runtimeInstallStatus('codex', 'global', hooksOnlyHome);
     assert.equal(status.state, 'hooks-only');
+  });
+
+  test('status reports install version, drift, and hook state', () => {
+    const claudeHome = tempDir('clean-room-status-command');
+
+    let result = runInstall(['status', '--claude', '--global'], { CLAUDE_CONFIG_DIR: claudeHome });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /clean-room-skill package version:/);
+    assert.match(result.stdout, /claude \(global\) not-installed/);
+
+    result = runInstall(['--claude', '--global', '--yes'], { CLAUDE_CONFIG_DIR: claudeHome });
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runInstall(['status', '--claude', '--global'], { CLAUDE_CONFIG_DIR: claudeHome });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /claude \(global\) installed/);
+    assert.match(result.stdout, /version: [0-9]+\.[0-9]+\.[0-9]+/);
+    assert.match(result.stdout, /phase: complete/);
+    assert.match(result.stdout, /hooks: safe; registration present/);
+    assert.match(result.stdout, /files: [0-9]+; missing 0; modified 0; stale 0; conflicts 0/);
+  });
+
+  test('update refreshes an installed runtime without rerunning onboarding', () => {
+    const claudeHome = tempDir('clean-room-update-command');
+    const manifestPath = path.join(claudeHome, 'clean-room-install-manifest.json');
+
+    let result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readJson(manifestPath).hooks_mode, 'copy-only');
+
+    result = runInstall(['update', '--claude', '--global', '--dry-run'], {
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Would update claude/);
+    assert.equal(readJson(manifestPath).hooks_mode, 'copy-only');
+
+    result = runInstall(['update', '--claude', '--global'], {
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Updating claude/);
+    assert.equal(readJson(manifestPath).hooks_mode, 'copy-only');
+    assert.equal(fs.existsSync(path.join(claudeHome, 'settings.json')), false);
   });
 
   test('generates command wrappers for command-only runtimes', () => {
