@@ -79,11 +79,7 @@ def allowed_roots_for_role(role: str) -> list[Path]:
             + env_roots(SCHEMA_READ_ROOTS)
         )
     if role == SANITIZER_ROLE:
-        return (
-            env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
-            + env_roots(ADDITIONAL_CLEAN_READ_ROOTS)
-            + env_roots(SCHEMA_READ_ROOTS)
-        )
+        return env_roots(ADDITIONAL_CLEAN_READ_ROOTS) + env_roots(SCHEMA_READ_ROOTS)
     return []
 
 

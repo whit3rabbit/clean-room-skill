@@ -193,13 +193,14 @@ describe('clean-room access hook policy', () => {
     assert.match(result.stderr, /outside allowed roots/);
   });
 
-  test('source-denied sanitizer can read staged artifacts but not source, clean, or source-index files', () => {
+  test('source-denied sanitizer can read only explicitly allowed staged artifacts and denied roots stay blocked', () => {
     const root = tempDir('clean-room-sanitizer-read');
     const env = policyEnv(root, 'contaminated-handoff-sanitizer');
     const contaminated = env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS;
     const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
     const source = env.CLEAN_ROOM_SOURCE_ROOTS;
     const allowed = env.CLEAN_ROOM_ALLOWED_READ_ROOTS;
+    env.CLEAN_ROOM_ALLOWED_READ_ROOTS = `${allowed}${path.delimiter}${contaminated}`;
     fs.writeFileSync(path.join(contaminated, 'behavior-spec.json'), '{}');
     fs.writeFileSync(path.join(contaminated, 'source-index.json'), '{}');
     fs.writeFileSync(path.join(source, 'secret.py'), 'VALUE = 1\n');
@@ -207,6 +208,13 @@ describe('clean-room access hook policy', () => {
     fs.writeFileSync(path.join(allowed, 'public.md'), '# Public reference\n');
 
     let result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: path.join(contaminated, 'behavior-spec.json') },
+    }, policyEnv(root, 'contaminated-handoff-sanitizer'));
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /outside allowed roots/);
+
+    result = runHook('deny-clean-source-read.py', {
       tool_name: 'Read',
       tool_input: { cwd: contaminated, file_path: 'behavior-spec.json' },
     }, env);
