@@ -9,8 +9,8 @@
 - Node requirement: `>=22`.
 - CI runs Node 22 with Python 3.12 on macOS.
 - This repo installs clean-room skills, role agents, hooks, schemas, and examples for multiple agent runtimes.
-- The workflow creates clean behavioral spec packages. It does not create replacement implementation code.
-- Full docs: [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- The workflow creates clean behavioral spec packages and clean implementation outputs. It does not generate replacement code directly from source.
+- Full docs: [README.md](README.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/REFERENCE.md](docs/REFERENCE.md).
 
 ## Repo Map
 
@@ -34,7 +34,12 @@
 - Run installer tests only: `npm run test:install`.
 - Set up Python verifier deps on macOS/Homebrew Python: `python3 -m venv .venv && .venv/bin/python -m pip install "jsonschema[format]>=4.18,<5"`.
 - Run full local checks: `npm run verify`.
+- Dry-run bootstrap folder creation: `node bin/install.js init --dry-run`.
+- Show preflight helper options: `node bin/install.js preflight --help`.
 - Dry-run installer: `node bin/install.js --dry-run --all --global`.
+- Check runtime install state: `node bin/install.js status --global`.
+- Dry-run runtime updates: `node bin/install.js update --global --dry-run`.
+- Smoke-test generated hooks: `node bin/install.js doctor --runtime codex --hooks=safe --config-dir <path>`.
 - Dry-run inner-loop runner: `node bin/install.js run --task-manifest <path> --agent-commands <path> --dry-run`.
 - No lint script exists. Do not invent one.
 
@@ -43,6 +48,7 @@
 - JS changes: run `node --check` on touched JS/CJS files and `npm test`.
 - Runner changes: run `node --check lib/run.cjs bin/install.js`, `node --test tests/run.test.js`, and `npm test`.
 - Installer/runtime layout changes: run `npm run test:install` and `npm run verify`.
+- Installer TUI changes: use the MCP TUI test tool for at least one representative interactive flow.
 - Python hook or script changes: run `python3 -m py_compile hooks/*.py skills/clean-room/scripts/*.py skills/clean-room/scripts/source_index/*.py`.
 - Schema or example changes: run `.venv/bin/python tests/validate_jsonschema.py` if `.venv` exists, otherwise use a Python with `jsonschema[format]>=4.18,<5`.
 - Marketplace metadata changes: run `jq empty` on changed JSON files, confirm plugin names match runtime manifests, and confirm local source paths start with `./` and resolve inside the repo.
@@ -91,7 +97,10 @@ Ask before changing:
 
 ## Installer And Indexer Safety
 
-- Runtime install/uninstall mutations are serialized per target root with `.clean-room-install.lock`.
+- Runtime install/update/uninstall mutations are serialized per target root with `.clean-room-install.lock`.
+- `status` is read-only. It may inspect manifests, managed file hashes, stale managed paths, conflicts, and hook registration state, but must not mutate target roots or hook config.
+- `update` refreshes manifest-managed files without rerunning onboarding. It must preserve the prior manifest hook mode unless the user explicitly passes `--hooks=<mode>`.
+- `update` should select only manifest-backed installs by default. Hook-only remnants are uninstall/repair concerns, not update targets.
 - Installer plans are not authority for later destructive actions. Recheck managed file state immediately before writes and removals, and back up late changes before mutation.
 - `clean-room-install-manifest.json` uses `phase: "installing"` until hook config mutation succeeds, then `phase: "complete"`. If hook config mutation fails after files are copied, preserve a manifest with `hook_registration.status: "failed"` when possible.
 - Bootstrap `init` must use atomic no-clobber writes unless `--force` is set.
@@ -118,6 +127,8 @@ Ask before changing:
 ## Skill Entry Points
 
 - `clean-room`: start the setup wizard when no durable artifacts are provided.
+- `preflight`: create or review the required `preflight-goal.json` before source discovery or controller execution.
+- `init`: record durable run preferences, separated roots, schema profile, model policy, and clean-safe/contaminated-only rules.
 - `attended`: start with `controller_policy.mode` fixed to `attended`.
 - `unattended`: start with bounded unattended defaults and `loop_context` for one approved spec slice.
 - `resume`: continue from existing durable artifacts.
@@ -128,8 +139,10 @@ Ask before changing:
 
 - [Agent 0: Contaminated Manager Verifier](agents/contaminated-manager-verifier.md): validates authorization, decomposes scope, tracks coverage, verifies Agent 3 terminal reports from the contaminated side, and writes `clean-room-result.json`.
 - [Agent 1: Contaminated Source Analyst](agents/contaminated-source-analyst.md): reads authorized source and writes neutral behavior specs with ledger references.
+- [Agent 1.5: Contaminated Handoff Sanitizer](agents/contaminated-handoff-sanitizer.md): reviews Agent 1 drafts from a source-denied contaminated context, scrubs identifying material, and approves or quarantines clean handoff candidates.
 - [Agent 2: Clean Architect](agents/clean-architect.md): reads clean inputs, manages schema base, and builds `skeleton-manifest.json`.
 - [Agent 3: Clean Implementer Verifier](agents/clean-qa-editor.md): implements only selected-slice work under implementation roots, records verification status, maintains QC, and emits one terminal report.
+- [Agent 3 shell variant](agents/clean-implementer-verifier-shell.md): shell-capable verification profile for isolated strict-hook homes; use only for bounded Agent 3 verification through the installed runner.
 - Leakage rules live in [skills/clean-room/references/LEAKAGE-RULES.md](skills/clean-room/references/LEAKAGE-RULES.md).
 
 ## Role Session Environment
