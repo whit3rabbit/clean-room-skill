@@ -108,6 +108,8 @@ npx clean-room-skill@latest run \
 
 The `run` command executes one bounded inner clean-room loop for an already approved spec slice. It does not replace the outer spec-development workflow.
 
+In strict context-management mode, every `agent-commands.json` stage must set `context.fresh_session: true` and `context.brief_path`; see the runner adapter example in `docs/REFERENCE.md`.
+
 ## Typical Workflow
 
 ![Clean Room Architecture](assets/clean-room-arch.svg)

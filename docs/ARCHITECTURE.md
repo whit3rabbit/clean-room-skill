@@ -235,11 +235,12 @@ Agent 3's terminal report is not enough to return. Agent 0 must consume that rep
 *   Reloads durable artifacts before each iteration.
 *   Selects at most one pending or gap unit inside `loop_context.approved_scope_refs`.
 *   Spawns configured role commands with `shell: false`, bounded output, and bounded timeout.
+*   In strict context-management mode, requires each configured stage to provide `context.fresh_session: true` and `context.brief_path`, then validates the session brief before spawn.
 *   Validates schema, leakage, and handoff integrity before advancing state.
 *   Records controller memory in contaminated-side `controller-run-ledger.json`.
 *   Writes `clean-room-result.json` before returning to the outer spec loop.
 
-Progress is durable-artifact based. `clean-room-skill run` compares semantic JSON artifact hashes that ignore volatile timestamp and artifact-hash fields, plus raw file hashes under implementation roots. Chat output alone and timestamp-only artifact churn do not count as progress.
+Progress is durable-artifact based. `clean-room-skill run` compares semantic JSON artifact hashes that ignore volatile timestamp and artifact-hash fields, plus raw file hashes under implementation roots. Chat output, timestamp-only artifact churn, and `controller-status.json` updates alone do not count as progress.
 
 ---
 

@@ -210,7 +210,7 @@ Options:
 
 The task manifest must already include preflight references, the required handoff sequence, unattended controller policy, finite iteration bounds, and `loop_context.approved_scope_refs`.
 
-Minimal agent command adapter shape:
+Minimal agent command adapter shape for advisory or disabled context management:
 
 ```json
 {
@@ -235,6 +235,73 @@ Minimal agent command adapter shape:
 
 Supported phases are `contaminated-analysis`, `sanitize-handoff`, `clean-plan`, `clean-implement-qc`, and `contaminated-coverage-verify`. The coverage verification phase is required.
 
+When `task-manifest.json` sets `context_management.mode` to `role-session-briefs` and `context_management.enforcement` to `strict`, every configured stage must include `context.fresh_session: true` and `context.brief_path`. The runner validates the brief before spawn, passes only the brief path plus environment facts in the stage prompt, and records the brief ref/hash in `controller-run-ledger.json`.
+
+Strict context-management adapter example:
+
+```json
+{
+  "version": 1,
+  "stages": [
+    {
+      "phase": "contaminated-analysis",
+      "role": "contaminated-source-analyst",
+      "cwd": "/tmp/clean-room/task-1234abcd/contaminated",
+      "argv": ["agent-cli", "--fresh-session", "--role", "source-analyst"],
+      "timeout_ms": 600000,
+      "context": {
+        "fresh_session": true,
+        "brief_path": "/tmp/clean-room/task-1234abcd/contaminated/session-briefs/iter-001-agent-1.json"
+      }
+    },
+    {
+      "phase": "sanitize-handoff",
+      "role": "contaminated-handoff-sanitizer",
+      "cwd": "/tmp/clean-room/task-1234abcd/contaminated",
+      "argv": ["agent-cli", "--fresh-session", "--role", "handoff-sanitizer"],
+      "context": {
+        "fresh_session": true,
+        "brief_path": "/tmp/clean-room/task-1234abcd/contaminated/session-briefs/iter-001-agent-1-5.json"
+      }
+    },
+    {
+      "phase": "clean-plan",
+      "role": "clean-architect",
+      "cwd": "/tmp/clean-room/task-1234abcd/clean",
+      "argv": ["agent-cli", "--fresh-session", "--role", "clean-architect"],
+      "context": {
+        "fresh_session": true,
+        "brief_path": "/tmp/clean-room/task-1234abcd/clean/session-briefs/iter-001-agent-2.json"
+      }
+    },
+    {
+      "phase": "clean-implement-qc",
+      "role": "clean-qa-editor",
+      "cwd": "/tmp/clean-room/task-1234abcd/implementation",
+      "argv": ["agent-cli", "--fresh-session", "--role", "clean-qa-editor"],
+      "context": {
+        "fresh_session": true,
+        "brief_path": "/tmp/clean-room/task-1234abcd/clean/session-briefs/iter-001-agent-3.json"
+      }
+    },
+    {
+      "phase": "contaminated-coverage-verify",
+      "role": "contaminated-manager-verifier",
+      "cwd": "/tmp/clean-room/task-1234abcd/contaminated",
+      "argv": ["agent-cli", "--fresh-session", "--role", "manager-verifier"],
+      "context": {
+        "fresh_session": true,
+        "brief_path": "/tmp/clean-room/task-1234abcd/contaminated/session-briefs/iter-001-agent-0-verify.json"
+      }
+    }
+  ]
+}
+```
+
+Relative `context.brief_path` values resolve relative to the `agent-commands.json` directory. Contaminated phases must point to briefs under the contaminated artifact root. Clean phases must point to briefs under the clean artifact root. A clean-stage brief may reference allowed clean artifacts, implementation artifacts, and approved public references, but not source indexes, contaminated ledgers, full manifests, controller status, or prior chat state.
+
+The runner exports `CLEAN_ROOM_SESSION_BRIEF_PATH`, `CLEAN_ROOM_ROLE_SESSION_ID`, and `CLEAN_ROOM_FRESH_CONTEXT_REQUIRED=1` for strict stages. The adapter still owns the actual fresh-context behavior: it must open a new model session, profile, or thread for that stage. Setting `fresh_session` while reusing one long chat is not a clean-room boundary.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Recovery |
@@ -245,6 +312,7 @@ Supported phases are `contaminated-analysis`, `sanitize-handoff`, `clean-plan`, 
 | Hook config write failed after files copied | Partial installer state | Fix the filesystem error, then re-run the same installer command. |
 | Install manifest remains `installing` | The previous install did not complete | Re-run the same installer command for that runtime and target root. |
 | `clean-room run` rejects the manifest | Invalid or incomplete unattended loop metadata | Fix `controller_policy`, `loop_context`, and `approved_scope_refs`, then retry `--dry-run`. |
+| `clean-room run` rejects an agent command stage in strict context mode | The stage is missing `context.fresh_session: true`, missing `context.brief_path`, or points the brief outside the allowed artifact root | Fix the stage context and regenerate the role-session brief for the selected unit. |
 | `clean-room run` reports no progress | Configured stages exited without durable artifact changes | Check role command cwd/argv, selected unit, and artifact write roots. |
 | `clean-room run` reports repeated unit selection | Same unit selected after a no-progress iteration | Resolve the blocker or update durable artifacts before retrying. |
 | Hook reports `could not read` or `could not stat` | Artifact disappeared, permissions changed, or path was replaced during validation | Restore readable artifact state and retry. |
