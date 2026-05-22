@@ -45,7 +45,7 @@ npx clean-room-skill@latest --claude --global --yes
 npx clean-room-skill@latest --all --global --yes
 ```
 
-For edge cases such as ccsilo variants or modified Claude directories, add `--config-dir <path-to-claude-config-root>` to target that Claude config root explicitly.
+For edge cases such as ccsilo variants or modified Claude directories, add `--config-dir <path-to-claude-config-root>` to target that Claude config root explicitly. If Claude is launched through a wrapper, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper`; the installer runs that exact executable and rejects relative, cwd-local, and `node_modules/.bin` paths.
 
 Claude global installs use Claude's plugin system for skills and agents, so entry points are namespaced as `/clean-room:init`, `/clean-room:preflight`, and `/clean-room`. The installer still manages hook files and migrates older standalone Claude skill copies out of the config root on reinstall or update.
 

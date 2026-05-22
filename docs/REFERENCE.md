@@ -56,6 +56,8 @@ npx clean-room-skill@latest update --codex --global --yes
 
 The installer serializes install and uninstall per target root with `.clean-room-install.lock`. Reinstalling replaces only manifest-managed files automatically. Unknown existing files are not overwritten in non-interactive mode.
 
+Claude global installs call the Claude CLI for plugin marketplace and plugin operations. To use a silo wrapper or non-standard Claude executable, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper`. The path must be absolute, executable, outside the current working directory, and outside `node_modules/.bin`. When the variable is unset, the installer searches a sanitized `PATH` and fails closed if more than one `claude` executable remains.
+
 ## Runtime Support
 
 Verified:

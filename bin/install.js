@@ -41,6 +41,7 @@ const INSTALL_LOCK_WAIT_MS = envPositiveInteger('CLEAN_ROOM_INSTALL_LOCK_WAIT_MS
 const INSTALL_LOCK_POLL_MS = 100;
 const PYTHON_PROBE_TIMEOUT_MS = envPositiveInteger('CLEAN_ROOM_INSTALL_PYTHON_TIMEOUT_MS', 10_000);
 const CLAUDE_PLUGIN_TIMEOUT_MS = envPositiveInteger('CLEAN_ROOM_INSTALL_CLAUDE_PLUGIN_TIMEOUT_MS', 120_000);
+const CLAUDE_EXECUTABLE_ENV = 'CLEAN_ROOM_CLAUDE_EXECUTABLE';
 const CLAUDE_PLUGIN_MARKETPLACE_NAME = 'clean-room-skill';
 const CLAUDE_PLUGIN_NAME = 'clean-room';
 const CLAUDE_PLUGIN_ID = `${CLAUDE_PLUGIN_NAME}@${CLAUDE_PLUGIN_MARKETPLACE_NAME}`;
@@ -755,79 +756,135 @@ function pathIsUnder(candidate, root) {
   return candidate === root || candidate.startsWith(`${root}${path.sep}`);
 }
 
-function trustedClaudeRoots() {
-  const roots = [
-    '/opt/homebrew',
-    '/usr/local',
-    '/usr/bin',
-    '/bin',
-  ];
-  if (process.env.HOME) {
-    roots.push(
-      path.join(process.env.HOME, '.local', 'bin'),
-      path.join(process.env.HOME, '.local', 'share', 'claude', 'versions')
-    );
+function currentWorkingRoots() {
+  const cwd = path.resolve(process.cwd());
+  const roots = [cwd];
+  try {
+    const real = fs.realpathSync.native(cwd);
+    if (!roots.includes(real)) roots.push(real);
+  } catch {
+    // Keep the resolved cwd as the policy root if realpath is unavailable.
   }
-  const resolvedRoots = [];
-  for (const root of roots) {
-    const resolved = path.resolve(root);
-    resolvedRoots.push(resolved);
-    try {
-      const real = fs.realpathSync.native(resolved);
-      if (!resolvedRoots.includes(real)) resolvedRoots.push(real);
-    } catch {
-      // Missing optional roots are still allowed when they appear later.
-    }
-  }
-  return resolvedRoots;
+  return roots;
 }
 
-function trustedClaudePath(filePath) {
-  const resolved = path.resolve(filePath);
-  const roots = trustedClaudeRoots();
-  if (!roots.some((root) => pathIsUnder(resolved, root))) return false;
-  try {
-    const real = fs.realpathSync.native(resolved);
-    return roots.some((root) => pathIsUnder(real, root));
-  } catch {
-    return false;
+function pathIsUnderAny(candidate, roots) {
+  return roots.some((root) => pathIsUnder(candidate, root));
+}
+
+function pathContainsNodeModulesBin(candidate) {
+  const parts = path.resolve(candidate).split(path.sep);
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    if (parts[i] === 'node_modules' && parts[i + 1] === '.bin') return true;
   }
+  return false;
+}
+
+function unsafeClaudeExecutableReason(filePath, label) {
+  if (!filePath || typeof filePath !== 'string' || !path.isAbsolute(filePath)) {
+    return `${label} must be an absolute path`;
+  }
+  const resolved = path.resolve(filePath);
+  const cwdRoots = currentWorkingRoots();
+  if (pathIsUnderAny(resolved, cwdRoots)) {
+    return `${label} must not be under the current working directory`;
+  }
+  if (pathContainsNodeModulesBin(resolved)) {
+    return `${label} must not be under node_modules/.bin`;
+  }
+  let real;
+  try {
+    real = fs.realpathSync.native(resolved);
+  } catch {
+    return `${label} must resolve to an executable file`;
+  }
+  if (pathIsUnderAny(real, cwdRoots)) {
+    return `${label} target must not be under the current working directory`;
+  }
+  if (pathContainsNodeModulesBin(real)) {
+    return `${label} target must not be under node_modules/.bin`;
+  }
+  try {
+    const stat = fs.statSync(real);
+    fs.accessSync(real, fs.constants.X_OK);
+    if (!stat.isFile()) {
+      return `${label} must be an executable regular file`;
+    }
+  } catch {
+    return `${label} must be an executable regular file`;
+  }
+  return null;
+}
+
+function assertClaudeExecutable(filePath, label) {
+  const reason = unsafeClaudeExecutableReason(filePath, label);
+  if (reason) throw new Error(reason);
+  return path.resolve(filePath);
+}
+
+function sanitizedPathEntriesForClaude(value) {
+  const entries = String(value || '').split(path.delimiter).filter(Boolean);
+  const cwdRoots = currentWorkingRoots();
+  const seen = new Set();
+  return entries.filter((entry) => {
+    if (!path.isAbsolute(entry)) return false;
+    const normalized = path.resolve(entry);
+    if (pathIsUnderAny(normalized, cwdRoots)) return false;
+    try {
+      if (pathIsUnderAny(fs.realpathSync.native(normalized), cwdRoots)) return false;
+    } catch {
+      // Nonexistent PATH entries cannot provide claude; leave candidate validation to fail later.
+    }
+    if (pathContainsNodeModulesBin(normalized)) return false;
+    if (seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
 }
 
 function sanitizePathForClaude(value) {
-  const entries = String(value || '').split(path.delimiter).filter(Boolean);
-  const cwd = process.cwd();
-  const roots = trustedClaudeRoots();
-  const safeEntries = entries.filter((entry) => {
-    if (!path.isAbsolute(entry)) return false;
-    const normalized = path.resolve(entry);
-    if (normalized === cwd || normalized.startsWith(`${cwd}${path.sep}`)) return false;
-    if (normalized.includes(`${path.sep}node_modules${path.sep}.bin`)) return false;
-    if (!roots.some((root) => pathIsUnder(normalized, root))) return false;
-    return true;
-  });
-  if (safeEntries.length === 0) {
-    throw new Error('Claude plugin command requires a non-empty trusted PATH');
-  }
-  return safeEntries.join(path.delimiter);
+  return sanitizedPathEntriesForClaude(value).join(path.delimiter);
 }
 
 function resolveClaudeExecutable() {
+  const configuredExecutable = process.env[CLAUDE_EXECUTABLE_ENV];
   const searchPath = sanitizePathForClaude(process.env.PATH);
-  for (const entry of searchPath.split(path.delimiter)) {
-    const candidate = path.join(entry, 'claude');
-    if (!trustedClaudePath(candidate)) continue;
-    try {
-      const stat = fs.statSync(candidate);
-      fs.accessSync(candidate, fs.constants.X_OK);
-      if (stat.isFile()) {
-        return { executable: candidate, searchPath };
-      }
-    } catch {
-      // Keep searching trusted PATH entries.
-    }
+  if (configuredExecutable) {
+    return {
+      executable: assertClaudeExecutable(configuredExecutable, CLAUDE_EXECUTABLE_ENV),
+      searchPath,
+    };
   }
-  throw new Error('Claude plugin command requires a trusted claude executable on PATH');
+
+  const entries = sanitizedPathEntriesForClaude(process.env.PATH);
+  if (entries.length === 0) {
+    throw new Error(`Claude plugin command requires ${CLAUDE_EXECUTABLE_ENV} or a non-empty sanitized PATH`);
+  }
+
+  const candidates = [];
+  const seenCandidates = new Set();
+  for (const entry of entries) {
+    const candidate = path.join(entry, 'claude');
+    if (unsafeClaudeExecutableReason(candidate, 'Claude executable')) continue;
+    const resolved = path.resolve(candidate);
+    let realCandidate;
+    try {
+      realCandidate = fs.realpathSync.native(resolved);
+    } catch {
+      continue;
+    }
+    if (seenCandidates.has(realCandidate)) continue;
+    seenCandidates.add(realCandidate);
+    candidates.push(resolved);
+  }
+
+  if (candidates.length === 1) {
+    return { executable: candidates[0], searchPath };
+  }
+  if (candidates.length > 1) {
+    throw new Error(`Claude plugin command found multiple claude executables on sanitized PATH; set ${CLAUDE_EXECUTABLE_ENV} to the intended absolute executable`);
+  }
+  throw new Error(`Claude plugin command requires ${CLAUDE_EXECUTABLE_ENV} or a claude executable on sanitized PATH`);
 }
 
 function claudePluginEnv(layout, searchPath) {

@@ -263,9 +263,11 @@ process.exit(2);
     binDir,
     homeDir,
     statePath,
+    executable: stubPath,
     env: {
       HOME: homeDir,
       PATH: `${binDir}${path.delimiter}${process.env.PATH || ''}`,
+      CLEAN_ROOM_CLAUDE_EXECUTABLE: stubPath,
       CLEAN_ROOM_CLAUDE_STUB_STATE: statePath,
     },
   };
@@ -287,6 +289,15 @@ exit 0
 `);
   fs.chmodSync(stubPath, 0o755);
   return stubPath;
+}
+
+function writeClaudeWrapper(wrapperPath, targetPath) {
+  fs.mkdirSync(path.dirname(wrapperPath), { recursive: true });
+  fs.writeFileSync(wrapperPath, `#!/bin/sh
+exec "${targetPath}" "$@"
+`);
+  fs.chmodSync(wrapperPath, 0o755);
+  return wrapperPath;
 }
 
 function writeLegacyClaudeStandaloneInstall(claudeHome) {
@@ -787,7 +798,29 @@ describe('clean-room-skill installer', () => {
     ]);
   });
 
-  test('Claude plugin commands skip untrusted PATH entries', () => {
+  test('Claude plugin executable override supports wrappers and ignores PATH hijacks', () => {
+    const root = tempDir('clean-room-claude-wrapper');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    const marker = path.join(root, 'marker.txt');
+    const hijackBin = path.join(root, 'hijack-bin');
+    const wrapper = writeClaudeWrapper(path.join(root, 'silo', 'ccsilo-claude'), stub.executable);
+    const claudeHome = path.join(root, 'config');
+    writeClaudeHijack(hijackBin, marker);
+
+    const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      HOME: stub.homeDir,
+      PATH: hijackBin,
+      CLEAN_ROOM_CLAUDE_EXECUTABLE: wrapper,
+      CLEAN_ROOM_CLAUDE_STUB_STATE: stub.statePath,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(marker), false);
+    assert.ok(readClaudeStubCalls(stub).includes(`plugin install ${CLAUDE_PLUGIN_ID} --scope user`));
+  });
+
+  test('Claude plugin PATH discovery skips unsafe local entries', () => {
     const root = tempDir('clean-room-claude-path-skip');
     const cases = [
       {
@@ -805,11 +838,6 @@ describe('clean-room-skill installer', () => {
         cwd: path.join(root, 'repo-node-modules'),
         binDir: path.join(root, 'repo-node-modules', 'node_modules', '.bin'),
       },
-      {
-        name: 'arbitrary-temp',
-        cwd: root,
-        binDir: path.join(root, 'tmp-bin'),
-      },
     ];
 
     for (const item of cases) {
@@ -821,7 +849,8 @@ describe('clean-room-skill installer', () => {
 
       const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
         ...stub.env,
-        PATH: `${item.binDir}${path.delimiter}${stub.binDir}${path.delimiter}${process.env.PATH || ''}`,
+        CLEAN_ROOM_CLAUDE_EXECUTABLE: '',
+        PATH: `${item.binDir}${path.delimiter}${stub.binDir}`,
         CLAUDE_CONFIG_DIR: claudeHome,
       }, item.cwd);
 
@@ -831,7 +860,72 @@ describe('clean-room-skill installer', () => {
     }
   });
 
-  test('Claude plugin commands fail closed without a trusted PATH entry', () => {
+  test('Claude plugin PATH discovery fails closed when PATH is ambiguous', () => {
+    const root = tempDir('clean-room-claude-path-ambiguous');
+    const cwd = path.join(root, 'work');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    const marker = path.join(root, 'marker.txt');
+    const hijackBin = path.join(root, 'tmp-bin');
+    const claudeHome = path.join(root, 'config');
+    fs.mkdirSync(cwd, { recursive: true });
+    writeClaudeHijack(hijackBin, marker);
+
+    const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
+      CLEAN_ROOM_CLAUDE_EXECUTABLE: '',
+      PATH: `${hijackBin}${path.delimiter}${stub.binDir}`,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    }, cwd);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /multiple claude executables on sanitized PATH/);
+    assert.equal(fs.existsSync(marker), false);
+    assert.equal(readClaudeStubCalls(stub).length, 0);
+  });
+
+  test('Claude plugin executable override rejects unsafe paths', () => {
+    const root = tempDir('clean-room-claude-override-unsafe');
+    const cases = [
+      {
+        name: 'relative',
+        cwd: path.join(root, 'relative-work'),
+        executable: 'claude',
+        expected: /CLEAN_ROOM_CLAUDE_EXECUTABLE must be an absolute path/,
+      },
+      {
+        name: 'cwd',
+        cwd: path.join(root, 'cwd-work'),
+        binDir: path.join(root, 'cwd-work'),
+        expected: /CLEAN_ROOM_CLAUDE_EXECUTABLE (target )?must not be under the current working directory/,
+      },
+      {
+        name: 'node-modules-bin',
+        cwd: path.join(root, 'node-work'),
+        binDir: path.join(root, 'project', 'node_modules', '.bin'),
+        expected: /CLEAN_ROOM_CLAUDE_EXECUTABLE must not be under node_modules\/\.bin/,
+      },
+    ];
+
+    for (const item of cases) {
+      const marker = path.join(root, `${item.name}-marker.txt`);
+      const claudeHome = path.join(root, `${item.name}-config`);
+      fs.mkdirSync(item.cwd, { recursive: true });
+      const executable = item.binDir ? writeClaudeHijack(item.binDir, marker) : item.executable;
+
+      const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+        HOME: path.join(root, `${item.name}-home`),
+        PATH: '',
+        CLEAN_ROOM_CLAUDE_EXECUTABLE: executable,
+        CLAUDE_CONFIG_DIR: claudeHome,
+      }, item.cwd);
+
+      assert.notEqual(result.status, 0, item.name);
+      assert.match(result.stderr, item.expected, item.name);
+      assert.equal(fs.existsSync(marker), false, item.name);
+    }
+  });
+
+  test('Claude plugin commands fail closed without a sanitized PATH candidate', () => {
     const root = tempDir('clean-room-claude-path-empty');
     const cwd = path.join(root, 'cwd');
     const marker = path.join(root, 'marker.txt');
@@ -844,11 +938,12 @@ describe('clean-room-skill installer', () => {
     const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
       HOME: home,
       PATH: cwd,
+      CLEAN_ROOM_CLAUDE_EXECUTABLE: '',
       CLAUDE_CONFIG_DIR: claudeHome,
     }, cwd);
 
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /non-empty trusted PATH/);
+    assert.match(result.stderr, /sanitized PATH/);
     assert.equal(fs.existsSync(marker), false);
   });
 
