@@ -751,19 +751,33 @@ function truncateCommandOutput(value) {
   return `${text.slice(0, 2000)}...`;
 }
 
+function sanitizePathForClaude(value) {
+  const entries = String(value || '').split(path.delimiter).filter(Boolean);
+  const cwd = process.cwd();
+  const safeEntries = entries.filter((entry) => {
+    if (!path.isAbsolute(entry)) return false;
+    const normalized = path.resolve(entry);
+    if (normalized === cwd || normalized.startsWith(`${cwd}${path.sep}`)) return false;
+    if (normalized.includes(`${path.sep}node_modules${path.sep}.bin`)) return false;
+    return true;
+  });
+  return safeEntries.join(path.delimiter);
+}
+
 function claudePluginEnv(layout) {
   return {
     ...process.env,
+    PATH: sanitizePathForClaude(process.env.PATH),
     CLAUDE_CONFIG_DIR: layout.targetRoot,
   };
 }
 
-function claudeCommandLabel(args) {
-  return ['claude', ...args].join(' ');
+function claudeCommandLabel(command, args) {
+  return [command, ...args].join(' ');
 }
 
-function claudePluginCommandFailure(args, result) {
-  const parts = [`Claude plugin command failed: ${claudeCommandLabel(args)}`];
+function claudePluginCommandFailure(command, args, result) {
+  const parts = [`Claude plugin command failed: ${claudeCommandLabel(command, args)}`];
   if (result.error) {
     parts.push(result.error.message);
   }
@@ -781,14 +795,15 @@ function claudePluginCommandFailure(args, result) {
 }
 
 function runClaudePluginCommand(layout, args, options = {}) {
-  const result = spawnSync('claude', args, {
+  const claudeExecutable = 'claude';
+  const result = spawnSync(claudeExecutable, args, {
     encoding: 'utf8',
     env: claudePluginEnv(layout),
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: CLAUDE_PLUGIN_TIMEOUT_MS,
   });
   if (result.error || result.status !== 0) {
-    throw new Error(claudePluginCommandFailure(args, result));
+    throw new Error(claudePluginCommandFailure(claudeExecutable, args, result));
   }
   if (!options.silent) {
     if (result.stdout) process.stdout.write(result.stdout);
@@ -804,7 +819,7 @@ function readClaudePluginJson(layout, args) {
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     throw new Error(
-      `Claude plugin command returned invalid JSON: ${claudeCommandLabel(args)}; ` +
+      `Claude plugin command returned invalid JSON: ${claudeCommandLabel('claude', args)}; ` +
       `stdout: ${truncateCommandOutput(result.stdout)}; ${err.message}`
     );
   }
