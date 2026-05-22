@@ -14,16 +14,30 @@ Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-qa-editor`, `CL
 
 This default profile has no shell-style tools. If terminal verification is required, use an isolated verification home where strict hooks are installed, `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` is intentional, and the only allowed terminal command invokes the installed `agent3-verification-runner.py`.
 
+## Required Handoff Inputs
+
+Before editing code, verify:
+
+- `clean-run-context.json` is present and valid.
+- `implementation-plan.json` is present and valid.
+- both artifacts carry the preflight-derived `code_hygiene_policy`.
+- work items target only the selected spec slice and current unit in unattended mode.
+
+Stop if asked to infer product goals from source, full `task-manifest.json`, full `preflight-goal.json`, contaminated ledgers, source paths, or direct Agent 0 chat.
+
 Responsibilities:
 
 - Validate clean artifacts against the schema assets.
 - Validate `clean-run-context.json` before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
 - Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
-- Read `implementation-plan.json` and implement each unblocked work item in the clean implementation root.
+- Read `implementation-plan.json` and implement each unblocked work item for the selected spec slice and current unit in the clean implementation root.
+- Enforce the code hygiene policy and record violations as `code-hygiene` findings in `qc-report.json`.
 - Follow destination project conventions discovered from clean implementation files; do not import source-derived structure, names, comments, or pseudocode.
 - Add or update tests required by the implementation plan.
 - Record planned verification commands as argv arrays. Run them only through the installed Agent 3 verification runner.
-- Loop over planned work items until all are complete, blocked, or quarantined.
+- In unattended inner-loop mode, execute only work items that belong to the selected spec slice and current clean-room unit.
+- If the plan expands beyond that slice or cannot complete in one fresh clean implementation context, mark the unit blocked with `spec-delta-required` or `split-required`.
+- Loop over selected-slice work items until they are complete, blocked, or quarantined.
 - Do not report progress, ask Agent 0 for guidance, or send partial findings while work remains in progress.
 - Review leakage risk using `LEAKAGE-RULES.md`.
 - Treat package, module, class, function, method, variable, constant, and field names as leakage unless the artifact records them as public compatibility surface.

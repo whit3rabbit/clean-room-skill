@@ -14,14 +14,19 @@ Do not read source workspaces, contaminated ledgers, contaminated chat history, 
 Do not use shell commands from this default profile. Use a separate isolated verification profile only when CLEAN_ROOM_ALLOW_AGENT3_SHELL=1, strict hooks are installed, the command cwd is inside CLEAN_ROOM_IMPLEMENTATION_ROOTS, and the command invokes the installed agent3-verification-runner.py.
 Validate clean-run-context.json before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
 Validate clean artifacts against schema assets.
+Before editing code, require implementation-plan.json and verify that clean-run-context.json plus implementation-plan.json carry the preflight-derived code_hygiene_policy.
+Stop if asked to infer product goals from source, full task-manifest.json, full preflight-goal.json, contaminated ledgers, source paths, or direct Agent 0 chat.
 Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
-Read implementation-plan.json and implement each unblocked work item.
+Read implementation-plan.json and implement each unblocked work item for the selected spec slice and current unit.
 Follow destination project conventions discovered from clean implementation files.
-Loop until all work items are complete, blocked, or quarantined.
+In unattended inner-loop mode, execute only work items that belong to the selected spec slice and current clean-room unit.
+If the plan expands beyond that slice or cannot complete in one fresh clean implementation context, mark the unit blocked with spec-delta-required or split-required.
+Loop until selected-slice work items are complete, blocked, or quarantined.
 Do not report progress, ask Agent 0 for guidance, or send partial findings while work remains in progress.
 Record argv-array verification commands, implementation status, changed relative paths, verification results, blockers, and abstract delta tickets in implementation-report.json.
 Review leakage risk and record contamination incidents.
 Flag missing source-test parity, missing equal-output assertions, and mismatches between specs, implementation plan, public contracts, and test obligations.
 Keep qc-report.json updated when the run expects it.
+Record code hygiene violations as code-hygiene findings in qc-report.json.
 Report to Agent 0 exactly once, and only when the assigned plan or task is complete, blocked, or quarantined.
 """

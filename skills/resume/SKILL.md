@@ -9,13 +9,14 @@ disable-model-invocation: true
 
 Resume an existing clean-room run from durable artifacts. Never use prior chat history as the source of truth.
 
-Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the same clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
+Use the canonical `clean-room` skill workflow and references in this plugin. Read `skills/clean-room/references/CONTROLLER-LOOP.md` when the manifest records `loop_context` or unattended mode. Preserve the same clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
 ## Load Order
 
 Load these artifacts from the paths recorded in `task-manifest.json` and the configured root environment. Treat missing optional artifacts as blockers only when the current gate requires them.
 
 - `task-manifest.json`
+- `preflight-goal.json`, when referenced by `task-manifest.json`, only on the contaminated/controller side
 - `init-config.json`, when present, only for drift comparison against `task-manifest.json` `initialization_snapshot`
 - `clean-run-context.json`, when present, only on the clean side
 - `source-index.json`, only when referenced by the task manifest and only on the contaminated side
@@ -26,6 +27,7 @@ Load these artifacts from the paths recorded in `task-manifest.json` and the con
 - `implementation-plan.json` when present
 - `implementation-report.json` when present
 - latest valid `qc-report.json`
+- `clean-room-result.json`, when present
 - open abstract delta tickets
 
 If more than one `qc-report.json` is present, select the valid report with the newest `reviewed_at`. If reports tie, cannot be validated, or disagree about artifact hashes, stop and report a blocker.
@@ -41,6 +43,9 @@ Before choosing work:
 - Report `run_state` when present; do not infer generation from chat history when it is missing.
 - Trust `initialization_snapshot` before any reusable `init-config.json`. If they differ, report drift and stop before changing roots, model policy, schema profile, or rule classification.
 - Preserve the existing `controller_policy`; missing policy means `attended`.
+- Stop if new-run artifacts lack `preflight_goal_ref`, `preflight_goal_sha256`, or the required `handoff_sequence`. Treat this as legacy or incomplete preflight state and ask for a reviewed preflight goal before resuming.
+- Validate referenced `preflight-goal.json` before using goal, stack, dependency, license, exactness, output, or hygiene decisions.
+- Preserve `loop_context` when present. In unattended inner-loop mode, selected work must remain inside `loop_context.approved_scope_refs`.
 - Stop if clean roles appear to require source, contaminated ledgers, contaminated chat history, raw diffs, source excerpts, `source-index.json`, or the full `task-manifest.json`.
 - Stop if Agent 3 appears to require writing code outside `CLEAN_ROOM_IMPLEMENTATION_ROOTS` or running shell outside the bounded Agent 3 shell policy.
 - Stop if `clean-run-context.json` exposes source roots, contaminated roots, source index refs, coverage ledgers, or evidence ledgers.
@@ -52,9 +57,9 @@ Before choosing work:
 
 Pick exactly one next safe action:
 
-- One pending, gap, or blocked unit from `task-manifest.json` and `coverage-ledger.json`.
+- One pending, gap, or blocked unit from `task-manifest.json` and `coverage-ledger.json`, limited to `loop_context.approved_scope_refs` when present.
 - One blocked gate when a required artifact, schema validation, handoff hash, leakage review, authorization check, or root-separation check is missing or invalid.
-- A final package closeout when implementation is complete, coverage is complete, and QC passed.
+- A final package closeout when implementation is complete, coverage is complete, QC passed, and `clean-room-result.json` records a terminal inner-loop return when `loop_context` is present.
 
 Do not batch units. Do not advance state from memory. Do not reinterpret the source scope.
 

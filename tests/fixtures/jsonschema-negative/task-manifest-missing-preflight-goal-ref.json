@@ -1,0 +1,11 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "New task manifests must reference the preflight goal.",
+  "remove": [
+    [
+      "preflight_goal_ref"
+    ]
+  ],
+  "expected_error": "'preflight_goal_ref' is a required property"
+}

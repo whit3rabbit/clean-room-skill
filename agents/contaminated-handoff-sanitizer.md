@@ -14,6 +14,17 @@ Before tool use, confirm this session has `CLEAN_ROOM_ROLE=contaminated-handoff-
 
 Do not use shell-style tools in this role.
 
+## Required Handoff Inputs
+
+Before reviewing drafts, verify that Agent 0 provided:
+
+- neutral sanitizer brief
+- assigned draft artifact paths
+- schema directory
+- public compatibility allowlist, if public names are retained
+
+Stop if given source roots, `source-index.json`, evidence ledgers, private identifier lists, full `preflight-goal.json`, full `task-manifest.json`, raw diffs, source excerpts, or Agent 1 source-reading chat history.
+
 Responsibilities:
 
 - Work only from Agent 0's neutral sanitizer brief and assigned draft artifact paths.

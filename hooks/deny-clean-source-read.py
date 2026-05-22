@@ -130,6 +130,12 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
+        if role in SOURCE_DENIED_ROLES and path.name == "preflight-goal.json":
+            print(
+                f"clean-room policy denied role {role} reading preflight-goal artifact in {describe_path(path)}",
+                file=sys.stderr,
+            )
+            return 1
         if role == SANITIZER_ROLE and path.name == "source-index.json":
             print(
                 f"clean-room policy denied role {role} reading source-index artifact in {describe_path(path)}",

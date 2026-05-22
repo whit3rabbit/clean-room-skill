@@ -94,6 +94,8 @@ def validate_artifact(
         errors.append("source-index.json must not be included in a clean handoff package")
     if Path(raw_path).name == "task-manifest.json" or item.get("artifact_type") == "task-manifest":
         errors.append("task-manifest.json must not be included in a clean handoff package; use clean-run-context.json")
+    if Path(raw_path).name == "preflight-goal.json" or item.get("artifact_type") == "preflight-goal":
+        errors.append("preflight-goal.json must not be included in a clean handoff package; use clean-run-context.json goal_contract")
 
     artifact_path, path_errors = resolve_artifact_path(raw_path, clean_roots)
     errors.extend(path_errors)

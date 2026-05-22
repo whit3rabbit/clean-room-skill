@@ -229,6 +229,16 @@ describe('clean-room schema hook policy', () => {
     assert.match(result.stderr, /init-config\.json is not a clean-role artifact/);
   });
 
+  test('preflight-goal JSON is rejected under clean roots', () => {
+    const root = tempDir('clean-room-preflight-goal-clean');
+    const env = policyEnv(root, 'clean-architect');
+    const preflightGoal = copyExample('preflight-goal.json', env.CLEAN_ROOM_CLEAN_ROOTS);
+
+    const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: preflightGoal } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preflight-goal\.json is not a clean-role artifact/);
+  });
+
   test('clean-run-context rejects unsafe clean artifact paths', () => {
     const root = tempDir('clean-room-context-paths');
     const env = policyEnv(root, 'clean-architect');

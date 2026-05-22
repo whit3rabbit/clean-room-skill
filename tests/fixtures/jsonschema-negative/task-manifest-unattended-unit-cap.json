@@ -1,0 +1,15 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Unattended controller mode must keep one unit per iteration.",
+  "set": [
+    {
+      "path": [
+        "controller_policy",
+        "max_units_per_iteration"
+      ],
+      "value": 2
+    }
+  ],
+  "expected_error": "is greater than the maximum of 1"
+}

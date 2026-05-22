@@ -226,6 +226,90 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
   });
 
+  test('preflight template writes an attended draft with blocking questions', () => {
+    const root = tempDir('clean-room-preflight-template');
+    const output = path.join(root, 'preflight-goal.json');
+
+    const result = runInstall(['preflight', '--template', '--output', output]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const goal = readJson(output);
+    assert.equal(goal.controller_policy.mode, 'attended');
+    assert.equal(goal.controller_policy.unattended_allowed_after_preflight, false);
+    assert.equal(goal.open_questions.some((question) => question.blocking === true), true);
+    assert.match(result.stdout, /Wrote preflight goal/);
+  });
+
+  test('preflight dry run does not write output', () => {
+    const root = tempDir('clean-room-preflight-dry-run');
+    const output = path.join(root, 'preflight-goal.json');
+
+    const result = runInstall(['preflight', '--template', '--output', output, '--dry-run']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Would write preflight goal/);
+    assert.equal(fs.existsSync(output), false);
+  });
+
+  test('preflight input validates and normalizes a completed contract', () => {
+    const root = tempDir('clean-room-preflight-input');
+    const input = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json');
+    const output = path.join(root, 'preflight-goal.json');
+
+    const result = runInstall(['preflight', '--input', input, '--output', output]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const goal = readJson(output);
+    assert.equal(goal.goal_id, 'goal-task-example');
+    assert.equal(goal.open_questions.length, 0);
+  });
+
+  test('preflight refuses overwrite without force and allows force', () => {
+    const root = tempDir('clean-room-preflight-force');
+    const output = path.join(root, 'preflight-goal.json');
+    fs.mkdirSync(root, { recursive: true });
+    fs.writeFileSync(output, '{"existing":true}\n');
+
+    let result = runInstall(['preflight', '--template', '--output', output]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /already exists/);
+    assert.deepEqual(readJson(output), { existing: true });
+
+    result = runInstall(['preflight', '--template', '--output', output, '--force']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readJson(output).controller_policy.mode, 'attended');
+  });
+
+  test('preflight rejects unattended template and unattended open questions', () => {
+    const root = tempDir('clean-room-preflight-unattended');
+    const output = path.join(root, 'preflight-goal.json');
+
+    let result = runInstall(['preflight', '--template', '--mode', 'unattended', '--output', output]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /template supports attended/);
+
+    const input = path.join(root, 'unattended-open.json');
+    const goal = readJson(path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json'));
+    goal.controller_policy.mode = 'unattended';
+    goal.controller_policy.unattended_allowed_after_preflight = true;
+    goal.open_questions = [
+      {
+        question_id: 'blocking',
+        question: 'Still unclear.',
+        blocking: true,
+      },
+    ];
+    fs.writeFileSync(input, `${JSON.stringify(goal, null, 2)}\n`);
+
+    result = runInstall(['preflight', '--input', input, '--mode', 'unattended', '--output', output]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /requires no open_questions/);
+  });
+
   test('installs Codex skills, agents, hooks, manifest, and preserves user hooks', () => {
     const codexHome = tempDir('clean-room-codex');
     fs.writeFileSync(path.join(codexHome, 'hooks.json'), JSON.stringify({

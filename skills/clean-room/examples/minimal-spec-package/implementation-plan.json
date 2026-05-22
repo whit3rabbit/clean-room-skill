@@ -11,6 +11,25 @@
     "skeleton-manifest.json"
   ],
   "foundation_summary": "Example clean implementation foundation is available through the configured implementation root.",
+  "code_hygiene_policy": {
+    "max_lines_per_code_file": 500,
+    "max_lines_per_test_file": 800,
+    "max_files_per_iteration": 12,
+    "split_large_files_by": [
+      "module boundary",
+      "public type",
+      "feature area"
+    ],
+    "exceptions": [
+      "fixtures",
+      "snapshots",
+      "generated files"
+    ],
+    "forbidden_patterns": [
+      "god file",
+      "source-shaped layout"
+    ]
+  },
   "work_items": [
     {
       "work_item_id": "work-example-flow",

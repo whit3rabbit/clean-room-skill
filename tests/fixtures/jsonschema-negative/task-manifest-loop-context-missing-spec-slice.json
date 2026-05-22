@@ -1,0 +1,12 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Nested loop context must name the selected spec slice.",
+  "remove": [
+    [
+      "loop_context",
+      "spec_slice_ref"
+    ]
+  ],
+  "expected_error": "'spec_slice_ref' is a required property"
+}

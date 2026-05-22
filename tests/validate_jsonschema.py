@@ -30,12 +30,14 @@ NEGATIVE_DIR = ROOT / "tests" / "fixtures" / "jsonschema-negative"
 PARITY_DIR = ROOT / "tests" / "fixtures" / "schema-parity"
 SCHEMA_BY_ARTIFACT = {
     "init-config": "init-config.schema.json",
+    "preflight-goal": "preflight-goal.schema.json",
     "clean-run-context": "clean-run-context.schema.json",
     "task-manifest": "task-manifest.schema.json",
     "behavior-spec": "behavior-spec.schema.json",
     "skeleton-manifest": "skeleton-manifest.schema.json",
     "implementation-plan": "implementation-plan.schema.json",
     "implementation-report": "implementation-report.schema.json",
+    "clean-room-result": "clean-room-result.schema.json",
     "qc-report": "qc-report.schema.json",
     "coverage-ledger": "coverage-ledger.schema.json",
     "evidence-ledger": "evidence-ledger.schema.json",

@@ -1,0 +1,34 @@
+{
+  "schema_kind": "preflight-goal",
+  "base": "preflight-goal.json",
+  "description": "Unattended preflight requires a completed contract with no open questions.",
+  "set": [
+    {
+      "path": [
+        "controller_policy",
+        "mode"
+      ],
+      "value": "unattended"
+    },
+    {
+      "path": [
+        "controller_policy",
+        "unattended_allowed_after_preflight"
+      ],
+      "value": true
+    },
+    {
+      "path": [
+        "open_questions"
+      ],
+      "value": [
+        {
+          "question_id": "target-stack",
+          "question": "Which target stack should be used?",
+          "blocking": true
+        }
+      ]
+    }
+  ],
+  "expected_error": "is expected to be empty"
+}

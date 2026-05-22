@@ -4,6 +4,7 @@
 
 - npm package: `clean-room-skill`.
 - CLI entrypoint: `bin/install.js`.
+- Executable inner-loop runner: `clean-room-skill run`.
 - Full local verifier: `bin/verify.sh`.
 - Node requirement: `>=22`.
 - CI runs Node 22 with Python 3.12 on macOS.
@@ -14,7 +15,7 @@
 ## Repo Map
 
 - `bin/`: installer CLI and local verification script.
-- `lib/`: installer helpers, hook config helpers, runtime layout logic.
+- `lib/`: installer helpers, hook config helpers, runtime layout logic, and inner-loop runner.
 - `skills/`: skill entrypoints, schemas, references, scripts, and example spec packages.
 - `agents/`: Claude role-agent prompts.
 - `examples/codex/`: Codex role-agent templates.
@@ -34,13 +35,15 @@
 - Set up Python verifier deps on macOS/Homebrew Python: `python3 -m venv .venv && .venv/bin/python -m pip install "jsonschema[format]>=4.18,<5"`.
 - Run full local checks: `npm run verify`.
 - Dry-run installer: `node bin/install.js --dry-run --all --global`.
+- Dry-run inner-loop runner: `node bin/install.js run --task-manifest <path> --agent-commands <path> --dry-run`.
 - No lint script exists. Do not invent one.
 
 ## Verification
 
 - JS changes: run `node --check` on touched JS/CJS files and `npm test`.
+- Runner changes: run `node --check lib/run.cjs bin/install.js`, `node --test tests/run.test.js`, and `npm test`.
 - Installer/runtime layout changes: run `npm run test:install` and `npm run verify`.
-- Python hook or script changes: run `python3 -m py_compile hooks/*.py skills/clean-room/scripts/*.py`.
+- Python hook or script changes: run `python3 -m py_compile hooks/*.py skills/clean-room/scripts/*.py skills/clean-room/scripts/source_index/*.py`.
 - Schema or example changes: run `.venv/bin/python tests/validate_jsonschema.py` if `.venv` exists, otherwise use a Python with `jsonschema[format]>=4.18,<5`.
 - Marketplace metadata changes: run `jq empty` on changed JSON files, confirm plugin names match runtime manifests, and confirm local source paths start with `./` and resolve inside the repo.
 - Package or release-facing changes: run `npm pack --dry-run`.
@@ -81,9 +84,28 @@ Ask before changing:
 - Public CLI flags, CLI output, config format, or compatibility behavior.
 - CI, release, publishing, or provenance workflows.
 
+## Installer And Indexer Safety
+
+- Runtime install/uninstall mutations are serialized per target root with `.clean-room-install.lock`.
+- Installer plans are not authority for later destructive actions. Recheck managed file state immediately before writes and removals, and back up late changes before mutation.
+- `clean-room-install-manifest.json` uses `phase: "installing"` until hook config mutation succeeds, then `phase: "complete"`. If hook config mutation fails after files are copied, preserve a manifest with `hook_registration.status: "failed"` when possible.
+- Bootstrap `init` must use atomic no-clobber writes unless `--force` is set.
+- `listFiles()` must stay iterative and bounded. Do not remove max depth, max file count, or readdir error handling.
+- Source indexing must enforce per-file and total byte limits after read, record changed-during-read files as skipped, use `os.walk(onerror=...)`, and prune traversal after global limits with one aggregate skipped entry.
+- Local npm helper installs must hold the cache-local install lock before mutating the shared npm prefix and must preserve the structured JSON contract for prefix creation errors, subprocess timeouts, and subprocess `OSError`s.
+
+## Hook Failure Behavior
+
+- Post-write hooks must fail closed without Python tracebacks when artifact `stat`, `read_text`, `read_bytes`, or referenced-artifact hashing raises `OSError`.
+- Hook error output must use redacted path labels through `describe_path()` / `redact_text()` for clean and source-denied roles.
+- `validate-json-schema.py` artifact kind inference is intentionally conservative. Ambiguous clean-root JSON should fail closed unless allowlisted.
+- `clean-room-skill doctor` is a smoke test. It should assert expected failure reasons and include spawn status, signal/error, stdout, and stderr snippets when a hook command fails.
+
 ## Clean-Room Architecture
 
 - The process separates contaminated source analysis from clean behavioral specification.
+- The outer loop evolves specs. The inner clean-room loop completes one approved spec slice, then returns `clean-room-result.json`.
+- `clean-room-skill run` executes only the inner clean-room loop. It requires schema-valid `loop_context`, selects at most one pending/gap unit inside `approved_scope_refs`, and uses a user-supplied `agent-commands` adapter with `shell: false`.
 - Prompt rules are not a boundary. Use path separation, role-specific sessions, hooks, schema validation, and artifact quarantine.
 - Recovery entry points must reload durable artifacts, not prior chat history.
 - Never expose `source-index.json`, contaminated ledgers, source paths, private identifiers, or contaminated chat history to clean roles.
@@ -92,17 +114,17 @@ Ask before changing:
 
 - `clean-room`: start the setup wizard when no durable artifacts are provided.
 - `attended`: start with `controller_policy.mode` fixed to `attended`.
-- `unattended`: start with bounded unattended defaults.
+- `unattended`: start with bounded unattended defaults and `loop_context` for one approved spec slice.
 - `resume`: continue from existing durable artifacts.
 - `start-over`: archive or quarantine current artifacts without deletion, then restart with a fresh `task_id`.
 - `refocus`: audit current artifacts against declared scope without expanding scope.
 
 ## Role Summary
 
-- [Agent 0: Contaminated Manager Verifier](agents/contaminated-manager-verifier.md): validates authorization, decomposes scope, tracks coverage, and sends only abstract delta tickets.
+- [Agent 0: Contaminated Manager Verifier](agents/contaminated-manager-verifier.md): validates authorization, decomposes scope, tracks coverage, verifies Agent 3 terminal reports from the contaminated side, and writes `clean-room-result.json`.
 - [Agent 1: Contaminated Source Analyst](agents/contaminated-source-analyst.md): reads authorized source and writes neutral behavior specs with ledger references.
 - [Agent 2: Clean Architect](agents/clean-architect.md): reads clean inputs, manages schema base, and builds `skeleton-manifest.json`.
-- [Agent 3: Clean Implementer Verifier](agents/clean-qa-editor.md): implements the clean plan under implementation roots, records verification status, maintains QC, and emits one terminal report.
+- [Agent 3: Clean Implementer Verifier](agents/clean-qa-editor.md): implements only selected-slice work under implementation roots, records verification status, maintains QC, and emits one terminal report.
 - Leakage rules live in [skills/clean-room/references/LEAKAGE-RULES.md](skills/clean-room/references/LEAKAGE-RULES.md).
 
 ## Role Session Environment
@@ -113,10 +135,11 @@ Set these before any clean-room role session:
 - `CLEAN_ROOM_SOURCE_ROOTS`
 - `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`
 - `CLEAN_ROOM_CLEAN_ROOTS`
+- `CLEAN_ROOM_IMPLEMENTATION_ROOTS`
 - `CLEAN_ROOM_ALLOWED_READ_ROOTS`
 - `CLEAN_ROOM_SCHEMA_DIR`
 
-Clean roles may read only clean roots and approved public/reference roots. Contaminated roles may read authorized source roots and write only contaminated artifacts. Shell-style tools should be disabled inside role sessions because they can bypass path-aware hooks. Normal repo maintenance commands are allowed outside role sessions.
+Clean roles may read only clean roots, implementation roots, schema roots, and approved public/reference roots. Contaminated roles may read authorized source roots and write only contaminated artifacts. Shell-style tools should be disabled inside role sessions because they can bypass path-aware hooks. Normal repo maintenance commands are allowed outside role sessions.
 
 ## Local Artifacts
 

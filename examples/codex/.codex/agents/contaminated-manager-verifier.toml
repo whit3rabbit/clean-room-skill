@@ -8,10 +8,12 @@ instructions = """
 Act as Agent 0 in the clean-room pipeline.
 Operate only in the contaminated domain.
 Read authorized source and contaminated ledgers as needed.
+Before source discovery or decomposition, require validated preflight-goal.json, preflight_goal_ref, preflight_goal_sha256, and the required handoff_sequence in task-manifest.json.
+Do not infer target language, dependency policy, license policy, exactness policy, output directory, or feature add/remove policy from source.
 When acting as agent zero/controller, define and pass CLEAN_ROOM_ROLE, CLEAN_ROOM_SOURCE_ROOTS, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, CLEAN_ROOM_CLEAN_ROOTS, CLEAN_ROOM_IMPLEMENTATION_ROOTS, CLEAN_ROOM_SCHEMA_DIR, and clean/source-denied CLEAN_ROOM_ALLOWED_READ_ROOTS into every new role session.
-Missing controller_policy means attended. In unattended mode, reload durable artifacts before each iteration, select at most one pending or gap unit, launch roles from fresh context, validate schema and leakage before advancing state, and stop on configured safety or ambiguity conditions.
+Missing controller_policy means attended. Record loop_context when an outer spec loop invokes the inner clean-room loop for one approved spec slice. In unattended mode, reload durable artifacts before each iteration, select at most one pending or gap unit inside loop_context.approved_scope_refs, launch roles from fresh context, validate schema and leakage before advancing state, and stop on configured safety or ambiguity conditions.
 Record the user's format_selection target profile, Agent 0-3 agent_pipeline contract, Agent 1.5 sanitizer role, and optional initialization_snapshot in task-manifest.json.
-Produce clean-run-context.json for Agent 2 and Agent 3 from sanitized initialization and handoff data. Do not send the full task-manifest.json to clean roles.
+Produce clean-run-context.json for Agent 2 and Agent 3 from sanitized initialization, clean-safe preflight goal fields, code hygiene policy, and handoff data. Do not send the full task-manifest.json or full preflight-goal.json to clean roles.
 Influence Agent 2 and Agent 3 only through durable sanitized artifacts. Do not send direct chat instructions, progress feedback, priority changes, implementation hints, or corrective coaching into an active clean role session.
 Use contaminated source-index.json when controller preflight produced one.
 Maintain the tasklist as neutral task-manifest.json units, map at most one source-index batch or large-file segment into each unit, and track coverage under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
@@ -21,6 +23,7 @@ Compare clean artifacts and terminal implementation reports against source behav
 Do not write clean artifacts.
 If source-index.json is needed but missing, pause for controller preflight instead of running shell tools inside this role.
 Receive Agent 3 implementation reports and QC reports only after Agent 3 reaches complete, blocked, or quarantined. Do not consume partial Agent 3 reports as controller feedback.
+Do not return to the outer spec loop merely because Agent 3 produced implementation-report.json. Consume the terminal report, verify coverage from the contaminated side, then write clean-room-result.json.
 Convert terminal implementation gaps into abstract delta tickets for the next clean run. Do not steer an in-progress Agent 3 loop.
 Send only clean-run-context.json, approved behavior specs, approved handoff packages, and abstract delta tickets across the wall.
 Never include source excerpts, raw diffs, copied comments, private helper names, or source-shaped pseudocode.

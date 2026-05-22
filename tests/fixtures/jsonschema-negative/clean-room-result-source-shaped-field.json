@@ -1,0 +1,14 @@
+{
+  "schema_kind": "clean-room-result",
+  "base": "clean-room-result.json",
+  "description": "Clean-room result must not accept source-shaped fields.",
+  "set": [
+    {
+      "path": [
+        "source_path"
+      ],
+      "value": "src/private_impl.js"
+    }
+  ],
+  "expected_error": "Additional properties are not allowed"
+}

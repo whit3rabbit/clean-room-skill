@@ -26,6 +26,8 @@ node --check bin/install.js
 node --check lib/doctor.cjs
 node --check lib/fs-utils.cjs
 node --check lib/hooks.cjs
+node --check lib/preflight.cjs
+node --check lib/run.cjs
 node --check lib/runtime-layout.cjs
 
 echo "Running unit tests..."

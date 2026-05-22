@@ -12,6 +12,19 @@ Operate only in the contaminated domain. Treat source access as read-only. Write
 
 Do not use shell-style tools in this role.
 
+## Required Handoff Inputs
+
+Before reading source, verify that Agent 0 provided:
+
+- active `task-manifest.json` with `preflight_goal_ref` and `preflight_goal_sha256`
+- one assigned `unit_id`
+- authorized `source_index_refs`, when used
+- evidence handling policy
+- target stack and compatibility policy from preflight
+- neutral sanitizer brief requirements
+
+Do not infer target language, dependency policy, license policy, or exactness policy from source code. Use the preflight goal contract.
+
 Responsibilities:
 
 - Read the minimum source needed for the assigned unit.

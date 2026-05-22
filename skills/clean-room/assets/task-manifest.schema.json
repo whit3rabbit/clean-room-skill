@@ -8,11 +8,14 @@
     "target_identifier",
     "authorization",
     "source_acquisition_basis",
+    "preflight_goal_ref",
+    "preflight_goal_sha256",
     "source_scope",
     "clean_scope",
     "trust_boundary",
     "format_selection",
     "agent_pipeline",
+    "handoff_sequence",
     "required_profiles",
     "artifact_paths",
     "handoff_policy",
@@ -79,6 +82,14 @@
     "source_index_ref": {
       "type": "string",
       "minLength": 1
+    },
+    "preflight_goal_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "preflight_goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
     },
     "run_state": {
       "type": "object",
@@ -192,6 +203,7 @@
       "required": [
         "agent_0",
         "agent_1",
+        "agent_1_5",
         "agent_2",
         "agent_3",
         "handoff_rules"
@@ -262,6 +274,41 @@
         }
       }
     },
+    "handoff_sequence": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/handoff_preflight_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_source_destination_discovery_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_0_decomposition_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_1_analysis_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_1_5_sanitization_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_handoff_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_planning_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_implementation_qc_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_0_coverage_verification_stage"
+        }
+      ],
+      "items": false
+    },
     "controller_policy": {
       "type": "object",
       "additionalProperties": false,
@@ -299,7 +346,13 @@
               "unit-blocked",
               "implementation-complete",
               "coverage-complete",
-              "iteration-limit-reached"
+              "iteration-limit-reached",
+              "spec-slice-complete",
+              "spec-slice-blocked",
+              "spec-delta-required",
+              "no-progress-detected",
+              "repeated-unit-selection",
+              "clean-room-returned"
             ]
           }
         },
@@ -326,6 +379,76 @@
           }
         }
       ]
+    },
+    "loop_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parent_loop_kind",
+        "child_loop_kind",
+        "parent_loop_ref",
+        "spec_slice_ref",
+        "approved_scope_refs",
+        "acceptance_refs",
+        "public_surface_refs",
+        "return_to",
+        "outer_iteration",
+        "inner_iteration",
+        "max_inner_iterations"
+      ],
+      "properties": {
+        "parent_loop_kind": {
+          "const": "spec-development"
+        },
+        "child_loop_kind": {
+          "const": "clean-room"
+        },
+        "parent_loop_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec_slice_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approved_scope_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "acceptance_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "public_surface_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "return_to": {
+          "const": "outer-spec-loop"
+        },
+        "outer_iteration": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "inner_iteration": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_inner_iterations": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
     },
     "required_profiles": {
       "type": "array",
@@ -691,6 +814,173 @@
           "const": "clean"
         }
       }
+    },
+    "handoff_stage_base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "producer",
+        "required_inputs",
+        "required_outputs",
+        "next"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "producer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_inputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required_outputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "handoff_preflight_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "preflight"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_source_destination_discovery_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "source-destination-discovery"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_agent_0_decomposition_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "agent-0-decomposition"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_agent_1_analysis_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "agent-1-analysis"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_agent_1_5_sanitization_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "agent-1-5-sanitization"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_clean_handoff_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "clean-handoff"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_clean_planning_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "clean-planning"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_clean_implementation_qc_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "clean-implementation-qc"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_agent_0_coverage_verification_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "agent-0-coverage-verification"
+            }
+          }
+        }
+      ]
     },
     "workspace_scope": {
       "type": "object",

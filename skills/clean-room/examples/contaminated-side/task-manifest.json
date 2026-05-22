@@ -16,6 +16,8 @@
   },
   "source_acquisition_basis": "Authorized local source access.",
   "license_contract_notes": "No legal conclusion recorded.",
+  "preflight_goal_ref": "contaminated-artifacts/preflight-goal.json",
+  "preflight_goal_sha256": "407120469a7911d6625da0718524525566165befa9067cdd53eba17d25577214",
   "source_index_ref": "contaminated-artifacts/source-index.json",
   "run_state": {
     "generation": 1,
@@ -101,9 +103,33 @@
       "leakage-scan-failed",
       "unit-blocked",
       "implementation-complete",
-      "coverage-complete"
+      "coverage-complete",
+      "spec-slice-complete",
+      "spec-delta-required",
+      "no-progress-detected",
+      "repeated-unit-selection",
+      "clean-room-returned"
     ],
     "notes": "Missing controller policy defaults to attended mode."
+  },
+  "loop_context": {
+    "parent_loop_kind": "spec-development",
+    "child_loop_kind": "clean-room",
+    "parent_loop_ref": "spec-dev-loop:example",
+    "spec_slice_ref": "behavior-spec:unit-example-flow",
+    "approved_scope_refs": [
+      "unit-example-flow"
+    ],
+    "acceptance_refs": [
+      "AC-example"
+    ],
+    "public_surface_refs": [
+      "public-contract:example"
+    ],
+    "return_to": "outer-spec-loop",
+    "outer_iteration": 1,
+    "inner_iteration": 0,
+    "max_inner_iterations": 10
   },
   "format_selection": {
     "mode": "canonical-plus-target",
@@ -176,6 +202,119 @@
       "interim_agent3_reporting": false
     }
   },
+  "handoff_sequence": [
+    {
+      "stage": "preflight",
+      "producer": "controller",
+      "required_inputs": [],
+      "required_outputs": [
+        "preflight-goal.json"
+      ],
+      "next": "source-destination-discovery"
+    },
+    {
+      "stage": "source-destination-discovery",
+      "producer": "controller",
+      "required_inputs": [
+        "preflight-goal.json"
+      ],
+      "required_outputs": [
+        "init-config.json",
+        "source-index.json"
+      ],
+      "next": "agent-0-decomposition"
+    },
+    {
+      "stage": "agent-0-decomposition",
+      "producer": "contaminated-manager-verifier",
+      "required_inputs": [
+        "preflight-goal.json",
+        "source-index.json"
+      ],
+      "required_outputs": [
+        "task-manifest.json",
+        "neutral-sanitizer-brief.json"
+      ],
+      "next": "agent-1-analysis"
+    },
+    {
+      "stage": "agent-1-analysis",
+      "producer": "contaminated-source-analyst",
+      "required_inputs": [
+        "assigned-unit",
+        "preflight-goal.json"
+      ],
+      "required_outputs": [
+        "draft-behavior-spec.json"
+      ],
+      "next": "agent-1-5-sanitization"
+    },
+    {
+      "stage": "agent-1-5-sanitization",
+      "producer": "contaminated-handoff-sanitizer",
+      "required_inputs": [
+        "neutral-sanitizer-brief.json",
+        "draft-behavior-spec.json"
+      ],
+      "required_outputs": [
+        "handoff-package.json",
+        "approved-behavior-spec.json"
+      ],
+      "next": "clean-handoff"
+    },
+    {
+      "stage": "clean-handoff",
+      "producer": "controller",
+      "required_inputs": [
+        "handoff-package.json",
+        "approved-behavior-spec.json",
+        "clean-run-context.json"
+      ],
+      "required_outputs": [
+        "clean-workspace-ready"
+      ],
+      "next": "clean-planning"
+    },
+    {
+      "stage": "clean-planning",
+      "producer": "clean-architect",
+      "required_inputs": [
+        "clean-run-context.json",
+        "handoff-package.json",
+        "approved-behavior-spec.json"
+      ],
+      "required_outputs": [
+        "implementation-plan.json"
+      ],
+      "next": "clean-implementation-qc"
+    },
+    {
+      "stage": "clean-implementation-qc",
+      "producer": "clean-qa-editor",
+      "required_inputs": [
+        "clean-run-context.json",
+        "implementation-plan.json"
+      ],
+      "required_outputs": [
+        "implementation-report.json",
+        "qc-report.json"
+      ],
+      "next": "agent-0-coverage-verification"
+    },
+    {
+      "stage": "agent-0-coverage-verification",
+      "producer": "contaminated-manager-verifier",
+      "required_inputs": [
+        "implementation-report.json",
+        "qc-report.json",
+        "coverage-ledger.json"
+      ],
+      "required_outputs": [
+        "clean-room-result.json"
+      ],
+      "next": null
+    }
+  ],
   "required_profiles": [
     {
       "role": "contaminated-manager-verifier",
@@ -318,13 +457,15 @@
   ],
   "expected_artifacts": [
     "init-config.json",
+    "preflight-goal.json",
     "clean-run-context.json",
     "source-index.json",
     "behavior-spec.json",
     "skeleton-manifest.json",
     "implementation-plan.json",
     "implementation-report.json",
-    "qc-report.json"
+    "qc-report.json",
+    "clean-room-result.json"
   ],
   "audit_log_refs": [
     "audit-log:example"

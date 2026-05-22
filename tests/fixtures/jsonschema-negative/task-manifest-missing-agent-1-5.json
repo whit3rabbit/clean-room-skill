@@ -1,0 +1,12 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "New task manifests must include the Agent 1.5 sanitizer stage.",
+  "remove": [
+    [
+      "agent_pipeline",
+      "agent_1_5"
+    ]
+  ],
+  "expected_error": "'agent_1_5' is a required property"
+}

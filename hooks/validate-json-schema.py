@@ -25,12 +25,14 @@ from clean_room_paths import (
 
 SCHEMA_BY_ARTIFACT = {
     "init-config": "init-config.schema.json",
+    "preflight-goal": "preflight-goal.schema.json",
     "clean-run-context": "clean-run-context.schema.json",
     "task-manifest": "task-manifest.schema.json",
     "behavior-spec": "behavior-spec.schema.json",
     "skeleton-manifest": "skeleton-manifest.schema.json",
     "implementation-plan": "implementation-plan.schema.json",
     "implementation-report": "implementation-report.schema.json",
+    "clean-room-result": "clean-room-result.schema.json",
     "qc-report": "qc-report.schema.json",
     "coverage-ledger": "coverage-ledger.schema.json",
     "evidence-ledger": "evidence-ledger.schema.json",
@@ -45,7 +47,19 @@ FORBIDDEN_CLEAN_CONTEXT_ARTIFACT_NAMES = {
     "evidence-ledger.json",
     "task-manifest.json",
     "init-config.json",
+    "preflight-goal.json",
 }
+TASK_MANIFEST_HANDOFF_SEQUENCE = [
+    "preflight",
+    "source-destination-discovery",
+    "agent-0-decomposition",
+    "agent-1-analysis",
+    "agent-1-5-sanitization",
+    "clean-handoff",
+    "clean-planning",
+    "clean-implementation-qc",
+    "agent-0-coverage-verification",
+]
 MAX_REPORTED_ERRORS = 20
 MAX_VALIDATION_ERRORS = MAX_REPORTED_ERRORS + 1
 
@@ -67,6 +81,8 @@ def artifact_kind(path: Path, data: dict) -> str | None:
         return "behavior-spec"
     if "config_id" in data and "artifact_base_root" in data:
         return "init-config"
+    if "goal_id" in data and "end_goal" in data:
+        return "preflight-goal"
     if "context_id" in data and "clean_isolation" in data:
         return "clean-run-context"
     if "manifest_id" in data:
@@ -226,6 +242,21 @@ def clean_context_path_errors(data: dict[str, Any]) -> list[str]:
         if error_limit_reached(errors):
             return errors
     return errors
+
+
+def task_manifest_handoff_sequence_errors(data: dict[str, Any]) -> list[str]:
+    sequence = data.get("handoff_sequence")
+    if not isinstance(sequence, list):
+        return ["<root>: missing required field 'handoff_sequence'"]
+    stages = [item.get("stage") if isinstance(item, dict) else None for item in sequence]
+    if stages != TASK_MANIFEST_HANDOFF_SEQUENCE:
+        return ["/handoff_sequence: stages must match the required clean-room handoff order"]
+    return []
+
+
+def is_clean_room_task_manifest_schema(schema: dict[str, Any]) -> bool:
+    properties = schema.get("properties")
+    return isinstance(properties, dict) and "handoff_sequence" in properties and "agent_pipeline" in properties
 
 
 def add_error(errors: list[str], message: str) -> None:
@@ -442,7 +473,7 @@ def main() -> int:
                 )
                 return 1
             continue
-        if in_clean_root and kind in {"source-index", "init-config"}:
+        if in_clean_root and kind in {"source-index", "init-config", "preflight-goal"}:
             print(
                 f"clean-room schema check failed for {describe_path(path)}: {kind}.json is not a clean-role artifact",
                 file=sys.stderr,
@@ -461,6 +492,8 @@ def main() -> int:
         errors = validate_value(data, schema, schema)
         if kind == "clean-run-context":
             extend_errors(errors, clean_context_path_errors(data))
+        if kind == "task-manifest" and is_clean_room_task_manifest_schema(schema):
+            extend_errors(errors, task_manifest_handoff_sequence_errors(data))
         if errors:
             print(f"clean-room schema check failed for {describe_path(path)}:", file=sys.stderr)
             for error in errors[:MAX_REPORTED_ERRORS]:

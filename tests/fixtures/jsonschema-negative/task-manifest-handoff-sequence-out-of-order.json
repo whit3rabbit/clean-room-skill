@@ -1,0 +1,16 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Task manifest handoff sequence stages must stay in the required order.",
+  "set": [
+    {
+      "path": [
+        "handoff_sequence",
+        0,
+        "stage"
+      ],
+      "value": "agent-0-decomposition"
+    }
+  ],
+  "expected_error": "was expected"
+}

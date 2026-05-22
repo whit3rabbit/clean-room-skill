@@ -12,6 +12,7 @@ Block these from clean artifacts:
 - copied source excerpts
 - raw diffs
 - full `task-manifest.json`
+- full `preflight-goal.json`
 - `init-config.json`
 - source roots, contaminated roots, source index refs, coverage ledger refs, and evidence ledger refs
 - copied comments
@@ -71,7 +72,7 @@ Before clean handoff, Agent 1.5 confirms from a fresh source-denied context:
 - Every retained public name has a compatibility reason.
 - Every uncertain behavior is marked as an open question.
 - `leakage_review.reviewer_role` is `contaminated-handoff-sanitizer`.
-- Clean roles receive `clean-run-context.json`, not `task-manifest.json` or `init-config.json`.
+- Clean roles receive `clean-run-context.json`, not `task-manifest.json`, full `preflight-goal.json`, or `init-config.json`.
 - Agent 0 influences clean roles only through schema-valid durable sanitized artifacts. Direct manager chat, progress feedback, implementation hints, priority changes, and in-progress corrections are contamination risks.
 - Agent 3 reports to Agent 0 only after implementation is complete, blocked, or quarantined.
 

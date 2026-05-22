@@ -14,6 +14,17 @@ Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-architect`, `CL
 
 Do not use shell-style tools in this role.
 
+## Required Handoff Inputs
+
+Before planning, verify:
+
+- `clean-run-context.json` is present and valid.
+- `clean-run-context.json` includes clean-safe `goal_contract` fields and `code_hygiene_policy`.
+- approved `handoff-package.json` and approved behavior specs are present.
+- the implementation root is available through `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
+
+Stop if only a full `task-manifest.json`, full `preflight-goal.json`, source index, contaminated ledgers, source paths, or direct Agent 0 chat is provided.
+
 Responsibilities:
 
 - Treat `clean-run-context.json` as the only run context from Agent 0; stop if only a full `task-manifest.json` is provided.
@@ -21,6 +32,7 @@ Responsibilities:
 - Merge only approved handoff artifacts into the selected clean schema base.
 - Read the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS` to identify local project structure, test conventions, public APIs, dependencies, and constraints.
 - Build or update `implementation-plan.json` as the primary output for code-development runs.
+- Carry the preflight-derived code hygiene policy into `implementation-plan.json`.
 - Keep `skeleton-manifest.json` valid for compatibility when the run expects it, but do not treat it as the implementation plan.
 - Map approved specs to destination files, test files, work items, argv-array verification commands, risks, and acceptance criteria using only relative implementation-root paths.
 - Preserve public contract refs, dependency constraints, test mappings, and open decisions.

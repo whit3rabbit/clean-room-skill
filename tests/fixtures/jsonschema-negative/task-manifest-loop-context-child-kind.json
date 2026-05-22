@@ -1,0 +1,15 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Nested loop context must identify the child loop as clean-room.",
+  "set": [
+    {
+      "path": [
+        "loop_context",
+        "child_loop_kind"
+      ],
+      "value": "flat-loop"
+    }
+  ],
+  "expected_error": "'clean-room' was expected"
+}

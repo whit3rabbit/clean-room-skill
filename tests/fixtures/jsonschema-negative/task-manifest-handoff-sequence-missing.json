@@ -1,0 +1,11 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Task manifests must record the required handoff sequence.",
+  "remove": [
+    [
+      "handoff_sequence"
+    ]
+  ],
+  "expected_error": "'handoff_sequence' is a required property"
+}

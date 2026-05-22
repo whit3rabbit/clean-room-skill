@@ -1,0 +1,11 @@
+{
+  "schema_kind": "preflight-goal",
+  "base": "preflight-goal.json",
+  "description": "Preflight goal contracts must record the end goal before execution.",
+  "remove": [
+    [
+      "end_goal"
+    ]
+  ],
+  "expected_error": "'end_goal' is a required property"
+}

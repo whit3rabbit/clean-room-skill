@@ -1,0 +1,14 @@
+{
+  "schema_kind": "clean-room-result",
+  "base": "clean-room-result.json",
+  "description": "Clean-room result must use a known terminal return value.",
+  "set": [
+    {
+      "path": [
+        "result"
+      ],
+      "value": "implementation-complete"
+    }
+  ],
+  "expected_error": "is not one of"
+}

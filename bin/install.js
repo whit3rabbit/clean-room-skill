@@ -9,6 +9,8 @@ const { spawnSync } = require('node:child_process');
 const { runInit } = require('../lib/bootstrap.cjs');
 const { runDoctor } = require('../lib/doctor.cjs');
 const { assertManagedPath } = require('../lib/fs-utils.cjs');
+const { parsePreflightArgs, runPreflight } = require('../lib/preflight.cjs');
+const { parseRunArgs, runCleanRoom } = require('../lib/run.cjs');
 const {
   buildHookEntries,
   configPathForRuntime,
@@ -144,10 +146,14 @@ function setExclusive(current, next, flag) {
 function printHelp() {
   console.log(`Usage: clean-room-skill [runtime] [scope] [options]
        clean-room-skill init [options]
+       clean-room-skill preflight [options]
+       clean-room-skill run [options]
 
 Commands:
   init                Create clean-room bootstrap folders and repo guidance
+  preflight           Create or validate a preflight goal contract
   doctor              Smoke test generated Codex or Claude hook registration
+  run                 Execute the bounded inner clean-room controller loop
 
 Runtime:
   --codex              Install for Codex
@@ -478,6 +484,14 @@ async function main() {
     runDoctor(argv.slice(1));
     return;
   }
+  if (argv[0] === 'preflight') {
+    runPreflight(argv.slice(1));
+    return;
+  }
+  if (argv[0] === 'run') {
+    await runCleanRoom(parseRunArgs(argv.slice(1)));
+    return;
+  }
   const options = await resolveInteractiveOptions(parseArgs(argv));
   if (!options.scope) {
     options.scope = 'global';
@@ -502,7 +516,11 @@ if (require.main === module) {
 module.exports = {
   buildDesiredFiles,
   parseArgs,
+  parsePreflightArgs,
   planInstall,
+  parseRunArgs,
   runInit,
+  runPreflight,
+  runCleanRoom,
   resolveTargetRoot,
 };

@@ -5,6 +5,7 @@
 Use these canonical artifact names unless the surrounding project already has a stricter convention:
 
 - `task-manifest.json`
+- `preflight-goal.json`
 - `init-config.json`
 - `clean-run-context.json`
 - `source-index.json`
@@ -15,6 +16,7 @@ Use these canonical artifact names unless the surrounding project already has a 
 - `skeleton-manifest.json`
 - `implementation-plan.json`
 - `implementation-report.json`
+- `clean-room-result.json`
 - `qc-report.json`
 - `contamination-incident.json`
 
@@ -41,14 +43,17 @@ Capture:
 - source workspace and clean workspace identifiers
 - trust boundary and required profiles
 - controller policy when the run is explicitly attended or unattended
+- `preflight_goal_ref` and `preflight_goal_sha256`
+- required `handoff_sequence`
 - optional initialization snapshot copied from `init-config.json`
 - user-selected output format profile
-- Agent 0-3 pipeline responsibilities, Agent 1.5 sanitizer role, and handoff rules
+- Agent 0-3 pipeline responsibilities, required Agent 1.5 sanitizer role, and handoff rules
 - artifact paths and retention policy
 - contaminated artifact roots for `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`
 - clean implementation roots for `CLEAN_ROOM_IMPLEMENTATION_ROOTS`
 - implementation status, plan refs, and report refs
 - optional `source_index_ref` for contaminated controller preflight output
+- optional `loop_context` for nested controller runs
 - prohibited actions
 - role assignments
 - handoff policy
@@ -62,7 +67,22 @@ Use neutral ids such as `unit-auth-flow` or `unit-config-loading`. Avoid source 
 
 When a role needs more than one runtime profile, keep the role name stable and set `profile_purpose` to distinguish the sessions. For example, Agent 3 may use `report-review` for clean artifact work and `implementation` for the clean implementation workspace.
 
-## Initialization And Clean Context
+## Preflight, Initialization, And Clean Context
+
+`preflight-goal.json` records user intent before source discovery, source indexing, decomposition, attended execution, or unattended execution. It is a controller/contaminated-side artifact and must not be placed in clean-role readable roots.
+
+Capture:
+
+- end goal, success definition, destination kind, and existing destination handling
+- target stack: language, runtime, framework, package manager, and test framework
+- license policy and dependency policy
+- compatibility/exactness policy, with exactness limited to public observable surfaces
+- feature preserve/remove/add lists and non-goals
+- code hygiene limits
+- output policy
+- controller mode and open questions
+
+Unattended mode requires `unattended_allowed_after_preflight: true`, finite `max_iterations`, and no `open_questions`.
 
 `init-config.json` records reusable controller-side preferences. It may contain source roots and contaminated-only rules, so keep it outside clean-role readable roots.
 
@@ -82,7 +102,7 @@ Capture:
 - user rules split into `clean_safe` and `contaminated_only`
 - reconfiguration policy requiring confirmation for root, schema, and model changes
 
-`clean-run-context.json` is the only run context Agent 2 and Agent 3 should read. It may contain clean artifact paths, implementation root environment references, target profile, native artifact expectations, approved public references, clean-safe rules, clean-side model preferences, and the artifact-only coordination boundary. It must not contain source roots, contaminated artifact roots, source index refs, coverage ledgers, evidence ledgers, contaminated-only rules, or the full `task-manifest.json`.
+`clean-run-context.json` is the only run context Agent 2 and Agent 3 should read. It may contain clean artifact paths, implementation root environment references, target profile, native artifact expectations, clean-safe goal contract fields, code hygiene policy, approved public references, clean-safe rules, clean-side model preferences, and the artifact-only coordination boundary. It must not contain source roots, contaminated artifact roots, source index refs, coverage ledgers, evidence ledgers, contaminated-only rules, full `preflight-goal.json`, or the full `task-manifest.json`.
 
 ## Source Index Content
 
@@ -97,6 +117,8 @@ Capture:
 - optional AST/indexing dependency status recorded during preflight
 - skipped files or directories and aggregate metrics
 
+Skipped entries are bounded coverage metadata. They can include ignored directories, file count or byte caps, total byte caps, binary files, stat/read errors, post-read size changes, files that changed during read, symlinks outside the source root, directory traversal errors, and aggregate remaining-files-skipped-after-limit entries after global caps are reached.
+
 Do not send `source-index.json`, file paths, import/export listings, dependency graphs, or private symbols to Agent 1.5 or clean roles. Agent 0 may map recommended batches or segment refs into neutral `task-manifest.json` units, where one unit is one bounded Agent 1 source-reading assignment.
 
 ## Controller Policy And Run State
@@ -104,7 +126,23 @@ Do not send `source-index.json`, file paths, import/export listings, dependency 
 `controller_policy` is optional. Missing policy means `attended`.
 
 - `attended`: agent zero pauses for human review at scope gate, handoff, QC deltas, blocked units, and final coverage.
-- `unattended`: agent zero runs a bounded controller loop with `max_iterations`, one unit per iteration, fresh role context, schema and leakage validation before advancing state, and hard stop conditions.
+- `unattended`: agent zero runs a bounded inner clean-room loop only after preflight allows unattended mode with no open questions. It uses `max_iterations`, one unit per iteration, fresh role context, schema and leakage validation before advancing state, and hard stop conditions.
+
+`loop_context` records the parent/child controller relationship when an outer spec-development loop invokes the inner clean-room loop. Capture:
+
+- `parent_loop_kind: "spec-development"`
+- `child_loop_kind: "clean-room"`
+- `parent_loop_ref`
+- `spec_slice_ref`
+- `approved_scope_refs`
+- `acceptance_refs`
+- `public_surface_refs`
+- `return_to: "outer-spec-loop"`
+- `outer_iteration`
+- `inner_iteration`
+- `max_inner_iterations`
+
+The inner loop may select only units named by `approved_scope_refs`. If a needed unit is outside that slice, return `spec-delta-required` instead of expanding scope.
 
 `run_state` is optional for compatibility with older manifests. When present, it records `generation`, `started_at`, optional `previous_generation_ref`, and `restart_reason`. Valid restart reasons are `user-requested`, `contamination`, `scope-change`, and `invalid-state`.
 
@@ -123,7 +161,7 @@ Every real task must record the user's actual target profile. Do not default sil
 
 ## Agent Pipeline
 
-`task-manifest.json` records the required Agent 0-3 handoff contract. New manifests should also include optional schema field `agent_1_5` for the source-denied sanitizer:
+`task-manifest.json` records the required Agent 0-3 handoff contract. New manifests must include schema field `agent_1_5` for the source-denied sanitizer:
 
 - Agent 0: `contaminated-manager-verifier`; controller, scope manager, coverage verifier, and receiver of Agent 3's terminal report.
 - Agent 1: `contaminated-source-analyst`; source reader and neutral draft task/spec generator.
@@ -133,6 +171,8 @@ Every real task must record the user's actual target profile. Do not default sil
 
 Agent 1.5 may read only Agent 0's neutral sanitizer brief, assigned draft artifacts, schema assets, and explicit public or destination reference roots. Do not give it source roots, `source-index.json`, evidence ledger contents, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 Agent 2 and Agent 3 must start in the clean domain and read `clean-run-context.json`, approved clean artifacts, schemas, approved public references, and clean implementation roots only. They must not read source roots, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`. Agent 0 may influence them only through schema-valid durable sanitized artifacts. Agent 3 reports back to Agent 0 only after the plan or task is complete, blocked, or quarantined, with abstract findings or delta tickets only.
+
+`handoff_sequence` must record these stages in order: `preflight`, `source-destination-discovery`, `agent-0-decomposition`, `agent-1-analysis`, `agent-1-5-sanitization`, `clean-handoff`, `clean-planning`, `clean-implementation-qc`, and `agent-0-coverage-verification`.
 
 ## Behavior Spec Content
 
@@ -208,6 +248,7 @@ Map API, protocol, config, and data/schema compatibility into `public_contracts`
 - clean implementation root refs such as `CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]`
 - clean source artifacts used for planning
 - destination foundation summary
+- code hygiene policy from preflight
 - work items with relative target paths and test paths
 - local clean-project patterns and dependency constraints
 - public contract refs and spec ids
@@ -231,6 +272,23 @@ Use only relative destination paths. Do not include source roots, contaminated r
 
 Do not include raw source excerpts, contaminated evidence, or source stack traces. Agent 3 does not declare source coverage complete, does not report progress to Agent 0, and does not request Agent 0 guidance during implementation. Agent 0 verifies coverage from the contaminated side after the terminal report.
 
+## Clean-Room Result Content
+
+`clean-room-result.json` is the inner loop return artifact. It is written only after Agent 0 consumes the terminal Agent 3 report and verifies coverage from the contaminated side.
+
+Capture:
+
+- task id
+- result: `spec-slice-complete`, `spec-slice-blocked`, `spec-delta-required`, `contamination-suspected`, `iteration-limit-reached`, or `no-progress-detected`
+- selected `spec_slice_ref`
+- coverage state
+- terminal implementation report ref
+- QC report ref
+- abstract delta tickets
+- return timestamp
+
+Do not include source excerpts, raw diffs, source paths, private identifiers, contaminated evidence details, or source-shaped pseudocode. Abstract deltas return to the outer spec loop for resolution.
+
 ## QC Report Content
 
 Capture:
@@ -250,6 +308,7 @@ Capture:
 - missing equal-output assertions
 - mismatches between specs, public contracts, and test obligations
 - terminology issues
+- code hygiene violations
 - clean-side changes made
 - abstract delta tickets for contaminated verification
 

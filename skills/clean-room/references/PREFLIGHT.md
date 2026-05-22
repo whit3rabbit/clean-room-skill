@@ -1,0 +1,71 @@
+# Preflight Goal Contract
+
+Preflight owns intent. Agent 0 owns orchestration. Later roles execute the recorded goal contract instead of deciding what the destination should become.
+
+## Required Questions
+
+Ask only enough to fill `preflight-goal.json`:
+
+- End goal: clean reimplementation, behavior-compatible port, API-compatible clone, modernization, partial extraction, or spec/test generation only.
+- Target stack: language, runtime, framework, package manager, and test framework.
+- Exactness: public APIs, CLI behavior, config files, output formats, error codes, UI behavior, or behavior-only.
+- Forbidden mirroring: internal names, private structure, comments, source file layout, private helper behavior, and dependencies.
+- Feature policy: preserve, remove, add, and non-goals.
+- Dependency policy: allow new dependencies, prefer standard library, allow/block dependencies, and native/system dependency approval.
+- License policy: destination license, allowed dependency licenses, blocked licenses, and source license notes.
+- Code hygiene: max lines per code/test file, max files per iteration, split strategy, exceptions, and forbidden patterns.
+- Output policy: artifact base, implementation root, assumed output directory, and existing destination handling.
+- Controller mode: attended, unattended with finite max iterations, or unattended only after review.
+
+## Defaults
+
+Record every default as an assumption. Good defaults:
+
+- Artifact base: `~/Documents/CleanRoom/<task-id>/`.
+- Implementation root: `~/Documents/CleanRoom/<task-id>/implementation/`.
+- Existing destination policy: `inspect-and-preserve`.
+- Dependency policy: allow new dependencies, prefer standard library, require approval for native/system dependencies.
+- Dependency licenses: allow MIT, Apache-2.0, BSD-2-Clause, and BSD-3-Clause; block GPL-3.0 and AGPL-3.0 unless the user explicitly approves otherwise.
+- Code hygiene: 500 lines per code file, 800 lines per test file, 12 files per iteration, split by module boundary/public type/feature area.
+
+## Exactness Boundary
+
+Exactness is allowed only for observable public compatibility surfaces:
+
+- public API names
+- CLI flags
+- serialized outputs
+- documented protocol behavior
+- public error codes
+- config files
+- UI behavior
+
+Private structure, comments, internal names, source file layout, private helper behavior, dependency choices, and source-shaped pseudocode remain blocked clean-side material.
+
+## Stage Ordering
+
+The controller must enforce this sequence:
+
+1. `preflight`
+2. `source-destination-discovery`
+3. `agent-0-decomposition`
+4. `agent-1-analysis`
+5. `agent-1-5-sanitization`
+6. `clean-handoff`
+7. `clean-planning`
+8. `clean-implementation-qc`
+9. `agent-0-coverage-verification`
+
+Agent 1 cannot start until Agent 0 records the preflight hash, assigned unit, source scope, evidence policy, and neutral sanitizer brief template.
+
+Agent 1.5 cannot start until Agent 1 writes draft behavior specs with evidence refs only and no direct source excerpts.
+
+Agent 2 cannot start until Agent 1.5 writes a passed handoff package, approved behavior specs, leakage review status, and `clean-run-context.json`.
+
+Agent 3 cannot start until Agent 2 writes `implementation-plan.json` with relative paths, argv-array verification commands, target stack, and code hygiene policy from preflight.
+
+## Recovery
+
+`resume` and `refocus` must stop when new-run artifacts lack `preflight_goal_ref`, `preflight_goal_sha256`, or a complete `handoff_sequence`. Report this as legacy or incomplete preflight state; do not infer intent from prior chat or source.
+
+`start-over` must create a new preflight goal or explicitly reuse a reviewed goal contract before recreating active artifacts.

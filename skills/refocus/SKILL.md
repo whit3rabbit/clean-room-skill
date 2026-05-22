@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Refocus realigns the current run to the declared scope, controller policy, artifact schemas, and clean-room boundary.
 
-Refocus does not optimize, expand, or reinterpret the task. It does not invent new requirements or add behavior beyond `task-manifest.json`, `clean-run-context.json`, ledgers, implementation plan/report, QC, and abstract delta tickets.
+Refocus does not optimize, expand, or reinterpret the task. It does not invent new requirements or add behavior beyond `preflight-goal.json`, `task-manifest.json`, `clean-run-context.json`, ledgers, implementation plan/report, QC, and abstract delta tickets.
 
 Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the same clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
@@ -18,6 +18,8 @@ Use the canonical `clean-room` skill workflow and references in this plugin. Pre
 Compare current artifacts to the canonical gate checklist:
 
 - Scope gate recorded authorization, roots, boundaries, prohibited actions, evidence handling, selected target profile, Agent 0-3 pipeline, and Agent 1.5 sanitizer role for new runs.
+- Preflight goal exists for new runs, validates against `preflight-goal.schema.json`, and is referenced by `task-manifest.json` with `preflight_goal_ref` and `preflight_goal_sha256`.
+- Task manifest records the required `handoff_sequence` and does not skip Stage 0.
 - Initialization snapshot exists when init preferences were used, and reusable `init-config.json` drift is reported instead of silently applied.
 - `clean-run-context.json` exists before clean roles run and excludes source roots, contaminated roots, source index refs, and ledger paths.
 - `clean-run-context.json` records artifact-only coordination: Agent 0 does not directly steer Agent 2 or Agent 3, and Agent 3 reports to Agent 0 only at terminal status.
@@ -48,6 +50,7 @@ Emit missed-gate findings only:
 - Stale implementation plan compared with latest clean handoff.
 - Stale implementation report compared with latest implementation plan.
 - Controller policy not preserved.
+- Missing, invalid, or drifted preflight goal.
 
 Do not suggest speculative improvements. Do not change source scope, target profile, public API, or implementation plan.
 If the user asks to add scope, stop and route to a new scope gate instead of silently expanding the run.

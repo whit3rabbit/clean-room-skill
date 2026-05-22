@@ -11,6 +11,69 @@
   "formatting_rules": [
     "Use prioritized user stories with Given/When/Then acceptance scenarios."
   ],
+  "goal_contract": {
+    "goal_id": "goal-task-example",
+    "intent": "clean-room-reimplementation",
+    "success_definition": "Build a behavior-compatible clean implementation from approved clean specs.",
+    "destination_kind": "new-project",
+    "target_stack": {
+      "language": "javascript",
+      "runtime": "node",
+      "framework": null,
+      "package_manager": "npm",
+      "test_framework": "node:test"
+    },
+    "destination_license": "MIT",
+    "dependency_policy": {
+      "allow_new_dependencies": true,
+      "prefer_stdlib": true,
+      "require_user_approval_for_native_deps": true,
+      "blocked_dependencies": []
+    },
+    "compatibility_policy": {
+      "mirror_public_behavior": true,
+      "mirror_public_api_names": true,
+      "mirror_private_structure": false,
+      "mirror_comments_or_internal_names": false,
+      "allowed_exactness": [
+        "public API names",
+        "CLI flags",
+        "serialized outputs",
+        "public error codes"
+      ]
+    },
+    "feature_policy": {
+      "preserve_features": [
+        "example observable flow"
+      ],
+      "remove_features": [],
+      "add_features": [],
+      "non_goals": []
+    },
+    "output_policy": {
+      "assumed_output_directory": "implementation/",
+      "write_mode": "create-or-preserve-existing"
+    }
+  },
+  "code_hygiene_policy": {
+    "max_lines_per_code_file": 500,
+    "max_lines_per_test_file": 800,
+    "max_files_per_iteration": 12,
+    "split_large_files_by": [
+      "module boundary",
+      "public type",
+      "feature area"
+    ],
+    "exceptions": [
+      "fixtures",
+      "snapshots",
+      "generated files"
+    ],
+    "forbidden_patterns": [
+      "god file",
+      "source-shaped layout"
+    ]
+  },
   "clean_artifacts": {
     "clean_root": "clean-artifacts/",
     "handoff_package": "handoff-package.json",
