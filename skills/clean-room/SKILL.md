@@ -65,7 +65,27 @@ Use the recovery skills when a run already has durable artifacts:
 
 Use the startup wizard when the user invokes this skill directly, such as `/clean-room` or `/clean-room:clean-room`, and does not provide an existing `task-manifest.json` or specific artifact review task.
 
-Load or create `preflight-goal.json` first. Do not start attended or unattended execution until the goal contract records the end goal, target stack, license policy, dependency policy, compatibility/exactness policy, feature add/remove policy, code hygiene limits, output policy, existing destination policy, and controller mode.
+### Run State Discovery Before Wizard
+
+Before asking preflight questions, perform read-only run-state discovery. Do not rely on prior chat as state.
+
+Discovery order:
+
+1. Resolve explicit user-provided paths first. Accept a task root, `task-manifest.json`, `preflight-goal.json`, or `clean-room-bootstrap.json`.
+2. Inspect configured clean-room roots from the current request or environment, including `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, and `CLEAN_ROOM_IMPLEMENTATION_ROOTS` when present.
+3. Scan `~/Documents/CleanRoom/task-*` as a bounded fallback. Inspect only immediate task directories and their expected artifact names.
+
+If more than one candidate run is found without an explicit user path, list the candidate task roots and stop for explicit selection. Do not choose the newest candidate automatically.
+
+Classify the selected candidate before starting the wizard:
+
+- Valid `task-manifest.json`: route to `resume` and continue from the earliest incomplete gate.
+- Valid canonical `preflight-goal.json` without `task-manifest.json`: continue at source/destination discovery and manifest creation. Do not ask the preflight wizard again.
+- `clean-room-bootstrap.json` only: run preflight using the bootstrap roots.
+- Invalid `preflight-goal.json`: stop, report canonical schema or required-field errors, and do not create a replacement preflight.
+- No artifacts found: start the normal preflight wizard.
+
+Load or create `preflight-goal.json` only after this discovery step. Do not start attended or unattended execution until the goal contract records the end goal, target stack, license policy, dependency policy, compatibility/exactness policy, feature add/remove policy, code hygiene limits, output policy, existing destination policy, and controller mode.
 
 Gather only the setup facts needed to decide whether the workflow may start, or invoke `init` when the user wants a dedicated setup pass:
 

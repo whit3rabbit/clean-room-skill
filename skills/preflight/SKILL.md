@@ -27,6 +27,10 @@ Record these decisions:
 - Controller policy: attended or unattended, iteration cap, and whether unattended is allowed after preflight.
 - Open questions, with blocking questions clearly marked.
 
+The artifact must use the canonical `preflight-goal.schema.json` shape. Required top-level keys are `goal_id`, `created_at`, `end_goal`, `target_stack`, `license_policy`, `dependency_policy`, `compatibility_policy`, `feature_policy`, `code_hygiene_policy`, `output_policy`, `controller_policy`, and `open_questions`.
+
+Reject non-canonical or legacy-shaped preflight artifacts instead of treating them as complete. Do not accept invented fields such as `version`, `created`, `source`, `destination`, `exactness_policy`, `output_policy.artifact_base`, `output_policy.contaminated_root`, `output_policy.clean_root`, or `output_policy.quarantine_root` as substitutes for canonical fields. Report the missing or invalid canonical fields and stop for review.
+
 ## Mode Rules
 
 Attended runs may continue with recorded `open_questions`, but each blocking question becomes a pause gate before the affected work starts.

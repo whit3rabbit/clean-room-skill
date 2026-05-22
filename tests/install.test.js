@@ -1121,7 +1121,9 @@ describe('clean-room-skill installer', () => {
     assert.equal(result.status, 0, result.stderr);
     const geminiCommand = path.join(geminiHome, 'commands', 'clean-room', 'clean-room.md');
     assert.ok(fs.existsSync(geminiCommand));
-    assert.match(fs.readFileSync(geminiCommand, 'utf8'), /Run the bundled `clean-room` clean-room workflow/);
+    const geminiCleanRoom = fs.readFileSync(geminiCommand, 'utf8');
+    assert.match(geminiCleanRoom, /Run the bundled `clean-room` clean-room workflow/);
+    assert.match(geminiCleanRoom, /Run State Discovery Before Wizard/);
 
     result = runInstall(['--opencode', '--global', '--yes'], { OPENCODE_CONFIG_DIR: opencodeHome });
     assert.equal(result.status, 0, result.stderr);
@@ -1132,6 +1134,14 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-resume.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-start-over.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-unattended.md')));
+    const opencodeCleanRoom = fs.readFileSync(path.join(opencodeHome, 'command', 'clean-room-clean-room.md'), 'utf8');
+    const opencodeAttended = fs.readFileSync(path.join(opencodeHome, 'command', 'clean-room-attended.md'), 'utf8');
+    const opencodeUnattended = fs.readFileSync(path.join(opencodeHome, 'command', 'clean-room-unattended.md'), 'utf8');
+    assert.match(opencodeCleanRoom, /Run State Discovery Before Wizard/);
+    assert.match(opencodeAttended, /Run State Discovery Before Wizard/);
+    assert.match(opencodeUnattended, /Run State Discovery Before Wizard/);
+    assert.match(opencodeAttended, /schema errors instead of restarting preflight/);
+    assert.match(opencodeUnattended, /schema errors instead of restarting preflight/);
   });
 
   test('strict hooks fail before mutating unsupported runtimes', () => {
