@@ -150,6 +150,7 @@ By default, `init` creates:
 
 - `contaminated/`
 - `clean/`
+- `implementation/`
 - `quarantine/`
 - `clean-room-bootstrap.json`
 - `.clean-room/README.md` in the target repository
@@ -175,7 +176,7 @@ Options:
 | `--template` | Write an attended draft with blocking open questions. |
 | `--input <path>` | Validate and normalize/copy a completed preflight goal. |
 | `--output <path>` | Destination `preflight-goal.json`. |
-| `--bootstrap <path>` | Generated task root or `clean-room-bootstrap.json`; writes to the generated contaminated artifact root after scaffold validation. |
+| `--bootstrap <path>` | Generated task root or `clean-room-bootstrap.json`; writes to the generated contaminated artifact root after scaffold validation and requires completed input roots to match the bootstrap. |
 | `--mode <mode>` | `attended` or `unattended`; template supports attended only. |
 | `--dry-run` | Print actions without writing files. |
 | `--force` | Overwrite output if it already exists. |

@@ -40,6 +40,12 @@ const INSTALL_LOCK_NAME = '.clean-room-install.lock';
 const INSTALL_LOCK_WAIT_MS = envPositiveInteger('CLEAN_ROOM_INSTALL_LOCK_WAIT_MS', 30_000);
 const INSTALL_LOCK_POLL_MS = 100;
 const PYTHON_PROBE_TIMEOUT_MS = envPositiveInteger('CLEAN_ROOM_INSTALL_PYTHON_TIMEOUT_MS', 10_000);
+const CLAUDE_PLUGIN_TIMEOUT_MS = envPositiveInteger('CLEAN_ROOM_INSTALL_CLAUDE_PLUGIN_TIMEOUT_MS', 120_000);
+const CLAUDE_PLUGIN_MARKETPLACE_NAME = 'clean-room-skill';
+const CLAUDE_PLUGIN_NAME = 'clean-room';
+const CLAUDE_PLUGIN_ID = `${CLAUDE_PLUGIN_NAME}@${CLAUDE_PLUGIN_MARKETPLACE_NAME}`;
+const CLAUDE_PLUGIN_SOURCE_URL = 'https://github.com/whit3rabbit/clean-room-skill.git';
+const CLAUDE_PLUGIN_SCOPE = 'user';
 
 function envPositiveInteger(name, fallback) {
   const value = process.env[name];
@@ -448,7 +454,7 @@ function defaultRuntimeSelections(statuses, action = 'install') {
     return statuses.filter((status) => isInstalledStatus(status)).map((status) => status.runtime);
   }
   if (action === 'update') {
-    return statuses.filter((status) => status.state === 'installed').map((status) => status.runtime);
+    return selectableRuntimeSelections(statuses, action);
   }
   if (action === 'status') {
     return statuses.map((status) => status.runtime);
@@ -458,9 +464,55 @@ function defaultRuntimeSelections(statuses, action = 'install') {
 
 function detectedRuntimeSelections(statuses, action = 'install') {
   if (action === 'update') {
-    return statuses.filter((status) => status.state === 'installed').map((status) => status.runtime);
+    return selectableRuntimeSelections(statuses, action);
   }
   return statuses.filter((status) => isInstalledStatus(status)).map((status) => status.runtime);
+}
+
+function isUpdateTargetStatus(status) {
+  return status?.state === 'installed' || status?.state === 'update-available';
+}
+
+function isSelectableRuntimeStatus(status, action = 'install') {
+  if (action === 'update') {
+    return isUpdateTargetStatus(status);
+  }
+  return true;
+}
+
+function selectableRuntimeSelections(statuses, action = 'install') {
+  return statuses
+    .filter((status) => isSelectableRuntimeStatus(status, action))
+    .map((status) => status.runtime);
+}
+
+function statusForRuntime(statuses, runtime) {
+  return statuses.find((status) => status.runtime === runtime) || {
+    runtime,
+    state: 'not-installed',
+  };
+}
+
+function unavailableRuntimeSelectionMessage(status, action) {
+  if (action === 'update') {
+    return `${status.runtime} is not installed in this scope; choose Install to add it.`;
+  }
+  return `${status.runtime} cannot be selected for ${action}.`;
+}
+
+function emptyRuntimeSelectionMessage(statuses, action) {
+  if (action === 'update' && selectableRuntimeSelections(statuses, action).length === 0) {
+    return 'No installed runtimes detected for update. Choose Install instead.';
+  }
+  return 'Select at least one runtime.';
+}
+
+function addRuntimeSelection(selected, runtime, statuses, action) {
+  const status = statusForRuntime(statuses, runtime);
+  if (!isSelectableRuntimeStatus(status, action)) {
+    throw new Error(unavailableRuntimeSelectionMessage(status, action));
+  }
+  selected.push(runtime);
 }
 
 function parseRuntimeSelection(answer, statuses, action = 'install') {
@@ -480,7 +532,7 @@ function parseRuntimeSelection(answer, statuses, action = 'install') {
   const tokens = text.split(/[,\s]+/).filter(Boolean);
   for (const token of tokens) {
     if (token === 'all') {
-      selected.push(...RUNTIMES);
+      selected.push(...(action === 'update' ? selectableRuntimeSelections(statuses, action) : RUNTIMES));
       continue;
     }
     if (token === 'installed') {
@@ -495,16 +547,16 @@ function parseRuntimeSelection(answer, statuses, action = 'install') {
         throw new Error(`invalid runtime range: ${token}`);
       }
       for (let index = start; index <= end; index += 1) {
-        selected.push(runtimeForSelectionIndex(statuses, index));
+        addRuntimeSelection(selected, runtimeForSelectionIndex(statuses, index), statuses, action);
       }
       continue;
     }
     if (/^\d+$/.test(token)) {
-      selected.push(runtimeForSelectionIndex(statuses, Number(token)));
+      addRuntimeSelection(selected, runtimeForSelectionIndex(statuses, Number(token)), statuses, action);
       continue;
     }
     if (RUNTIMES.includes(token)) {
-      selected.push(token);
+      addRuntimeSelection(selected, token, statuses, action);
       continue;
     }
     throw new Error(`unsupported runtime selection: ${token}`);
@@ -528,11 +580,11 @@ function isInstalledStatus(status) {
 }
 
 function nextTuiStage(options, flags) {
-  if (!flags.actionResolved) {
-    return 'action';
-  }
   if (!options.scope) {
     return 'scope';
+  }
+  if (!flags.actionResolved) {
+    return 'action';
   }
   if (operationForOptions(options) === 'status') {
     return 'complete';
@@ -580,14 +632,18 @@ function RuntimeMultiSelect({ React, Box, Text, useInput, h, action, statuses, o
   const [selected, setSelected] = React.useState(initialSelected);
   const [error, setError] = React.useState('');
 
-  function toggle(runtime) {
+  function toggle(status) {
     setError('');
+    if (!isSelectableRuntimeStatus(status, action)) {
+      setError(unavailableRuntimeSelectionMessage(status, action));
+      return;
+    }
     setSelected((current) => {
       const next = new Set(current);
-      if (next.has(runtime)) {
-        next.delete(runtime);
+      if (next.has(status.runtime)) {
+        next.delete(status.runtime);
       } else {
-        next.add(runtime);
+        next.add(status.runtime);
       }
       return next;
     });
@@ -603,17 +659,17 @@ function RuntimeMultiSelect({ React, Box, Text, useInput, h, action, statuses, o
     } else if (key.end) {
       setIndex(statuses.length - 1);
     } else if (input === ' ') {
-      toggle(statuses[index].runtime);
+      toggle(statuses[index]);
     } else if (input === 'a') {
       setError('');
-      setSelected(new Set(RUNTIMES));
+      setSelected(new Set(action === 'update' ? selectableRuntimeSelections(statuses, action) : RUNTIMES));
     } else if (input === 'i') {
       setError('');
       setSelected(new Set(detectedRuntimeSelections(statuses, action)));
     } else if (key.return || /[\r\n]/.test(input)) {
       const runtimes = RUNTIMES.filter((runtime) => selected.has(runtime));
       if (runtimes.length === 0) {
-        setError('Select at least one runtime.');
+        setError(emptyRuntimeSelectionMessage(statuses, action));
         return;
       }
       onSubmit(runtimes);
@@ -622,7 +678,7 @@ function RuntimeMultiSelect({ React, Box, Text, useInput, h, action, statuses, o
 
   return h(Box, { flexDirection: 'column' },
     h(Text, { bold: true }, `Runtimes to ${action}`),
-    h(Text, { dimColor: true }, 'Space toggles. a selects all. i selects detected installs. Enter continues.'),
+    h(Text, { dimColor: true }, `${action === 'update' ? 'Space toggles installed runtimes. a selects installed runtimes.' : 'Space toggles. a selects all.'} i selects detected installs. Enter continues.`),
     ...statuses.map((status, itemIndex) => {
       const checked = selected.has(status.runtime) ? '[x]' : '[ ]';
       const cursor = itemIndex === index ? '>' : ' ';
@@ -681,6 +737,200 @@ function displayPath(filePath) {
   return filePath;
 }
 
+function usesClaudeGlobalPlugin(layout) {
+  return layout.runtime === 'claude' && layout.scope === 'global';
+}
+
+function claudePluginSource() {
+  return `${CLAUDE_PLUGIN_SOURCE_URL}#v${packageVersion()}`;
+}
+
+function truncateCommandOutput(value) {
+  const text = String(value || '').trim();
+  if (text.length <= 2000) return text;
+  return `${text.slice(0, 2000)}...`;
+}
+
+function claudePluginEnv(layout) {
+  return {
+    ...process.env,
+    CLAUDE_CONFIG_DIR: layout.targetRoot,
+  };
+}
+
+function claudeCommandLabel(args) {
+  return ['claude', ...args].join(' ');
+}
+
+function claudePluginCommandFailure(args, result) {
+  const parts = [`Claude plugin command failed: ${claudeCommandLabel(args)}`];
+  if (result.error) {
+    parts.push(result.error.message);
+  }
+  if (result.status !== null && result.status !== undefined) {
+    parts.push(`status ${result.status}`);
+  }
+  if (result.signal) {
+    parts.push(`signal ${result.signal}`);
+  }
+  const stdout = truncateCommandOutput(result.stdout);
+  const stderr = truncateCommandOutput(result.stderr);
+  if (stdout) parts.push(`stdout: ${stdout}`);
+  if (stderr) parts.push(`stderr: ${stderr}`);
+  return parts.join('; ');
+}
+
+function runClaudePluginCommand(layout, args, options = {}) {
+  const result = spawnSync('claude', args, {
+    encoding: 'utf8',
+    env: claudePluginEnv(layout),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: CLAUDE_PLUGIN_TIMEOUT_MS,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(claudePluginCommandFailure(args, result));
+  }
+  if (!options.silent) {
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+  }
+  return result;
+}
+
+function readClaudePluginJson(layout, args) {
+  const result = runClaudePluginCommand(layout, args, { silent: true });
+  try {
+    const parsed = JSON.parse(result.stdout || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    throw new Error(
+      `Claude plugin command returned invalid JSON: ${claudeCommandLabel(args)}; ` +
+      `stdout: ${truncateCommandOutput(result.stdout)}; ${err.message}`
+    );
+  }
+}
+
+function claudeMarketplaceExists(layout) {
+  return readClaudePluginJson(layout, ['plugin', 'marketplace', 'list', '--json'])
+    .some((entry) => entry && entry.name === CLAUDE_PLUGIN_MARKETPLACE_NAME);
+}
+
+function claudePluginEntry(layout) {
+  return readClaudePluginJson(layout, ['plugin', 'list', '--json'])
+    .find((entry) => entry && entry.id === CLAUDE_PLUGIN_ID) || null;
+}
+
+function claudePluginExists(layout) {
+  return Boolean(claudePluginEntry(layout));
+}
+
+function claudePluginMetadata(manifest, state = {}) {
+  const previous = manifest?.claude_plugin || {};
+  const metadata = {
+    plugin_id: CLAUDE_PLUGIN_ID,
+    plugin_name: CLAUDE_PLUGIN_NAME,
+    marketplace_name: CLAUDE_PLUGIN_MARKETPLACE_NAME,
+    source_url: CLAUDE_PLUGIN_SOURCE_URL,
+    source: claudePluginSource(),
+    scope: CLAUDE_PLUGIN_SCOPE,
+    version: packageVersion(),
+    marketplace_added_by_installer: previous.marketplace_added_by_installer === true ||
+      state.marketplaceAdded === true,
+    plugin_installed_by_installer: previous.plugin_installed_by_installer === true ||
+      state.pluginInstalled === true,
+    recorded_at: new Date().toISOString(),
+  };
+  if (state.installPath || previous.install_path) {
+    metadata.install_path = state.installPath || previous.install_path;
+  }
+  return metadata;
+}
+
+function ensureClaudeGlobalPlugin(layout, manifest, options, action) {
+  if (!usesClaudeGlobalPlugin(layout)) return null;
+
+  const source = claudePluginSource();
+  if (options.dryRun) {
+    const marketplaceVerb = action === 'update' ? 'refresh' : 'add';
+    const pluginVerb = action === 'update' ? 'update or install' : 'install';
+    console.log(`  Claude plugin marketplace: would ${marketplaceVerb} ${source}`);
+    console.log(`  Claude plugin: would ${pluginVerb} ${CLAUDE_PLUGIN_ID}`);
+    return claudePluginMetadata(manifest);
+  }
+
+  const marketplaceWasPresent = claudeMarketplaceExists(layout);
+  console.log(`  Claude plugin marketplace: ${source}`);
+  runClaudePluginCommand(layout, [
+    'plugin',
+    'marketplace',
+    'add',
+    source,
+    '--scope',
+    CLAUDE_PLUGIN_SCOPE,
+  ]);
+
+  const pluginBefore = claudePluginEntry(layout);
+  const pluginWasPresent = Boolean(pluginBefore);
+  if (action === 'update' && pluginWasPresent) {
+    console.log(`  Claude plugin: updating ${CLAUDE_PLUGIN_ID}`);
+    runClaudePluginCommand(layout, ['plugin', 'update', CLAUDE_PLUGIN_ID]);
+  } else if (!pluginWasPresent) {
+    console.log(`  Claude plugin: installing ${CLAUDE_PLUGIN_ID}`);
+    runClaudePluginCommand(layout, [
+      'plugin',
+      'install',
+      CLAUDE_PLUGIN_ID,
+      '--scope',
+      CLAUDE_PLUGIN_SCOPE,
+    ]);
+  } else {
+    console.log(`  Claude plugin: already installed ${CLAUDE_PLUGIN_ID}`);
+  }
+
+  const pluginAfter = claudePluginEntry(layout) || pluginBefore;
+  return claudePluginMetadata(manifest, {
+    marketplaceAdded: !marketplaceWasPresent,
+    pluginInstalled: !pluginWasPresent,
+    installPath: pluginAfter?.installPath,
+  });
+}
+
+function removeClaudeGlobalPlugin(layout, manifest, options) {
+  if (!usesClaudeGlobalPlugin(layout)) return;
+  const plugin = manifest?.claude_plugin;
+  if (!plugin) return;
+
+  if (options.dryRun) {
+    if (plugin.plugin_installed_by_installer) {
+      console.log(`  Claude plugin: would uninstall ${plugin.plugin_id || CLAUDE_PLUGIN_ID}`);
+    }
+    if (plugin.marketplace_added_by_installer) {
+      console.log(`  Claude plugin marketplace: would remove ${plugin.marketplace_name || CLAUDE_PLUGIN_MARKETPLACE_NAME}`);
+    }
+    return;
+  }
+
+  if (plugin.plugin_installed_by_installer) {
+    const pluginId = plugin.plugin_id || CLAUDE_PLUGIN_ID;
+    if (claudePluginExists(layout)) {
+      console.log(`  Claude plugin: uninstalling ${pluginId}`);
+      runClaudePluginCommand(layout, ['plugin', 'uninstall', pluginId]);
+    } else {
+      console.log(`  Claude plugin: already absent ${pluginId}`);
+    }
+  }
+
+  if (plugin.marketplace_added_by_installer) {
+    const marketplaceName = plugin.marketplace_name || CLAUDE_PLUGIN_MARKETPLACE_NAME;
+    if (claudeMarketplaceExists(layout)) {
+      console.log(`  Claude plugin marketplace: removing ${marketplaceName}`);
+      runClaudePluginCommand(layout, ['plugin', 'marketplace', 'remove', marketplaceName]);
+    } else {
+      console.log(`  Claude plugin marketplace: already absent ${marketplaceName}`);
+    }
+  }
+}
+
 function collectRuntimeStatus(runtime, scope, configDir) {
   const layout = resolveRuntimeLayout(runtime, scope, { configDir });
   const base = {
@@ -701,6 +951,7 @@ function collectRuntimeStatus(runtime, scope, configDir) {
     unknownConflicts: 0,
     hookRegistration: layout.supportsHookRegistration ? 'none' : 'unsupported',
     updateAvailable: false,
+    claudePlugin: null,
     issues: [],
   };
 
@@ -790,6 +1041,7 @@ function collectRuntimeStatus(runtime, scope, configDir) {
     unknownConflicts: plan.unknownConflicts.length,
     hookRegistration: hookState,
     updateAvailable,
+    claudePlugin: manifest.claude_plugin || null,
     issues,
   };
 }
@@ -835,6 +1087,9 @@ function printStatusReport(statuses) {
       console.log(`  phase: ${status.phase || 'unknown'}`);
       console.log(`  hooks: ${status.hooksMode || 'unknown'}; registration ${status.hookRegistration}`);
       console.log(`  files: ${status.files}; missing ${status.missing}; modified ${status.modified}; stale ${status.stale}; conflicts ${status.unknownConflicts}`);
+      if (status.claudePlugin) {
+        console.log(`  plugin: ${status.claudePlugin.plugin_id || CLAUDE_PLUGIN_ID}; marketplace ${status.claudePlugin.marketplace_name || CLAUDE_PLUGIN_MARKETPLACE_NAME}`);
+      }
     } else if (status.hookRegistration === 'present') {
       console.log('  hooks: managed hook registration present without install manifest');
     }
@@ -853,7 +1108,7 @@ function selectedUpdateRuntimes(options) {
     return options.runtimes;
   }
   return runtimeInstallStatuses(options.scope, options.configDir)
-    .filter((status) => status.state === 'installed')
+    .filter((status) => isUpdateTargetStatus(status))
     .map((status) => status.runtime);
 }
 
@@ -985,6 +1240,8 @@ async function installRuntime(runtime, options) {
     }
 
     const hookResult = prepareHookRegistration(layout, options.hookMode, { dryRun: options.dryRun });
+    const pluginState = ensureClaudeGlobalPlugin(layout, manifest, options, verb);
+    const installState = pluginState ? { claude_plugin: pluginState } : {};
     // Install order is files, installing manifest, hook config, then complete manifest.
     // The installing manifest gives repair/uninstall a durable handle if hook config write fails.
     let result;
@@ -1002,6 +1259,7 @@ async function installRuntime(runtime, options) {
       try {
         writeInstallManifest(targetRoot, result.manifest, runtime, options.scope, options.hookMode, options.dryRun, {
           phase: 'installing',
+          ...installState,
         });
       } catch (err) {
         throw new Error(partialInstallMessage(targetRoot, {
@@ -1027,13 +1285,14 @@ async function installRuntime(runtime, options) {
               result.manifest,
               runtime,
               options.scope,
-              options.hookMode,
-              false,
-              {
-                phase: 'installing',
-                ...hookRegistrationFailureState(hookResult, err),
-              }
-            );
+                options.hookMode,
+                false,
+                {
+                  phase: 'installing',
+                  ...installState,
+                  ...hookRegistrationFailureState(hookResult, err),
+                }
+              );
             manifestStatus = 'install manifest records the failed hook registration';
           } catch {
             manifestStatus = 'install manifest could not record the failed hook registration';
@@ -1061,6 +1320,7 @@ async function installRuntime(runtime, options) {
       try {
         writeInstallManifest(targetRoot, result.manifest, runtime, options.scope, options.hookMode, options.dryRun, {
           phase: 'complete',
+          ...installState,
         });
       } catch (err) {
         throw new Error(partialInstallMessage(targetRoot, {
@@ -1141,6 +1401,7 @@ async function uninstallRuntime(runtime, options) {
       console.log(`  untracked package-path files left in place: ${plan.untracked.length}`);
     }
 
+    removeClaudeGlobalPlugin(layout, manifest, options);
     const result = applyUninstall(targetRoot, plan, options.dryRun);
     if (!options.dryRun) {
       removeHookRegistrations(layout, false);

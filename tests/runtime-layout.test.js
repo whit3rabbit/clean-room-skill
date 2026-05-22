@@ -28,7 +28,7 @@ const GLOBAL_ENV = {
 
 const EXPECTED_GLOBAL = {
   codex: { root: '/tmp/clean-room/codex', kinds: ['skills:skills', 'agents:agents', 'hooks:hooks/clean-room'], hooks: true },
-  claude: { root: '/tmp/clean-room/claude', kinds: ['skills:skills', 'agents:agents', 'hooks:hooks/clean-room'], hooks: true },
+  claude: { root: '/tmp/clean-room/claude', kinds: ['hooks:hooks/clean-room'], hooks: true },
   antigravity: {
     root: '/tmp/clean-room/antigravity-plugin',
     kinds: ['plugin-manifest:plugin.json', 'skills:skills', 'agents:agents', 'hooks:hooks/clean-room'],

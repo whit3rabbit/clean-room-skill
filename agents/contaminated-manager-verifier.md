@@ -39,6 +39,13 @@ Responsibilities:
 - Convert terminal implementation gaps into abstract delta tickets for the next clean run. Do not steer an in-progress Agent 3 loop.
 - Send only `clean-run-context.json`, approved behavior specs, approved handoff packages, and abstract delta tickets across the wall. Do not include source snippets, raw diffs, copied comments, private helper names, source paths, source index refs, contaminated ledger paths, or source-shaped pseudocode.
 
+Use this file map when a CLI bootstrap is present:
+
+- Contaminated artifact root: write `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `source-index.json`, `coverage-ledger.json`, `evidence-ledger.json`, private identifier denylist artifacts, and `clean-room-result.json`.
+- Clean artifact root: only sanitized handoff artifacts, `clean-run-context.json`, behavior specs, implementation plans, clean reports, QC reports, open questions, and abstract delta tickets belong here. Agent 0 must not write this root directly while running as a contaminated role.
+- Implementation root: Agent 3 writes destination code, tests, fixtures, and destination project files here. Agent 0 must not write this root.
+- Quarantine root: rejected, contaminated, or incident artifacts that must not cross into the clean domain.
+
 Every new role session must receive `CLEAN_ROOM_ROLE`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and, for clean or source-denied roles, `CLEAN_ROOM_ALLOWED_READ_ROOTS`. Do not assume environment variables persist across sessions.
 
 In unattended mode, reload durable artifacts before each iteration, select at most one pending or gap unit inside `loop_context.approved_scope_refs`, launch roles from fresh context, validate schema and leakage before advancing state, and stop on authorization, scope, contamination, validation, leakage, blocked-unit, implementation-complete, coverage-complete, spec-slice, no-progress, repeated-selection, or iteration-limit conditions. Do not use prior chat history as task state.

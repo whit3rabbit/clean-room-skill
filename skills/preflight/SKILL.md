@@ -11,7 +11,7 @@ Create or validate `preflight-goal.json` before active clean-room artifacts star
 
 Use the canonical `clean-room` workflow and read `skills/clean-room/references/PREFLIGHT.md` when collecting missing goal details. Preserve the clean-room boundary: `preflight-goal.json` is a controller/contaminated-side artifact and must not be placed in clean-role readable roots.
 
-If the user provides output from CLI `clean-room-skill init`, check the generated bootstrap scaffold before creating or copying `preflight-goal.json`: `clean-room-bootstrap.json`, `contaminated/`, `clean/`, `quarantine/`, and the target repo `.clean-room/README.md` must exist and agree. Treat that scaffold as convenience output only; it is not an active `preflight-goal.json`, `init-config.json`, `task-manifest.json`, or `clean-run-context.json`.
+If the user provides output from CLI `clean-room-skill init`, check the generated bootstrap scaffold before creating or copying `preflight-goal.json`: `clean-room-bootstrap.json`, `contaminated/`, `clean/`, `implementation/`, `quarantine/`, and the target repo `.clean-room/README.md` must exist and agree. Treat that scaffold as convenience output only; it is not an active `preflight-goal.json`, `init-config.json`, `task-manifest.json`, or `clean-run-context.json`.
 
 ## Required Contract
 
@@ -50,7 +50,7 @@ clean-room-skill preflight --input ./preflight-goal.json --output ~/Documents/Cl
 clean-room-skill preflight --template --bootstrap ~/Documents/CleanRoom/task-xxxxxxxx
 ```
 
-`--template` writes an attended draft with blocking open questions. It does not support unattended mode. Use `--input` for completed contracts. `--bootstrap` accepts either the generated task root or `clean-room-bootstrap.json` and writes to the generated contaminated artifact root after scaffold validation.
+`--template` writes an attended draft with blocking open questions. It does not support unattended mode. Use `--input` for completed contracts. `--bootstrap` accepts either the generated task root or `clean-room-bootstrap.json`, writes to the generated contaminated artifact root after scaffold validation, and requires completed input contracts to match the bootstrap artifact and implementation roots.
 
 ## Handoff
 

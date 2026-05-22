@@ -33,6 +33,9 @@ const {
 } = require('./helpers/install.cjs');
 
 const TEST_TIMEOUT_MS = 30_000;
+const CLAUDE_PLUGIN_ID = 'clean-room@clean-room-skill';
+const CLAUDE_MARKETPLACE_NAME = 'clean-room-skill';
+const CLAUDE_PLUGIN_SOURCE_URL = 'https://github.com/whit3rabbit/clean-room-skill.git';
 
 function spawnSync(command, args, options) {
   if (!Array.isArray(args)) {
@@ -120,6 +123,179 @@ function writeLock(lockPath, pid, createdAt) {
   fs.utimesSync(lockPath, createdAt, createdAt);
 }
 
+function packageVersion() {
+  return readJson(path.join(ROOT, 'package.json')).version;
+}
+
+function claudePluginSource() {
+  return `${CLAUDE_PLUGIN_SOURCE_URL}#v${packageVersion()}`;
+}
+
+function createClaudeStub(root, initial = {}) {
+  const binDir = path.join(root, 'bin');
+  const statePath = path.join(root, 'claude-plugin-state.json');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(statePath, `${JSON.stringify({
+    marketplaces: initial.marketplaces ? [CLAUDE_MARKETPLACE_NAME] : [],
+    plugins: initial.plugins ? [CLAUDE_PLUGIN_ID] : [],
+    calls: [],
+  }, null, 2)}\n`);
+
+  const stubPath = path.join(binDir, 'claude');
+  fs.writeFileSync(stubPath, `#!/usr/bin/env node
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+const statePath = process.env.CLEAN_ROOM_CLAUDE_STUB_STATE;
+const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(process.env.HOME || '.', '.claude');
+const marketplaceName = ${JSON.stringify(CLAUDE_MARKETPLACE_NAME)};
+const pluginId = ${JSON.stringify(CLAUDE_PLUGIN_ID)};
+const pluginSource = ${JSON.stringify(CLAUDE_PLUGIN_SOURCE_URL)};
+const version = ${JSON.stringify(packageVersion())};
+const args = process.argv.slice(2);
+
+function pluginInstallPath() {
+  return path.join(configDir, 'plugins', 'cache', marketplaceName, 'clean-room', version);
+}
+
+function readState() {
+  try {
+    return JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  } catch {
+    return { marketplaces: [], plugins: [], calls: [] };
+  }
+}
+
+function writeState(state) {
+  fs.mkdirSync(path.dirname(statePath), { recursive: true });
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\\n');
+}
+
+function has(value, list) {
+  return Array.isArray(list) && list.includes(value);
+}
+
+const state = readState();
+state.calls.push({ args, configDir });
+
+const fail = process.env.CLEAN_ROOM_CLAUDE_STUB_FAIL;
+if (fail && args.join(' ').includes(fail)) {
+  writeState(state);
+  console.error('stubbed claude failure for ' + fail);
+  process.exit(42);
+}
+
+if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'list' && args.includes('--json')) {
+  console.log(JSON.stringify((state.marketplaces || []).map((name) => ({
+    name,
+    source: 'git',
+    url: pluginSource,
+    installLocation: path.join(configDir, 'plugins', 'marketplaces', name),
+  }))));
+  writeState(state);
+  process.exit(0);
+}
+
+if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add') {
+  if (!has(marketplaceName, state.marketplaces)) state.marketplaces.push(marketplaceName);
+  console.log('stub marketplace added');
+  writeState(state);
+  process.exit(0);
+}
+
+if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'remove') {
+  state.marketplaces = (state.marketplaces || []).filter((name) => name !== marketplaceName);
+  state.plugins = (state.plugins || []).filter((id) => id !== pluginId);
+  console.log('stub marketplace removed');
+  writeState(state);
+  process.exit(0);
+}
+
+if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'update') {
+  console.log('stub marketplace updated');
+  writeState(state);
+  process.exit(0);
+}
+
+if (args[0] === 'plugin' && args[1] === 'list' && args.includes('--json')) {
+  console.log(JSON.stringify((state.plugins || []).map((id) => ({
+    id,
+    version,
+    scope: 'user',
+    enabled: true,
+    installPath: pluginInstallPath(),
+  }))));
+  writeState(state);
+  process.exit(0);
+}
+
+if (args[0] === 'plugin' && args[1] === 'install') {
+  if (!has(pluginId, state.plugins)) state.plugins.push(pluginId);
+  fs.mkdirSync(path.join(pluginInstallPath(), 'skills', 'clean-room', 'assets'), { recursive: true });
+  console.log('stub plugin installed');
+  writeState(state);
+  process.exit(0);
+}
+
+if (args[0] === 'plugin' && args[1] === 'update') {
+  console.log('stub plugin updated');
+  writeState(state);
+  process.exit(0);
+}
+
+if (args[0] === 'plugin' && args[1] === 'uninstall') {
+  state.plugins = (state.plugins || []).filter((id) => id !== pluginId);
+  console.log('stub plugin uninstalled');
+  writeState(state);
+  process.exit(0);
+}
+
+console.error('unexpected claude stub command: ' + args.join(' '));
+writeState(state);
+process.exit(2);
+`);
+  fs.chmodSync(stubPath, 0o755);
+
+  return {
+    statePath,
+    env: {
+      PATH: `${binDir}${path.delimiter}${process.env.PATH || ''}`,
+      CLEAN_ROOM_CLAUDE_STUB_STATE: statePath,
+    },
+  };
+}
+
+function readClaudeStubCalls(stub) {
+  return readJson(stub.statePath).calls.map((call) => call.args.join(' '));
+}
+
+function writeLegacyClaudeStandaloneInstall(claudeHome) {
+  const files = {};
+  function writeManaged(relPath, content) {
+    const fullPath = path.join(claudeHome, relPath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, content);
+    files[relPath] = { sha256: sha256Bytes(Buffer.from(content)) };
+  }
+
+  writeManaged('skills/clean-room/SKILL.md', '# legacy clean-room skill\n');
+  writeManaged('skills/init/SKILL.md', '# legacy init skill\n');
+  writeManaged('agents/clean-architect.md', '# legacy clean architect\n');
+  fs.writeFileSync(path.join(claudeHome, 'clean-room-install-manifest.json'), `${JSON.stringify({
+    schema: 1,
+    package: 'clean-room-skill',
+    version: packageVersion(),
+    runtime: 'claude',
+    scope: 'global',
+    hooks_mode: 'copy-only',
+    phase: 'complete',
+    installed_at: new Date().toISOString(),
+    files,
+  }, null, 2)}\n`);
+}
+
 describe('clean-room-skill installer', () => {
   test('init dry run makes no target changes and prints bootstrap paths', () => {
     const root = tempDir('clean-room-init-dry-run');
@@ -161,6 +337,7 @@ describe('clean-room-skill installer', () => {
     const outputRoot = path.join(artifactBase, taskIds[0]);
     assert.equal(fs.existsSync(path.join(outputRoot, 'contaminated')), true);
     assert.equal(fs.existsSync(path.join(outputRoot, 'clean')), true);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'implementation')), true);
     assert.equal(fs.existsSync(path.join(outputRoot, 'quarantine')), true);
 
     const metadata = readJson(path.join(outputRoot, 'clean-room-bootstrap.json'));
@@ -168,12 +345,15 @@ describe('clean-room-skill installer', () => {
     assert.equal(metadata.target_profile, 'speckit-feature-folder');
     assert.equal(metadata.roots.contaminated_artifacts, path.join(outputRoot, 'contaminated'));
     assert.equal(metadata.roots.clean_artifacts, path.join(outputRoot, 'clean'));
+    assert.equal(metadata.roots.implementation_root, path.join(outputRoot, 'implementation'));
     assert.equal(metadata.roots.quarantine, path.join(outputRoot, 'quarantine'));
 
     const stub = fs.readFileSync(path.join(targetDir, '.clean-room', 'README.md'), 'utf8');
     assert.match(stub, /Clean Room Bootstrap/);
     assert.match(stub, /Default target profile: `speckit-feature-folder`/);
+    assert.match(stub, /`implementation\/`/);
     assert.doesNotMatch(stub, /source roots:/i);
+    assert.match(result.stdout, /implementation root:/);
     assert.match(result.stdout, /Codex:/);
     assert.match(result.stdout, /npx clean-room-skill@latest --codex --global --hooks=safe --yes/);
     assert.match(result.stdout, /start in Codex: invoke the init skill, then clean-room through @ or the skills UI/);
@@ -233,6 +413,7 @@ describe('clean-room-skill installer', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(fs.readFileSync(stubPath, 'utf8'), /Default target profile: `speckit-feature-folder`/);
     assert.equal(fs.existsSync(path.join(artifactBase, 'task-force', 'clean-room-bootstrap.json')), true);
+    assert.equal(fs.existsSync(path.join(artifactBase, 'task-force', 'implementation')), true);
   });
 
   test('init rejects existing generated task paths without force', () => {
@@ -312,6 +493,8 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(output), true);
     const goal = readJson(output);
     assert.equal(goal.controller_policy.mode, 'attended');
+    assert.equal(goal.output_policy.artifact_base_root, taskRoot);
+    assert.equal(goal.output_policy.implementation_root, path.join(taskRoot, 'implementation'));
     assert.match(result.stdout, /Wrote preflight goal/);
   });
 
@@ -334,6 +517,54 @@ describe('clean-room-skill installer', () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), true);
+    const goal = readJson(path.join(taskRoot, 'contaminated', 'preflight-goal.json'));
+    assert.equal(goal.output_policy.artifact_base_root, taskRoot);
+    assert.equal(goal.output_policy.implementation_root, path.join(taskRoot, 'implementation'));
+  });
+
+  test('preflight bootstrap rejects input contracts with mismatched output roots', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-input-mismatch');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const taskRoot = path.join(artifactBase, 'task-bootstrap-input-mismatch');
+    const input = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-input-mismatch']);
+    assert.equal(init.status, 0, init.stderr);
+
+    const result = runInstall(['preflight', '--input', input, '--bootstrap', taskRoot]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preflight goal does not match bootstrap scaffold/);
+    assert.match(result.stderr, /output_policy\.artifact_base_root must match bootstrap task root/);
+    assert.match(result.stderr, /output_policy\.implementation_root must match bootstrap implementation root/);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), false);
+  });
+
+  test('preflight bootstrap accepts input contracts with matching output roots', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-input-match');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const taskRoot = path.join(artifactBase, 'task-bootstrap-input-match');
+    const input = path.join(root, 'preflight-goal.json');
+    const goal = readJson(path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json'));
+    goal.output_policy.artifact_base_root = taskRoot;
+    goal.output_policy.implementation_root = path.join(taskRoot, 'implementation');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.writeFileSync(input, `${JSON.stringify(goal, null, 2)}\n`);
+
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-input-match']);
+    assert.equal(init.status, 0, init.stderr);
+
+    const result = runInstall(['preflight', '--input', input, '--bootstrap', taskRoot]);
+    const output = path.join(taskRoot, 'contaminated', 'preflight-goal.json');
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(output), true);
+    const written = readJson(output);
+    assert.equal(written.output_policy.artifact_base_root, taskRoot);
+    assert.equal(written.output_policy.implementation_root, path.join(taskRoot, 'implementation'));
   });
 
   test('preflight rejects broken bootstrap scaffold without writing', () => {
@@ -345,13 +576,13 @@ describe('clean-room-skill installer', () => {
 
     const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-broken']);
     assert.equal(init.status, 0, init.stderr);
-    fs.rmSync(path.join(taskRoot, 'clean'), { recursive: true, force: true });
+    fs.rmSync(path.join(taskRoot, 'implementation'), { recursive: true, force: true });
 
     const result = runInstall(['preflight', '--template', '--bootstrap', taskRoot]);
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /bootstrap scaffold is invalid/);
-    assert.match(result.stderr, /bootstrap clean directory missing/);
+    assert.match(result.stderr, /bootstrap implementation directory missing/);
     assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), false);
   });
 
@@ -486,8 +717,11 @@ describe('clean-room-skill installer', () => {
     assert.match(postWriteHookCommand(hooksJson), /--check validate-handoff-package\.py/);
   });
 
-  test('installs Claude skills, agents, hooks, manifest, and preserves user settings hooks', () => {
-    const claudeHome = tempDir('clean-room-claude');
+  test('installs Claude plugin, hooks, manifest, and preserves user settings hooks', () => {
+    const root = tempDir('clean-room-claude');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    fs.mkdirSync(claudeHome, { recursive: true });
     fs.writeFileSync(path.join(claudeHome, 'settings.json'), JSON.stringify({
       hooks: {
         PreToolUse: [
@@ -499,20 +733,22 @@ describe('clean-room-skill installer', () => {
       },
     }, null, 2));
 
-    const result = runInstall(['--claude', '--global', '--yes'], { CLAUDE_CONFIG_DIR: claudeHome });
+    const result = runInstall(['--claude', '--global', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
     assert.equal(result.status, 0, result.stderr);
-    assert.ok(fs.existsSync(path.join(claudeHome, 'skills', 'clean-room', 'SKILL.md')));
-    assert.ok(fs.existsSync(path.join(claudeHome, 'skills', 'init', 'SKILL.md')));
-    assert.ok(fs.existsSync(path.join(claudeHome, 'agents', 'clean-architect.md')));
-    assert.ok(fs.existsSync(path.join(claudeHome, 'agents', 'clean-implementer-verifier-shell.md')));
-    const defaultAgent = fs.readFileSync(path.join(claudeHome, 'agents', 'clean-qa-editor.md'), 'utf8');
-    const shellAgent = fs.readFileSync(path.join(claudeHome, 'agents', 'clean-implementer-verifier-shell.md'), 'utf8');
-    assert.match(defaultAgent, /tools: Read, Write, Edit, Glob\n/);
-    assert.doesNotMatch(defaultAgent, /tools: .*Bash/);
-    assert.match(shellAgent, /tools: Read, Write, Edit, Glob, Bash/);
-    assert.ok(fs.existsSync(path.join(claudeHome, 'agents', 'contaminated-handoff-sanitizer.md')));
+    assert.equal(fs.existsSync(path.join(claudeHome, 'skills', 'clean-room', 'SKILL.md')), false);
+    assert.equal(fs.existsSync(path.join(claudeHome, 'skills', 'init', 'SKILL.md')), false);
+    assert.equal(fs.existsSync(path.join(claudeHome, 'agents', 'clean-architect.md')), false);
     assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
     assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'agent3-verification-runner.py')));
+    const manifest = readJson(path.join(claudeHome, 'clean-room-install-manifest.json'));
+    assert.equal(manifest.claude_plugin.plugin_id, CLAUDE_PLUGIN_ID);
+    assert.equal(manifest.claude_plugin.source, claudePluginSource());
+    assert.equal(manifest.claude_plugin.marketplace_added_by_installer, true);
+    assert.equal(manifest.claude_plugin.plugin_installed_by_installer, true);
+    assert.deepEqual(readJson(stub.statePath).plugins, [CLAUDE_PLUGIN_ID]);
 
     const settings = readJson(path.join(claudeHome, 'settings.json'));
     assert.equal(
@@ -528,6 +764,9 @@ describe('clean-room-skill installer', () => {
       'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
     ]);
     assert.match(postWriteHookCommand(settings), /--check validate-handoff-package\.py/);
+    assert.deepEqual(readClaudeStubCalls(stub).filter((call) => call.includes('plugin install')), [
+      `plugin install ${CLAUDE_PLUGIN_ID} --scope user`,
+    ]);
   });
 
   test('runtime plugin manifests do not declare cwd-fragile static hooks', () => {
@@ -578,6 +817,7 @@ describe('clean-room-skill installer', () => {
     const root = tempDir('clean-room-all');
     const codexHome = path.join(root, 'codex');
     const claudeHome = path.join(root, 'claude');
+    const claudeStub = createClaudeStub(path.join(root, 'claude-stub'));
     const antigravityPlugin = path.join(root, 'antigravity-cli', 'plugins', 'clean-room');
     const geminiHome = path.join(root, 'gemini');
     const opencodeHome = path.join(root, 'opencode');
@@ -591,6 +831,7 @@ describe('clean-room-skill installer', () => {
     const hermesHome = path.join(root, 'hermes');
     const codebuddyHome = path.join(root, 'codebuddy');
     const result = runInstall(['--all', '--global', '--yes'], {
+      ...claudeStub.env,
       CODEX_HOME: codexHome,
       CLAUDE_CONFIG_DIR: claudeHome,
       ANTIGRAVITY_PLUGIN_DIR: antigravityPlugin,
@@ -608,7 +849,9 @@ describe('clean-room-skill installer', () => {
     });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(fs.existsSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md')));
-    assert.ok(fs.existsSync(path.join(claudeHome, 'skills', 'clean-room', 'SKILL.md')));
+    assert.equal(fs.existsSync(path.join(claudeHome, 'skills', 'clean-room', 'SKILL.md')), false);
+    assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
+    assert.deepEqual(readJson(claudeStub.statePath).plugins, [CLAUDE_PLUGIN_ID]);
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'plugin.json')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'clean-architect.md')));
@@ -635,6 +878,23 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /hook registration: would update/);
     assert.match(result.stdout, /python3 required when applying/);
     assert.equal(fs.existsSync(codexHome), false);
+  });
+
+  test('Claude global dry run plans plugin install without calling Claude CLI', () => {
+    const root = tempDir('clean-room-claude-dry-run');
+    const claudeHome = path.join(root, 'config');
+    const emptyPath = path.join(root, 'empty-bin');
+    fs.mkdirSync(emptyPath, { recursive: true });
+
+    const result = runInstall(['--claude', '--global', '--dry-run', '--yes'], {
+      CLAUDE_CONFIG_DIR: claudeHome,
+      PATH: emptyPath,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, new RegExp(`Claude plugin marketplace: would add ${claudePluginSource().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    assert.match(result.stdout, new RegExp(`Claude plugin: would install ${CLAUDE_PLUGIN_ID}`));
+    assert.equal(fs.existsSync(claudeHome), false);
   });
 
   test('dry run does not require python3 for hook-capable runtimes', () => {
@@ -691,6 +951,9 @@ describe('clean-room-skill installer', () => {
     assert.deepEqual(parseRuntimeSelection('', statuses, 'update'), ['claude']);
     assert.deepEqual(parseRuntimeSelection('installed', statuses, 'uninstall'), ['claude', 'gemini']);
     assert.deepEqual(parseRuntimeSelection('installed', statuses, 'update'), ['claude']);
+    assert.deepEqual(parseRuntimeSelection('all', statuses, 'update'), ['claude']);
+    assert.throws(() => parseRuntimeSelection('codex', statuses, 'update'), /codex is not installed in this scope/);
+    assert.throws(() => parseRuntimeSelection('4', statuses, 'update'), /gemini is not installed in this scope/);
     assert.throws(() => parseRuntimeSelection('99', statuses, 'install'), /out of range/);
   });
 
@@ -721,49 +984,132 @@ describe('clean-room-skill installer', () => {
   });
 
   test('status reports install version, drift, and hook state', () => {
-    const claudeHome = tempDir('clean-room-status-command');
+    const root = tempDir('clean-room-status-command');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
 
-    let result = runInstall(['status', '--claude', '--global'], { CLAUDE_CONFIG_DIR: claudeHome });
+    let result = runInstall(['status', '--claude', '--global'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /clean-room-skill package version:/);
     assert.match(result.stdout, /claude \(global\) not-installed/);
 
-    result = runInstall(['--claude', '--global', '--yes'], { CLAUDE_CONFIG_DIR: claudeHome });
+    result = runInstall(['--claude', '--global', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
     assert.equal(result.status, 0, result.stderr);
 
-    result = runInstall(['status', '--claude', '--global'], { CLAUDE_CONFIG_DIR: claudeHome });
+    result = runInstall(['status', '--claude', '--global'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /claude \(global\) installed/);
     assert.match(result.stdout, /version: [0-9]+\.[0-9]+\.[0-9]+/);
     assert.match(result.stdout, /phase: complete/);
     assert.match(result.stdout, /hooks: safe; registration present/);
     assert.match(result.stdout, /files: [0-9]+; missing 0; modified 0; stale 0; conflicts 0/);
+    assert.match(result.stdout, /plugin: clean-room@clean-room-skill; marketplace clean-room-skill/);
   });
 
   test('update refreshes an installed runtime without rerunning onboarding', () => {
-    const claudeHome = tempDir('clean-room-update-command');
+    const root = tempDir('clean-room-update-command');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
     const manifestPath = path.join(claudeHome, 'clean-room-install-manifest.json');
 
     let result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
       CLAUDE_CONFIG_DIR: claudeHome,
     });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(readJson(manifestPath).hooks_mode, 'copy-only');
 
     result = runInstall(['update', '--claude', '--global', '--dry-run'], {
+      ...stub.env,
       CLAUDE_CONFIG_DIR: claudeHome,
     });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Would update claude/);
+    assert.match(result.stdout, /Claude plugin marketplace: would refresh/);
+    assert.match(result.stdout, /Claude plugin: would update or install/);
     assert.equal(readJson(manifestPath).hooks_mode, 'copy-only');
 
     result = runInstall(['update', '--claude', '--global'], {
+      ...stub.env,
       CLAUDE_CONFIG_DIR: claudeHome,
     });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Updating claude/);
     assert.equal(readJson(manifestPath).hooks_mode, 'copy-only');
     assert.equal(fs.existsSync(path.join(claudeHome, 'settings.json')), false);
+    assert.ok(readClaudeStubCalls(stub).includes(`plugin update ${CLAUDE_PLUGIN_ID}`));
+  });
+
+  test('Claude global install migrates managed standalone skills after plugin install succeeds', () => {
+    const root = tempDir('clean-room-claude-migrate');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    fs.mkdirSync(claudeHome, { recursive: true });
+    writeLegacyClaudeStandaloneInstall(claudeHome);
+
+    const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(path.join(claudeHome, 'skills', 'clean-room', 'SKILL.md')), false);
+    assert.equal(fs.existsSync(path.join(claudeHome, 'skills', 'init', 'SKILL.md')), false);
+    assert.equal(fs.existsSync(path.join(claudeHome, 'agents', 'clean-architect.md')), false);
+    assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
+    assert.deepEqual(readJson(stub.statePath).plugins, [CLAUDE_PLUGIN_ID]);
+    assert.equal(readJson(path.join(claudeHome, 'clean-room-install-manifest.json')).claude_plugin.plugin_installed_by_installer, true);
+  });
+
+  test('Claude plugin install failure leaves legacy standalone skills intact', () => {
+    const root = tempDir('clean-room-claude-plugin-failure');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    fs.mkdirSync(claudeHome, { recursive: true });
+    writeLegacyClaudeStandaloneInstall(claudeHome);
+
+    const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+      CLEAN_ROOM_CLAUDE_STUB_FAIL: 'plugin install',
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Claude plugin command failed/);
+    assert.equal(fs.readFileSync(path.join(claudeHome, 'skills', 'clean-room', 'SKILL.md'), 'utf8'), '# legacy clean-room skill\n');
+    assert.equal(fs.readFileSync(path.join(claudeHome, 'skills', 'init', 'SKILL.md'), 'utf8'), '# legacy init skill\n');
+    assert.equal(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'clean-room-hook.py')), false);
+  });
+
+  test('Claude global reinstall does not reinstall an existing managed plugin', () => {
+    const root = tempDir('clean-room-claude-reinstall');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+
+    let result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    const installCalls = readClaudeStubCalls(stub)
+      .filter((call) => call === `plugin install ${CLAUDE_PLUGIN_ID} --scope user`);
+    assert.equal(installCalls.length, 1);
   });
 
   test('generates command wrappers for command-only runtimes', () => {
@@ -883,7 +1229,11 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /clean-room hook coverage:/);
     assert.match(result.stdout, /unsupported surfaces:/);
 
-    result = runInstall(['--claude', '--global', '--hooks=strict', '--yes'], { CLAUDE_CONFIG_DIR: claudeHome });
+    const claudeStub = createClaudeStub(path.join(root, 'claude-stub'));
+    result = runInstall(['--claude', '--global', '--hooks=strict', '--yes'], {
+      ...claudeStub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
     assert.equal(result.status, 0, result.stderr);
     result = runInstall(['doctor', '--runtime=claude', '--hooks=strict', '--config-dir', claudeHome]);
     assert.equal(result.status, 0, result.stderr);
@@ -1112,7 +1462,9 @@ describe('clean-room-skill installer', () => {
   });
 
   test('uninstall removes only managed files and clean-room hooks', () => {
-    const claudeHome = tempDir('clean-room-uninstall');
+    const root = tempDir('clean-room-uninstall');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
     const userSkill = path.join(claudeHome, 'skills', 'user-skill', 'SKILL.md');
     fs.mkdirSync(path.dirname(userSkill), { recursive: true });
     fs.writeFileSync(userSkill, '# user skill\n');
@@ -1127,9 +1479,13 @@ describe('clean-room-skill installer', () => {
       },
     }, null, 2));
 
-    let result = runInstall(['--claude', '--global', '--yes'], { CLAUDE_CONFIG_DIR: claudeHome });
+    let result = runInstall(['--claude', '--global', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
     assert.equal(result.status, 0, result.stderr);
     result = runInstall(['--claude', '--global', '--yes', '--uninstall'], {
+      ...stub.env,
       CLAUDE_CONFIG_DIR: claudeHome,
     });
     assert.equal(result.status, 0, result.stderr);
@@ -1144,6 +1500,34 @@ describe('clean-room-skill installer', () => {
       ),
       true
     );
+    assert.deepEqual(readJson(stub.statePath).plugins, []);
+    const calls = readClaudeStubCalls(stub);
+    assert.ok(calls.includes(`plugin uninstall ${CLAUDE_PLUGIN_ID}`));
+    assert.ok(calls.includes(`plugin marketplace remove ${CLAUDE_MARKETPLACE_NAME}`));
+  });
+
+  test('uninstall leaves pre-existing Claude plugin when manifest did not install it', () => {
+    const root = tempDir('clean-room-uninstall-preexisting-plugin');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'), { marketplaces: true, plugins: true });
+
+    let result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const manifestPath = path.join(claudeHome, 'clean-room-install-manifest.json');
+    const manifest = readJson(manifestPath);
+    assert.equal(manifest.claude_plugin.plugin_installed_by_installer, false);
+    assert.equal(manifest.claude_plugin.marketplace_added_by_installer, false);
+
+    result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes', '--uninstall'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readJson(stub.statePath).plugins, [CLAUDE_PLUGIN_ID]);
+    assert.equal(readClaudeStubCalls(stub).some((call) => call.startsWith('plugin uninstall ')), false);
   });
 
   test('uninstall warns about untracked package-path files without deleting them', () => {
