@@ -70,6 +70,16 @@ def is_under(path: Path, root: Path) -> bool:
     return path_is_under(path, root)
 
 
+def sanitizer_allowed_roots() -> list[Path]:
+    contaminated_roots = env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
+    allowed_roots = []
+    for root in env_roots(ADDITIONAL_CLEAN_READ_ROOTS):
+        if any(is_under(contaminated_root, root) for contaminated_root in contaminated_roots):
+            continue
+        allowed_roots.append(root)
+    return allowed_roots + env_roots(SCHEMA_READ_ROOTS)
+
+
 def allowed_roots_for_role(role: str) -> list[Path]:
     if role in CLEAN_ROLES:
         return (
@@ -79,7 +89,7 @@ def allowed_roots_for_role(role: str) -> list[Path]:
             + env_roots(SCHEMA_READ_ROOTS)
         )
     if role == SANITIZER_ROLE:
-        return env_roots(ADDITIONAL_CLEAN_READ_ROOTS) + env_roots(SCHEMA_READ_ROOTS)
+        return sanitizer_allowed_roots()
     return []
 
 
@@ -103,6 +113,7 @@ def main() -> int:
         return 1
     source_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS")
     clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+    implementation_roots = env_roots("CLEAN_ROOM_IMPLEMENTATION_ROOTS")
     allowed_roots = allowed_roots_for_role(role)
     paths = candidate_paths(payload)
     if not paths:
@@ -121,6 +132,12 @@ def main() -> int:
             )
             return 1
         if role == SANITIZER_ROLE and any(is_under(path, root) for root in clean_roots):
+            print(
+                f"clean-room policy denied role {role} reading {describe_path(path)}",
+                file=sys.stderr,
+            )
+            return 1
+        if role == SANITIZER_ROLE and any(is_under(path, root) for root in implementation_roots):
             print(
                 f"clean-room policy denied role {role} reading {describe_path(path)}",
                 file=sys.stderr,

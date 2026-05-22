@@ -197,19 +197,24 @@ describe('clean-room access hook policy', () => {
     const root = tempDir('clean-room-sanitizer-read');
     const env = policyEnv(root, 'contaminated-handoff-sanitizer');
     const contaminated = env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS;
+    const assignedArtifact = path.join(contaminated, 'behavior-spec.json');
+    const renamedLedger = path.join(contaminated, 'renamed-ledger.json');
     const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
     const source = env.CLEAN_ROOM_SOURCE_ROOTS;
     const allowed = env.CLEAN_ROOM_ALLOWED_READ_ROOTS;
-    env.CLEAN_ROOM_ALLOWED_READ_ROOTS = `${allowed}${path.delimiter}${contaminated}`;
-    fs.writeFileSync(path.join(contaminated, 'behavior-spec.json'), '{}');
+    env.CLEAN_ROOM_ALLOWED_READ_ROOTS = `${allowed}${path.delimiter}${assignedArtifact}`;
+    fs.writeFileSync(assignedArtifact, '{}');
+    fs.writeFileSync(renamedLedger, '{}');
     fs.writeFileSync(path.join(contaminated, 'source-index.json'), '{}');
     fs.writeFileSync(path.join(source, 'secret.py'), 'VALUE = 1\n');
     fs.writeFileSync(path.join(clean, 'handoff-package.json'), '{}');
+    fs.writeFileSync(path.join(implementation, 'generated.txt'), 'ok\n');
     fs.writeFileSync(path.join(allowed, 'public.md'), '# Public reference\n');
 
     let result = runHook('deny-clean-source-read.py', {
       tool_name: 'Read',
-      tool_input: { file_path: path.join(contaminated, 'behavior-spec.json') },
+      tool_input: { file_path: assignedArtifact },
     }, policyEnv(root, 'contaminated-handoff-sanitizer'));
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /outside allowed roots/);
@@ -219,6 +224,23 @@ describe('clean-room access hook policy', () => {
       tool_input: { cwd: contaminated, file_path: 'behavior-spec.json' },
     }, env);
     assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: renamedLedger },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /outside allowed roots/);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: renamedLedger },
+    }, {
+      ...env,
+      CLEAN_ROOM_ALLOWED_READ_ROOTS: `${allowed}${path.delimiter}${contaminated}`,
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /outside allowed roots/);
 
     result = runHook('deny-clean-source-read.py', {
       tool_name: 'Read',
@@ -245,6 +267,16 @@ describe('clean-room access hook policy', () => {
     }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /reading clean-root\[0\]/);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: path.join(implementation, 'generated.txt') },
+    }, {
+      ...env,
+      CLEAN_ROOM_ALLOWED_READ_ROOTS: `${env.CLEAN_ROOM_ALLOWED_READ_ROOTS}${path.delimiter}${implementation}`,
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /reading implementation-root\[0\]/);
 
     result = runHook('deny-clean-source-read.py', {
       tool_name: 'Read',
