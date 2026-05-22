@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -137,6 +138,7 @@ def describe_path(path: Path | str, role: str | None = None) -> str:
     return root_label_for_path(resolved) or "path"
 
 
+@lru_cache(maxsize=1)
 def _redaction_replacements() -> list[tuple[str, str]]:
     replacements: list[tuple[str, str]] = []
     private_terms: set[str] = set()

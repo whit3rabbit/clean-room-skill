@@ -16,7 +16,7 @@
   },
   "source_acquisition_basis": "Authorized local source access.",
   "license_contract_notes": "No legal conclusion recorded.",
-  "preflight_goal_ref": "contaminated-artifacts/preflight-goal.json",
+  "preflight_goal_ref": "preflight-goal.json",
   "preflight_goal_sha256": "407120469a7911d6625da0718524525566165befa9067cdd53eba17d25577214",
   "source_index_ref": "contaminated-artifacts/source-index.json",
   "run_state": {

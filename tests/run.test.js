@@ -10,6 +10,7 @@ const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..');
 const INSTALL = path.join(ROOT, 'bin', 'install.js');
 const TASK_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'task-manifest.json');
+const PREFLIGHT_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json');
 const TMP_DIRS = [];
 
 function tempDir(name) {
@@ -39,10 +40,10 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function runCli(args, cwd = ROOT) {
+function runCli(args, cwd = ROOT, env = {}) {
   return spawnSync(process.execPath, [INSTALL, ...args], {
     cwd,
-    env: process.env,
+    env: { ...process.env, ...env },
     encoding: 'utf8',
   });
 }
@@ -111,6 +112,7 @@ function baseWorkspace(name) {
     approved_public_reference_roots: [dirs.allowed],
   };
   const manifestPath = path.join(dirs.contaminated, 'task-manifest.json');
+  fs.copyFileSync(PREFLIGHT_FIXTURE, path.join(dirs.contaminated, 'preflight-goal.json'));
   writeJson(manifestPath, manifest);
   writeCoverage(dirs.contaminated, 'gap');
   return { ...dirs, manifestPath };
@@ -164,6 +166,37 @@ function coverageStage(cwd, script) {
   };
 }
 
+function readJsonLines(filePath) {
+  return fs.readFileSync(filePath, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
+function writeHookCaptureShim(root, capturePath) {
+  const script = path.join(root, 'hook-capture.js');
+  fs.writeFileSync(script, `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+fs.appendFileSync(${JSON.stringify(capturePath)}, JSON.stringify({
+  script: path.basename(process.argv[2] || ''),
+  env: process.env
+}) + '\\n');
+`);
+  fs.chmodSync(script, 0o755);
+  return script;
+}
+
+function writeStageEnvCaptureScript(root, capturePath) {
+  const script = path.join(root, 'stage-env-capture.js');
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+fs.writeFileSync(${JSON.stringify(capturePath)}, JSON.stringify(process.env, null, 2) + '\\n');
+`);
+  return script;
+}
+
 function writeDeltaScript(root) {
   const script = path.join(root, 'write-delta.js');
   fs.writeFileSync(script, `
@@ -205,6 +238,27 @@ describe('clean-room run command', () => {
     assert.match(result.stdout, /selected unit-example-flow/);
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'clean-room-result.json')), false);
+  });
+
+  test('rejects missing preflight goal before run work', () => {
+    const workspace = baseWorkspace('clean-room-run-missing-preflight');
+    fs.rmSync(path.join(workspace.contaminated, 'preflight-goal.json'));
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preflight goal not found/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
+  test('rejects mismatched preflight goal hash', () => {
+    const workspace = baseWorkspace('clean-room-run-preflight-hash');
+    fs.writeFileSync(path.join(workspace.contaminated, 'preflight-goal.json'), '{"goal_id":"changed"}\n');
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preflight goal sha256 mismatch/);
   });
 
   test('rejects attended manifests and missing loop context', () => {
@@ -279,6 +333,75 @@ describe('clean-room run command', () => {
     assert.equal(ledger.iterations[0].stop_reason, 'no-progress-detected');
   });
 
+  test('passes only allowlisted parent and hook-only env to validation hooks', () => {
+    const workspace = baseWorkspace('clean-room-run-hook-env');
+    const capturePath = path.join(workspace.root, 'hook-env.jsonl');
+    const hookShim = writeHookCaptureShim(workspace.root, capturePath);
+    const denylistPath = path.join(workspace.root, 'private-identifiers.txt');
+    fs.writeFileSync(denylistPath, '# empty test denylist\n');
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--dry-run',
+      '--python',
+      hookShim,
+    ], ROOT, {
+      CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST: path.join(workspace.clean, 'auxiliary.json'),
+      CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST: denylistPath,
+      SECRET_TOKEN: 'must-not-leak',
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const captures = readJsonLines(capturePath);
+    assert.ok(captures.length > 0);
+    for (const item of captures) {
+      assert.equal(item.env.SECRET_TOKEN, undefined);
+      assert.equal(item.env.CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST, path.join(workspace.clean, 'auxiliary.json'));
+      assert.equal(item.env.CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST, denylistPath);
+      assert.equal(item.env.CLEAN_ROOM_ROLE, 'contaminated-manager-verifier');
+      assert.equal(item.env.CLEAN_ROOM_CLEAN_ROOTS, workspace.clean);
+    }
+  });
+
+  test('stage env excludes parent secrets and hook-only variables while preserving adapter env', () => {
+    const workspace = baseWorkspace('clean-room-run-stage-env');
+    const capturePath = path.join(workspace.root, 'stage-env.json');
+    const stageScript = writeStageEnvCaptureScript(workspace.root, capturePath);
+    const denylistPath = path.join(workspace.root, 'private-identifiers.txt');
+    fs.writeFileSync(denylistPath, '# empty test denylist\n');
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      {
+        ...coverageStage(workspace.root, stageScript),
+        env: {
+          ADAPTER_VISIBLE: 'yes',
+        },
+      },
+    ]);
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--agent-commands',
+      config,
+    ], ROOT, {
+      CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST: path.join(workspace.clean, 'auxiliary.json'),
+      CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST: denylistPath,
+      SECRET_TOKEN: 'must-not-leak',
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const env = readJson(capturePath);
+    assert.equal(env.ADAPTER_VISIBLE, 'yes');
+    assert.equal(env.SECRET_TOKEN, undefined);
+    assert.equal(env.CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST, undefined);
+    assert.equal(env.CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST, undefined);
+    assert.equal(env.CLEAN_ROOM_ROLE, 'contaminated-manager-verifier');
+    assert.equal(env.CLEAN_ROOM_SELECTED_UNIT_ID, 'unit-example-flow');
+  });
+
   test('repeated unit selection stops after prior no-progress iteration', () => {
     const workspace = baseWorkspace('clean-room-run-repeated');
     writeJson(path.join(workspace.contaminated, 'controller-run-ledger.json'), {
@@ -308,6 +431,37 @@ describe('clean-room run command', () => {
     assert.match(result.stdout, /repeated-unit-selection/);
     const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
     assert.equal(ledger.iterations.at(-1).stop_reason, 'repeated-unit-selection');
+  });
+
+  test('controller run ledger keeps the latest 50 entries and records pruned count', () => {
+    const workspace = baseWorkspace('clean-room-run-ledger-cap');
+    writeJson(path.join(workspace.contaminated, 'controller-run-ledger.json'), {
+      ledger_id: 'controller-run-ledger',
+      task_id: 'task-example',
+      updated_at: '2024-01-01T00:00:00Z',
+      loop_context: {
+        parent_loop_ref: 'spec-dev-loop:test',
+        spec_slice_ref: 'behavior-spec:unit-example-flow',
+      },
+      iterations: Array.from({ length: 50 }, (_, index) => ({
+        iteration: index + 1,
+        unit_id: 'unit-example-flow',
+        stop_reason: 'spec-delta-required',
+        phases: [],
+      })),
+    });
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.root),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations.length, 50);
+    assert.equal(ledger.pruned_iteration_count, 1);
+    assert.equal(ledger.iterations[0].iteration, 2);
+    assert.equal(ledger.iterations.at(-1).stop_reason, 'no-progress-detected');
   });
 
   test('spec-delta-required writes clean-room result with abstract deltas only', () => {

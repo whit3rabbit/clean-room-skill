@@ -239,6 +239,22 @@ describe('clean-room schema hook policy', () => {
     assert.match(result.stderr, /preflight-goal\.json is not a clean-role artifact/);
   });
 
+  test('schema hook does not infer task manifest from arbitrary task_id JSON', () => {
+    const root = tempDir('clean-room-task-id-fallback');
+    const env = policyEnv(root, 'clean-architect');
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const arbitrary = path.join(clean, 'notes.json');
+    fs.writeFileSync(arbitrary, JSON.stringify({ task_id: 'task-test', notes: 'not a manifest' }));
+
+    let result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: arbitrary } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unrecognized clean JSON artifact/);
+
+    const taskManifest = copyExample('task-manifest.json', clean);
+    result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: taskManifest } }, env);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   test('clean-run-context rejects unsafe clean artifact paths', () => {
     const root = tempDir('clean-room-context-paths');
     const env = policyEnv(root, 'clean-architect');

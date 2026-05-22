@@ -109,8 +109,6 @@ def artifact_kind(path: Path, data: dict) -> str | None:
     for kind in SCHEMA_BY_ARTIFACT:
         if kind in name:
             return kind
-    if "task_id" in data:
-        return "task-manifest"
     return None
 
 
@@ -290,6 +288,8 @@ def validate_combinator(
     for index, subschema in enumerate(subschemas):
         if not isinstance(subschema, dict):
             add_error(errors, f"{path_label(path)}: {keyword}[{index}] is not a schema object")
+            if error_limit_reached(errors):
+                break
             continue
         sub_errors = validate_value(value, subschema, root_schema, path)
         if not sub_errors:
