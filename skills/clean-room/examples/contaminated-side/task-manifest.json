@@ -150,7 +150,7 @@
   "agent_pipeline": {
     "agent_0": {
       "role": "contaminated-manager-verifier",
-      "responsibility": "Manage scope, assign agents, verify coverage, and receive only terminal Agent 3 implementation reports.",
+      "responsibility": "Manage scope, assign agents, verify coverage, and receive only terminal Agent 3 implementation reports plus configured Agent 4 polish reports.",
       "trust_domain": "contaminated"
     },
     "agent_1": {

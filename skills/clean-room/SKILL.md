@@ -157,9 +157,10 @@ Use `hooks/` as optional guardrail and audit scaffolding. Configure the host wit
 - `CLEAN_ROOM_ALLOWED_READ_ROOTS`
 - `CLEAN_ROOM_SCHEMA_DIR`
 - Optional `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` to allow isolated Agent 3 terminal verification through the installed verification runner only from implementation roots.
+- Optional `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1` to allow isolated Agent 4 polish verification and one local commit through the installed polish runner only from implementation roots.
 - Optional `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST` for hook-only scanning of private source identifiers.
 
-For clean roles, read access is deny-by-default: allow only `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and explicit public or destination constraint roots in `CLEAN_ROOM_ALLOWED_READ_ROOTS`. Agent 1.5 is source-denied: allow only assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and explicit public or destination constraint roots. Write access is also deny-by-default: Agent 2 writes only clean artifacts, Agent 3 writes clean reports under `CLEAN_ROOM_CLEAN_ROOTS` and implementation files under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and contaminated roles write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`. Mark every behavioral claim as `observed`, `derived`, `inferred`, `unknown`, or `error`.
+For clean roles, read access is deny-by-default: allow only `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and explicit public or destination constraint roots in `CLEAN_ROOM_ALLOWED_READ_ROOTS`. Agent 1.5 is source-denied: allow only assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and explicit public or destination constraint roots. Write access is also deny-by-default: Agent 2 writes only clean artifacts, Agent 3 writes clean reports under `CLEAN_ROOM_CLEAN_ROOTS` and implementation files under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, Agent 4 writes polish reports under `CLEAN_ROOM_CLEAN_ROOTS` and final hygiene/commit state under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and contaminated roles write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`. Mark every behavioral claim as `observed`, `derived`, `inferred`, `unknown`, or `error`.
 
 ## Output Rules
 

@@ -196,33 +196,48 @@
     <text x="44" y="44" class="body-text">Clean Architect</text>
   </g>
 
-  <g transform="translate(900, 125)" class="shadow-sm">
+  <g transform="translate(870, 125)" class="shadow-sm">
     <rect width="165" height="65" fill="#ffffff" stroke="#059669" stroke-width="1" rx="6" />
     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="#059669" transform="translate(10, 12)"/>
     <text x="44" y="28" class="body-bold">Agent 3</text>
     <text x="44" y="44" class="body-text">Implementer</text>
   </g>
 
-  <g transform="translate(695, 235)" class="shadow-sm">
-    <rect width="165" height="160" fill="#f0fdf4" stroke="#10b981" stroke-width="1" rx="6" />
+  <g transform="translate(1045, 125)" class="shadow-sm">
+    <rect width="165" height="65" fill="#ffffff" stroke="#059669" stroke-width="1" rx="6" />
+    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="#059669" transform="translate(10, 12)"/>
+    <text x="44" y="28" class="body-bold">Agent 4</text>
+    <text x="44" y="44" class="body-text">Polish Reviewer</text>
+  </g>
+
+  <g transform="translate(695, 220)" class="shadow-sm">
+    <rect width="205" height="195" fill="#f0fdf4" stroke="#10b981" stroke-width="1" rx="6" />
     <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z" fill="#047857" transform="translate(12, 10)"/>
     <text x="40" y="24" class="body-bold" fill="#065f46">Clean Artifacts</text>
 
-    <g transform="translate(10, 42)">
-      <rect width="145" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
+    <g transform="translate(10, 40)">
+      <rect width="185" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
       <text x="8" y="16" class="code-text">behavior-spec.json</text>
     </g>
-    <g transform="translate(10, 70)">
-      <rect width="145" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
+    <g transform="translate(10, 66)">
+      <rect width="185" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
       <text x="8" y="16" class="code-text">handoff-package.json</text>
     </g>
-    <g transform="translate(10, 98)">
-      <rect width="145" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
+    <g transform="translate(10, 92)">
+      <rect width="185" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
       <text x="8" y="16" class="code-text">implementation-plan.json</text>
     </g>
-    <g transform="translate(10, 126)">
-      <rect width="145" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
+    <g transform="translate(10, 118)">
+      <rect width="185" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
       <text x="8" y="16" class="code-text">implementation-report.json</text>
+    </g>
+    <g transform="translate(10, 144)">
+      <rect width="185" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
+      <text x="8" y="16" class="code-text">qc-report.json</text>
+    </g>
+    <g transform="translate(10, 170)">
+      <rect width="185" height="24" fill="#ffffff" stroke="#a7f3d0" stroke-width="1" rx="4" />
+      <text x="8" y="16" class="code-text">polish-report.json</text>
     </g>
   </g>
 
@@ -230,18 +245,19 @@
     <rect width="200" height="130" fill="#f8fafc" stroke="#475569" stroke-width="1.5" rx="8" />
     <circle cx="100" cy="45" r="18" fill="#059669" />
     <path d="M94 45 l4 4 l8 -8" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="100" y="88" class="section-title" font-size="16" text-anchor="middle">Approved</text>
-    <text x="100" y="108" class="section-title" font-size="16" text-anchor="middle">Clean Implementation</text>
+    <text x="100" y="82" class="section-title" font-size="16" text-anchor="middle">Approved</text>
+    <text x="100" y="102" class="section-title" font-size="16" text-anchor="middle">Polished Clean</text>
+    <text x="100" y="122" class="section-title" font-size="16" text-anchor="middle">Implementation</text>
   </g>
 
-  <line x1="860" y1="157" x2="900" y2="157" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
-  <line x1="777" y1="235" x2="777" y2="190" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
-  <line x1="982" y1="190" x2="982" y2="310" stroke="#4b5563" stroke-width="1.5" />
-  <line x1="982" y1="310" x2="1000" y2="310" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
+  <line x1="860" y1="157" x2="870" y2="157" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
+  <line x1="1035" y1="157" x2="1045" y2="157" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
+  <line x1="777" y1="220" x2="777" y2="190" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
+  <line x1="1128" y1="190" x2="1128" y2="255" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)" />
 
-  <path d="M 695 390 L 170 390 L 170 370" fill="none" stroke="#374151" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow-dash)" />
-  <rect x="382" y="378" width="196" height="22" fill="#ffffff" rx="4" />
-  <text x="480" y="394" class="body-bold" text-anchor="middle" font-size="12">Terminal report + deltas only</text>
+  <path d="M 695 410 L 170 410 L 170 370" fill="none" stroke="#374151" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow-dash)" />
+  <rect x="382" y="398" width="196" height="22" fill="#ffffff" rx="4" />
+  <text x="480" y="414" class="body-bold" text-anchor="middle" font-size="12">Terminal report + deltas only</text>
 
 
   <line x1="0" y1="460" x2="1240" y2="460" stroke="#e5e7eb" stroke-width="2" />
@@ -303,9 +319,9 @@
     <rect width="136" height="100" fill="#ffffff" stroke="#2563eb" stroke-width="1" rx="6" />
     <circle cx="68" cy="-12" r="12" fill="#2563eb" />
     <text x="68" y="-7" class="step-num" text-anchor="middle">6</text>
-    <text x="68" y="36" class="body-text" text-anchor="middle">6. Organize into</text>
-    <text x="68" y="54" class="body-text" text-anchor="middle">selected clean</text>
-    <text x="68" y="72" class="body-text" text-anchor="middle">schema</text>
+    <text x="68" y="28" class="body-text" text-anchor="middle">6. Plan and</text>
+    <text x="68" y="44" class="body-text" text-anchor="middle">implement</text>
+    <text x="68" y="60" class="body-text" text-anchor="middle">clean slice</text>
   </g>
   <line x1="916" y1="575" x2="932" y2="575" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)" />
 
@@ -313,10 +329,10 @@
     <rect width="136" height="100" fill="#ffffff" stroke="#2563eb" stroke-width="1" rx="6" />
     <circle cx="68" cy="-12" r="12" fill="#2563eb" />
     <text x="68" y="-7" class="step-num" text-anchor="middle">7</text>
-    <text x="68" y="28" class="body-text" text-anchor="middle">7. QA: schema,</text>
-    <text x="68" y="44" class="body-text" text-anchor="middle">leakage,</text>
-    <text x="68" y="60" class="body-text" text-anchor="middle">coverage,</text>
-    <text x="68" y="76" class="body-text" text-anchor="middle">testability</text>
+    <text x="68" y="28" class="body-text" text-anchor="middle">7. Agent 4</text>
+    <text x="68" y="44" class="body-text" text-anchor="middle">polish review</text>
+    <text x="68" y="60" class="body-text" text-anchor="middle">and local</text>
+    <text x="68" y="76" class="body-text" text-anchor="middle">commit</text>
   </g>
   <line x1="1068" y1="575" x2="1084" y2="575" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)" />
 
@@ -324,10 +340,10 @@
     <rect width="136" height="100" fill="#ffffff" stroke="#2563eb" stroke-width="1" rx="6" />
     <circle cx="68" cy="-12" r="12" fill="#2563eb" />
     <text x="68" y="-7" class="step-num" text-anchor="middle">8</text>
-    <text x="68" y="28" class="body-text" text-anchor="middle">8. Publish</text>
-    <text x="68" y="44" class="body-text" text-anchor="middle">approved clean-</text>
-    <text x="68" y="60" class="body-text" text-anchor="middle">room package</text>
-    <text x="68" y="76" class="body-text" text-anchor="middle">or return gaps</text>
+    <text x="68" y="28" class="body-text" text-anchor="middle">8. Agent 0</text>
+    <text x="68" y="44" class="body-text" text-anchor="middle">verifies</text>
+    <text x="68" y="60" class="body-text" text-anchor="middle">coverage or</text>
+    <text x="68" y="76" class="body-text" text-anchor="middle">returns gaps</text>
   </g>
 
   <g transform="translate(140, 650)">

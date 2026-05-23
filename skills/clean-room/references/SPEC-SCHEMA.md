@@ -171,7 +171,7 @@ Every real task must record the user's actual target profile. Do not default sil
 
 `task-manifest.json` records the required Agent 0-4 handoff contract. New manifests must include schema field `agent_1_5` for the source-denied sanitizer. `agent_4` is optional for compatibility with older manifests, but new code-development manifests should include it:
 
-- Agent 0: `contaminated-manager-verifier`; controller, scope manager, coverage verifier, and receiver of Agent 3's terminal report.
+- Agent 0: `contaminated-manager-verifier`; controller, scope manager, coverage verifier, and receiver of Agent 3's terminal report plus any configured Agent 4 polish report.
 - Agent 1: `contaminated-source-analyst`; source reader and neutral draft task/spec generator.
 - Agent 1.5: `contaminated-handoff-sanitizer`; source-denied contaminated reviewer that sanitizes draft specs before clean handoff.
 - Agent 2: `clean-architect`; clean-domain implementation planner using approved handoff artifacts and clean implementation roots.

@@ -23,9 +23,9 @@ Responsibilities:
 
 - Confirm authorization, source scope, clean output scope, and prohibited actions before assigning work.
 - Do not infer target language, dependency policy, license policy, exactness policy, output directory, or feature add/remove policy from source.
-- Record the user's `format_selection` target profile, Agent 0-3 `agent_pipeline` contract, Agent 1.5 sanitizer role, and optional `initialization_snapshot` in `task-manifest.json`.
-- Produce `clean-run-context.json` for Agent 2 and Agent 3 from sanitized initialization, clean-safe preflight goal fields, code hygiene policy, and handoff data. Do not send the full `task-manifest.json` or `preflight-goal.json` to clean roles.
-- Influence Agent 2 and Agent 3 only through durable sanitized artifacts. Do not send direct chat instructions, progress feedback, prioritization, implementation hints, or corrective coaching into an active clean planning or implementation session.
+- Record the user's `format_selection` target profile, Agent 0-4 `agent_pipeline` contract, Agent 1.5 sanitizer role, and optional `initialization_snapshot` in `task-manifest.json`.
+- Produce `clean-run-context.json` for Agent 2, Agent 3, and Agent 4 from sanitized initialization, clean-safe preflight goal fields, code hygiene policy, and handoff data. Do not send the full `task-manifest.json` or `preflight-goal.json` to clean roles.
+- Influence Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts. Do not send direct chat instructions, progress feedback, prioritization, implementation hints, or corrective coaching into an active clean planning, implementation, or polish session.
 - Record `controller_policy` when the task explicitly uses attended or bounded unattended mode. Missing policy means attended. Record `loop_context` when an outer spec loop invokes the inner clean-room loop for one approved spec slice.
 - Act as agent zero/controller when no separate coordinator exists: define and pass the clean-room environment block to every role session before tool use.
 - When context management is enabled, maintain `controller-status.json` as compact contaminated-side status and create one `role-session-brief.json` per role launch. In strict mode, launch every role from a fresh model session, profile, or thread; role labels in a continuing chat are not fresh context.
@@ -35,17 +35,17 @@ Responsibilities:
 - Maintain a private identifier denylist for hook scanning when practical; never send the denylist contents to Agent 1.5, clean roles, or clean artifacts.
 - Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
 - Send Agent 1 draft specs to Agent 1.5 for independent source-denied sanitization before clean handoff.
-- Compare clean artifacts and terminal implementation reports against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility for coverage gaps.
+- Compare clean artifacts and terminal implementation or polish reports against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility for coverage gaps.
 - Reject `complete` when source-test-derived parity, protocol invariants, public-contract tests, or approved behavior-spec open questions remain unresolved. Convert the gap into abstract delta tickets for a fresh clean cycle.
-- Receive Agent 3 implementation reports and QC reports only after Agent 3 reaches a terminal state: complete, blocked, or quarantined. Do not consume partial Agent 3 reports as controller feedback.
-- Convert terminal implementation gaps into abstract delta tickets for the next clean run. Do not steer an in-progress Agent 3 loop.
+- Receive Agent 3 implementation reports and QC reports only after Agent 3 reaches a terminal state: complete, blocked, or quarantined. Receive Agent 4 polish reports only after the configured polish review reaches passed, blocked, or quarantined. Do not consume partial clean-role reports as controller feedback.
+- Convert terminal implementation or polish gaps into abstract delta tickets for the next clean run. Do not steer an in-progress Agent 3 or Agent 4 loop.
 - Send only `clean-run-context.json`, approved behavior specs, approved handoff packages, and abstract delta tickets across the wall. Do not include source snippets, raw diffs, copied comments, private helper names, source paths, source index refs, contaminated ledger paths, or source-shaped pseudocode.
 
 Use this file map when a CLI bootstrap is present:
 
 - Contaminated artifact root: write `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `source-index.json`, `coverage-ledger.json`, `evidence-ledger.json`, private identifier denylist artifacts, and `clean-room-result.json`.
-- Clean artifact root: only sanitized handoff artifacts, `clean-run-context.json`, behavior specs, implementation plans, clean reports, QC reports, open questions, and abstract delta tickets belong here. Agent 0 must not write this root directly while running as a contaminated role.
-- Implementation root: Agent 3 writes destination code, tests, fixtures, and destination project files here. Agent 0 must not write this root.
+- Clean artifact root: only sanitized handoff artifacts, `clean-run-context.json`, behavior specs, implementation plans, clean reports, QC reports, polish reports, open questions, and abstract delta tickets belong here. Agent 0 must not write this root directly while running as a contaminated role.
+- Implementation root: Agent 3 writes destination code, tests, fixtures, and destination project files here. Agent 4 may write final hygiene changes and local git metadata here through the polish runner. Agent 0 must not write this root.
 - Quarantine root: rejected, contaminated, or incident artifacts that must not cross into the clean domain.
 
 Every new role session must receive `CLEAN_ROOM_ROLE`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and, for clean or source-denied roles, `CLEAN_ROOM_ALLOWED_READ_ROOTS`. Do not assume environment variables persist across sessions.
@@ -54,9 +54,9 @@ In unattended mode, reload durable artifacts before each iteration, select at mo
 
 Role session briefs must contain only compact status, next action, allowed artifact refs with hashes, and forbidden inputs. Do not put copied artifact bodies, source excerpts, source paths, contaminated ledgers, or prior chat in a brief.
 
-Do not return to the outer spec loop merely because Agent 3 produced `implementation-report.json`. Consume the terminal report, verify coverage from the contaminated side, then write `clean-room-result.json`.
+Do not return to the outer spec loop merely because Agent 3 produced `implementation-report.json`. Consume the terminal implementation report, any configured Agent 4 `polish-report.json`, verify coverage from the contaminated side, then write `clean-room-result.json`.
 
-Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the default Agent 3 profile. Agent 3 terminal verification must use the installed verification runner with `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
+Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the default Agent 3/4 profiles. Agent 3 terminal verification must use the installed verification runner with `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Agent 4 polish verification and local commit must use the installed polish runner with `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1` and cwd under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 
 If a multi-file scope needs relationship-aware batching and `source-index.json` is missing, pause for controller preflight rather than running shell tools inside this role.
 

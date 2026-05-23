@@ -11,7 +11,7 @@ Use this package when you need documented separation between source-reading work
 It installs:
 
 - Clean-room skills for Codex, Claude Code, and other agent runtime layouts.
-- Role-agent prompts for contaminated analysis, clean planning, and clean implementation.
+- Role-agent prompts for contaminated analysis, clean planning, clean implementation, and final polish.
 - JSON schemas and examples for durable workflow artifacts.
 - Hook guardrails that help keep source material out of clean artifacts.
 - A small CLI for runtime installation, bootstrap folders, preflight contracts, hook smoke tests, and the bounded inner clean-room runner.

@@ -178,7 +178,7 @@ The architecture delegates work across six distinct custom role agents to enforc
     *   Influences Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts, never direct chat, progress feedback, implementation hints, or priority changes.
     *   Performs final verification of clean specification and implementation coverage against the source scope.
     *   Writes the inner-loop `clean-room-result.json` only after contaminated-side coverage verification.
-    *   Consumes Agent 3 reports only after Agent 3 reaches a terminal state, then sends only abstract delta tickets into a fresh clean artifact cycle.
+    *   Consumes Agent 3 reports only after Agent 3 reaches a terminal state, and consumes Agent 4 reports only after the configured polish review reaches a terminal state, then sends only abstract delta tickets into a fresh clean artifact cycle.
 
 ### [Agent 1: Contaminated Source Analyst](../agents/contaminated-source-analyst.md)
 *   **Domain**: Contaminated (Source-readable, Read-only access to source)
@@ -270,7 +270,7 @@ Every clean-room role session requires a populated environment block before any 
 *   `CLEAN_ROOM_SOURCE_ROOTS`: Source roots (only readable by source-reading contaminated roles, not Agent 1.5).
 *   `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`: Target write directory for contaminated roles.
 *   `CLEAN_ROOM_CLEAN_ROOTS`: Target write directory for clean artifacts and reports.
-*   `CLEAN_ROOM_IMPLEMENTATION_ROOTS`: Target write directory for Agent 3 clean implementation code and tests.
+*   `CLEAN_ROOM_IMPLEMENTATION_ROOTS`: Target write directory for Agent 3 clean implementation code and tests, plus Agent 4 implementation-root hygiene changes and local git metadata.
 *   `CLEAN_ROOM_ALLOWED_READ_ROOTS`: Approved reference docs or constraints readable by clean and source-denied roles.
 *   `CLEAN_ROOM_SCHEMA_DIR`: Path to the directory containing JSON schema assets.
 
