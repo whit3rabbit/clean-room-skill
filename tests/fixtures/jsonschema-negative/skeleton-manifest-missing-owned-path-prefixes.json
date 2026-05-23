@@ -1,0 +1,13 @@
+{
+  "schema_kind": "skeleton-manifest",
+  "base": "skeleton-manifest.json",
+  "description": "Skeleton architecture areas must declare owned destination path prefixes.",
+  "remove": [
+    [
+      "areas",
+      0,
+      "owned_path_prefixes"
+    ]
+  ],
+  "expected_error": "'owned_path_prefixes' is a required property"
+}

@@ -157,8 +157,12 @@ Clean architect/implementation planner:
 - Ignore direct Agent 0 messages or manager notes unless they arrive as schema-valid clean artifacts for a fresh clean session.
 - Merge approved handoff artifacts into the selected clean schema base.
 - Inspect the clean destination foundation to identify relative target paths, local patterns, tests, dependencies, and argv-array verification commands.
+- Read any existing `skeleton-manifest.json` and maintain it as the whole clean destination architecture map.
+- Define architecture areas with owned relative path prefixes, responsibilities, forbidden responsibilities, allowed area dependencies, and refactor triggers.
+- Assign every planned target and test path to one or more architecture areas.
+- Record split, move, merge, or extract work as planned refactors before implementation.
 - Produce `implementation-plan.json` as the primary code-development contract.
-- Keep `skeleton-manifest.json` valid when the selected target profile expects it.
+- Keep `skeleton-manifest.json` valid and current for code-development runs.
 - Do not write implementation code.
 
 Clean implementer/verifier:
@@ -166,6 +170,8 @@ Clean implementer/verifier:
 - Start from the clean domain and validate `clean-run-context.json` before using run preferences.
 - Validate the implementation plan includes the preflight-derived code hygiene policy before editing code.
 - Read `implementation-plan.json` and implement each unblocked work item for the selected spec slice and current unit.
+- Read `skeleton-manifest.json` before editing and touch only paths owned by the work item's referenced architecture areas.
+- Refuse unowned target paths and unplanned cross-area refactors by recording an abstract delta.
 - Write code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 - Run bounded argv-array verification commands only through the installed Agent 3 verification runner.
 - Produce or update `implementation-report.json` with changed paths, verification results, blockers, and abstract delta tickets.
@@ -235,8 +241,9 @@ Clean implementer/verifier:
 10. Plan implementation:
    - Start from a fresh role session brief when context management is enabled.
    - Agent 2 starts from the clean artifact workspace and builds or merges the clean schema base from `clean-run-context.json`, approved handoff artifacts, the selected target profile, target constraints, and clean implementation foundation.
-   - Produce `implementation-plan.json` with relative destination paths, work items, tests, code hygiene policy, constraints, risks, and argv-array verification commands.
-   - Keep `skeleton-manifest.json` valid when the target profile expects it.
+   - Update `skeleton-manifest.json` as the clean destination architecture map before writing work items.
+   - Produce `implementation-plan.json` with relative destination paths, architecture area refs, work items, tests, code hygiene policy, constraints, risks, planned refactors, and argv-array verification commands.
+   - Keep `skeleton-manifest.json` valid and current for code-development runs.
    - Avoid implementation code, private algorithm choices, source-derived layout, and source-shaped pseudocode.
 11. Implement and verify:
    - Start from a fresh role session brief when context management is enabled.
@@ -244,7 +251,7 @@ Clean implementer/verifier:
    - In unattended inner-loop mode, Agent 3 executes only work items for the selected spec slice and current unit.
    - Run bounded argv-array verification commands only through the installed Agent 3 verification runner.
    - Record changed paths, verification status, blockers, and abstract delta tickets in `implementation-report.json`.
-   - Maintain `qc-report.json` for schema, leakage, source-test parity, equal-output assertions, and spec-to-plan-to-test mismatches.
+   - Maintain `qc-report.json` for schema, leakage, architecture alignment, source-test parity, equal-output assertions, and spec-to-plan-to-test mismatches.
    - Treat missing invariant tests as a parity gap when protocol, serialization, streaming, queueing, error-budget, async, or typed-data behavior is in scope.
    - Do not send Agent 0 progress updates or partial findings while work remains in progress.
 12. Verify coverage:

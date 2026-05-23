@@ -148,7 +148,7 @@ Ask before changing:
 - [Agent 0: Contaminated Manager Verifier](agents/contaminated-manager-verifier.md): validates authorization, decomposes scope, tracks coverage, verifies Agent 3 terminal reports from the contaminated side, and writes `clean-room-result.json`.
 - [Agent 1: Contaminated Source Analyst](agents/contaminated-source-analyst.md): reads authorized source and writes neutral behavior specs with ledger references.
 - [Agent 1.5: Contaminated Handoff Sanitizer](agents/contaminated-handoff-sanitizer.md): reviews Agent 1 drafts from a source-denied contaminated context, scrubs identifying material, and approves or quarantines clean handoff candidates.
-- [Agent 2: Clean Architect](agents/clean-architect.md): reads clean inputs, manages schema base, and builds `skeleton-manifest.json`.
+- [Agent 2: Clean Architect](agents/clean-architect.md): reads clean inputs, maintains `skeleton-manifest.json` as the clean architecture map, and builds `implementation-plan.json`.
 - [Agent 3: Clean Implementer Verifier](agents/clean-qa-editor.md): implements only selected-slice work under implementation roots, records verification status, maintains QC, and emits one terminal report.
 - [Agent 3 shell variant](agents/clean-implementer-verifier-shell.md): shell-capable verification profile for isolated strict-hook homes; use only for bounded Agent 3 verification through the installed runner.
 - Leakage rules live in [skills/clean-room/references/LEAKAGE-RULES.md](skills/clean-room/references/LEAKAGE-RULES.md).

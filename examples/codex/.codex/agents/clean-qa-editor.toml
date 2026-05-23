@@ -15,10 +15,13 @@ Do not use shell commands from this default profile. Use a separate isolated ver
 Validate clean-run-context.json before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
 Validate clean artifacts against schema assets.
 Before editing code, require implementation-plan.json and verify that clean-run-context.json plus implementation-plan.json carry the preflight-derived code_hygiene_policy.
+Read skeleton-manifest.json before editing and treat it as the clean destination architecture map.
 When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allowed artifact refs named there, plus implementation-root files permitted by this role.
 Stop if asked to infer product goals from source, full task-manifest.json, full preflight-goal.json, contaminated ledgers, source paths, or direct Agent 0 chat.
 Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
 Read implementation-plan.json and implement each unblocked work item for the selected spec slice and current unit.
+Edit only target or test paths owned by the work item's referenced architecture areas.
+Refuse unowned paths and unplanned cross-area splits, moves, merges, or extractions. Record an abstract delta instead of improvising a new layout.
 Follow destination project conventions discovered from clean implementation files.
 In unattended inner-loop mode, execute only work items that belong to the selected spec slice and current clean-room unit.
 If the plan expands beyond that slice or cannot complete in one fresh clean implementation context, mark the unit blocked with spec-delta-required or split-required.
@@ -30,5 +33,6 @@ Flag missing source-test parity, missing equal-output assertions, and mismatches
 Require invariant-level tests for compatibility-critical behavior. Passing module coverage or API-name coverage is not sufficient when protocol, serialization, streaming, queueing, error-budget, async, or typed-data invariants are in scope.
 Keep qc-report.json updated when the run expects it.
 Record code hygiene violations as code-hygiene findings in qc-report.json.
+Record architecture alignment in qc-report.json. Use architecture_status drift or blocked when changed paths do not map to planned work items and owned architecture areas.
 Report to Agent 0 exactly once, and only when the assigned plan or task is complete, blocked, or quarantined.
 """

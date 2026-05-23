@@ -269,6 +269,8 @@ fs.writeFileSync(path.join(clean, 'qc-report.json'), JSON.stringify({
   schema_status: 'passed',
   leakage_status: 'passed',
   leakage_scan_summary: 'No blocked markers in test.',
+  architecture_status: 'aligned',
+  architecture_findings: [],
   coverage_status: 'partial',
   required_rerun: true,
   contamination_incidents: [],
@@ -296,6 +298,8 @@ function writeQcReport(clean, reviewedAt) {
     schema_status: 'passed',
     leakage_status: 'passed',
     leakage_scan_summary: 'No blocked markers in test.',
+    architecture_status: 'aligned',
+    architecture_findings: [],
     coverage_status: 'partial',
     required_rerun: true,
     contamination_incidents: [],
@@ -310,6 +314,114 @@ function validBehaviorSpec(overrides = {}) {
     ...readJson(BEHAVIOR_SPEC_FIXTURE),
     ...overrides,
   };
+}
+
+function writeSkeletonManifest(workspace, overrides = {}) {
+  writeJson(path.join(workspace.clean, 'skeleton-manifest.json'), {
+    manifest_id: 'skeleton-test',
+    target_language: 'unspecified',
+    area_id_naming_policy: 'Use neutral clean architecture area ids.',
+    architecture_summary: 'Test architecture map owns one clean feature area.',
+    target_constraints: [],
+    areas: [
+      {
+        area_id: 'area-example-flow',
+        purpose: 'Own the example flow behavior and tests.',
+        owned_path_prefixes: [
+          'src/',
+          'test/',
+        ],
+        responsibilities: [
+          'Implement and test the example flow.',
+        ],
+        forbidden_responsibilities: [
+          'Do not own unrelated destination behavior.',
+        ],
+        allowed_area_dependencies: [],
+        spec_ids: ['spec-example-flow'],
+        public_contract_refs: [],
+        target_constraints: [],
+        dependency_constraints: [],
+        test_obligations: ['test-001'],
+        open_decisions: [],
+      },
+    ],
+    public_contracts: [],
+    dependency_constraints: [],
+    implementation_forbidden_material: [
+      'source_excerpt',
+      'raw_diff',
+      'private_identifier',
+      'source_shaped_pseudocode',
+    ],
+    test_mapping: [
+      {
+        test_id: 'test-001',
+        spec_ids: ['spec-example-flow'],
+        scenario_refs: ['test-001'],
+      },
+    ],
+    test_obligations: ['test-001'],
+    refactor_triggers: [
+      'Split the area before adding unrelated destination behavior.',
+    ],
+    open_decisions: [],
+    ...overrides,
+  });
+}
+
+function writeImplementationPlan(workspace, overrides = {}) {
+  writeJson(path.join(workspace.clean, 'implementation-plan.json'), {
+    plan_id: 'implementation-plan-test',
+    task_id: 'task-example',
+    created_at: '2024-01-01T00:00:00Z',
+    planner_role: 'clean-architect',
+    implementation_root_refs: ['CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]'],
+    source_artifacts: ['behavior-spec.json', 'skeleton-manifest.json'],
+    architecture_manifest_ref: 'skeleton-manifest.json',
+    foundation_summary: 'Test clean implementation foundation.',
+    code_hygiene_policy: {
+      max_lines_per_code_file: 500,
+      max_lines_per_test_file: 800,
+      max_files_per_iteration: 12,
+      split_large_files_by: ['module boundary', 'public type', 'feature area'],
+      exceptions: [],
+    },
+    work_items: [
+      {
+        work_item_id: 'wi-test',
+        status: 'planned',
+        summary: 'Implement the example flow.',
+        spec_ids: ['spec-example-flow'],
+        architecture_area_refs: ['area-example-flow'],
+        implementation_root_ref: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+        target_paths: ['src/example-flow.js'],
+        test_paths: ['test/example-flow.test.js'],
+        acceptance_criteria: ['Example flow is implemented and tested.'],
+      },
+    ],
+    planned_refactors: [],
+    verification_strategy: [
+      {
+        command: ['npm', 'test'],
+        cwd: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+        purpose: 'Run destination tests.',
+      },
+    ],
+    implementation_forbidden_material: [
+      'source_excerpt',
+      'raw_diff',
+      'private_identifier',
+      'source_shaped_pseudocode',
+    ],
+    open_decisions: [],
+    ...overrides,
+  });
+}
+
+function writeArchitectureArtifacts(workspace, planOverrides = {}, skeletonOverrides = {}) {
+  writeSkeletonManifest(workspace, skeletonOverrides);
+  writeImplementationPlan(workspace, planOverrides);
 }
 
 function writeCleanRunContext(workspace, behaviorSpecs = ['behavior-spec.json']) {
@@ -387,6 +499,8 @@ function writeCompleteCleanReports(workspace) {
     schema_status: 'passed',
     leakage_status: 'passed',
     leakage_scan_summary: 'No blocked markers in test.',
+    architecture_status: 'aligned',
+    architecture_findings: [],
     coverage_status: 'complete',
     required_rerun: false,
     contamination_incidents: [],
@@ -1096,10 +1210,103 @@ describe('clean-room run command', () => {
     assert.match(result.stderr, /schema check failed/);
   });
 
+  test('rejects clean-run-context behavior specs without a skeleton manifest', () => {
+    const workspace = baseWorkspace('clean-room-run-missing-skeleton');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /skeleton manifest does not exist/);
+  });
+
+  test('rejects implementation plans that reference unknown architecture areas', () => {
+    const workspace = baseWorkspace('clean-room-run-unknown-area');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace, {
+      work_items: [
+        {
+          work_item_id: 'wi-test',
+          status: 'planned',
+          summary: 'Implement the example flow.',
+          spec_ids: ['spec-example-flow'],
+          architecture_area_refs: ['area-missing'],
+          implementation_root_ref: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+          target_paths: ['src/example-flow.js'],
+          test_paths: ['test/example-flow.test.js'],
+          acceptance_criteria: ['Example flow is implemented and tested.'],
+        },
+      ],
+    });
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unknown architecture area/);
+  });
+
+  test('rejects implementation plan paths outside referenced architecture areas', () => {
+    const workspace = baseWorkspace('clean-room-run-area-path-drift');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace, {
+      work_items: [
+        {
+          work_item_id: 'wi-test',
+          status: 'planned',
+          summary: 'Implement the example flow.',
+          spec_ids: ['spec-example-flow'],
+          architecture_area_refs: ['area-example-flow'],
+          implementation_root_ref: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+          target_paths: ['unowned/example-flow.js'],
+          test_paths: ['test/example-flow.test.js'],
+          acceptance_criteria: ['Example flow is implemented and tested.'],
+        },
+      ],
+    });
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /outside referenced architecture areas/);
+  });
+
+  test('accepts planned refactor paths covered by architecture areas', () => {
+    const workspace = baseWorkspace('clean-room-run-covered-refactor');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace, {
+      planned_refactors: [
+        {
+          refactor_id: 'refactor-test',
+          kind: 'extract',
+          summary: 'Extract a helper inside the existing clean area.',
+          architecture_area_refs: ['area-example-flow'],
+          existing_paths: ['src/example-flow.js'],
+          target_paths: ['src/example-helper.js'],
+          test_paths: ['test/example-helper.test.js'],
+          rationale: 'Keep related clean behavior inside the owned area.',
+        },
+      ],
+    });
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /selected unit-example-flow/);
+  });
+
   test('rejects handoff packages that omit clean-run-context behavior specs', () => {
     const workspace = baseWorkspace('clean-room-run-handoff-omits-spec');
     writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
     writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
     writeHandoffPackage(workspace, ['clean-run-context.json']);
 
     const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
@@ -1112,6 +1319,7 @@ describe('clean-room run command', () => {
     const workspace = baseWorkspace('clean-room-run-handoff-stale-hash');
     writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
     writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
     writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
     const handoffPath = path.join(workspace.clean, 'handoff-package.json');
     const handoff = readJson(handoffPath);
@@ -1125,12 +1333,52 @@ describe('clean-room run command', () => {
     assert.match(result.stderr, /sha256 mismatch/);
   });
 
+  test('architecture drift in terminal reports returns spec delta', () => {
+    const workspace = baseWorkspace('clean-room-run-architecture-drift');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    const reportPath = path.join(workspace.clean, 'implementation-report.json');
+    const report = readJson(reportPath);
+    report.changed_paths = [
+      {
+        path: 'unowned/generated.js',
+        kind: 'code',
+        work_item_ids: ['wi-test'],
+      },
+    ];
+    writeJson(reportPath, report);
+    const script = writeCoveredCoverageScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      coverageStage(workspace.root, script),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-delta-required/);
+    const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
+    assert.equal(runResult.result, 'spec-delta-required');
+    assert.deepEqual(runResult.abstract_delta_tickets, [
+      {
+        ticket_id: 'delta-architecture-drift',
+        kind: 'implementation-gap',
+        summary: 'Implementation report changed paths do not map to planned work items and owned architecture areas.',
+        requested_clean_change: 'Revise skeleton-manifest.json and implementation-plan.json, then rerun clean implementation inside owned architecture areas.',
+        status: 'open',
+      },
+    ]);
+  });
+
   test('open questions in approved behavior specs force spec delta instead of completion', () => {
     const workspace = baseWorkspace('clean-room-run-open-question-delta');
     writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec({
       open_questions: ['The approved behavior spec still has an unresolved compatibility question.'],
     }));
     writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
     writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
     writeCompleteCleanReports(workspace);
     const script = writeCoveredCoverageScript(workspace.root);

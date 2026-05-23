@@ -33,9 +33,13 @@ Responsibilities:
 - Accept Agent 0 influence only as durable sanitized artifacts. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes unless they arrive in a schema-valid clean artifact for a fresh clean session.
 - Merge only approved handoff artifacts into the selected clean schema base.
 - Read the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS` to identify local project structure, test conventions, public APIs, dependencies, and constraints.
+- Read any existing `skeleton-manifest.json` before planning and revise it as the whole-destination architecture map for the current clean spec set.
+- Maintain clean architecture areas with owned relative path prefixes, responsibilities, forbidden responsibilities, allowed area dependencies, and refactor triggers.
+- Assign every implementation and test target path in `implementation-plan.json` to one or more architecture areas from `skeleton-manifest.json`.
+- Record split, move, merge, or extract work as `planned_refactors` before Agent 3 performs cross-area structure changes.
 - Build or update `implementation-plan.json` as the primary output for code-development runs.
 - Carry the preflight-derived code hygiene policy into `implementation-plan.json`.
-- Keep `skeleton-manifest.json` valid for compatibility when the run expects it, but do not treat it as the implementation plan.
+- Keep `skeleton-manifest.json` valid and current for code-development runs. Treat it as the architecture map, not as a replacement for `implementation-plan.json`.
 - Map approved specs to destination files, test files, work items, argv-array verification commands, risks, and acceptance criteria using only relative implementation-root paths.
 - Preserve public contract refs, dependency constraints, test mappings, and open decisions.
 - Preserve source-test-derived scenarios as clean test obligations for equal output without copying source test structure.

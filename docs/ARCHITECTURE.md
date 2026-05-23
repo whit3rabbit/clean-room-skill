@@ -206,7 +206,8 @@ The architecture delegates work across five distinct custom role agents to enfor
     *   Cannot write to `CLEAN_ROOM_IMPLEMENTATION_ROOTS`; the write hook rejects Agent 2 implementation-root writes.
     *   Merges approved handoff artifacts into the clean workspace.
     *   Writes `implementation-plan.json` with relative destination paths, tests, code hygiene policy, constraints, risks, and argv-array verification commands.
-    *   Keeps `skeleton-manifest.json` valid when the target profile expects it.
+    *   Maintains `skeleton-manifest.json` as the clean destination architecture map for code-development runs, with owned path prefixes and refactor triggers.
+    *   Assigns each implementation-plan target and test path to one or more architecture areas.
 
 ### [Agent 3: Clean Implementer Verifier](../agents/clean-qa-editor.md)
 *   **Domain**: Clean (Source-denied)

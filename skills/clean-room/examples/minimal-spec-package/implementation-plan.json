@@ -10,6 +10,7 @@
     "behavior-spec.json",
     "skeleton-manifest.json"
   ],
+  "architecture_manifest_ref": "skeleton-manifest.json",
   "foundation_summary": "Example clean implementation foundation is available through the configured implementation root.",
   "code_hygiene_policy": {
     "max_lines_per_code_file": 500,
@@ -37,6 +38,9 @@
       "summary": "Implement the example observable flow.",
       "spec_ids": [
         "spec-example-flow"
+      ],
+      "architecture_area_refs": [
+        "area-example-flow"
       ],
       "public_contract_refs": [],
       "implementation_root_ref": "CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]",
@@ -73,6 +77,7 @@
       ]
     }
   ],
+  "planned_refactors": [],
   "verification_strategy": [
     {
       "command": [

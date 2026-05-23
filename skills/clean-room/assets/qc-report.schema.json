@@ -13,6 +13,8 @@
     "schema_status",
     "leakage_status",
     "leakage_scan_summary",
+    "architecture_status",
+    "architecture_findings",
     "coverage_status",
     "required_rerun",
     "contamination_incidents",
@@ -84,6 +86,20 @@
     "leakage_scan_summary": {
       "type": "string",
       "minLength": 1
+    },
+    "architecture_status": {
+      "enum": [
+        "aligned",
+        "drift",
+        "blocked",
+        "not-run"
+      ]
+    },
+    "architecture_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
     },
     "coverage_status": {
       "enum": [
@@ -198,6 +214,7 @@
             "testability",
             "code-hygiene",
             "terminology",
+            "architecture",
             "process"
           ]
         },

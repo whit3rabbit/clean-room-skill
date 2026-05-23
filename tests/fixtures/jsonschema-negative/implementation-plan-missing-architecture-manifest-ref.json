@@ -1,0 +1,11 @@
+{
+  "schema_kind": "implementation-plan",
+  "base": "implementation-plan.json",
+  "description": "Implementation plans must reference the clean architecture manifest.",
+  "remove": [
+    [
+      "architecture_manifest_ref"
+    ]
+  ],
+  "expected_error": "'architecture_manifest_ref' is a required property"
+}

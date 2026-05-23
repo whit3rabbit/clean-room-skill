@@ -145,7 +145,31 @@ function writeImplementationPlan(cleanRoot, command, commandExtra = {}) {
     planner_role: 'clean-architect',
     created_at: '2024-01-01T00:00:00Z',
     target_profile: 'speckit-feature-folder',
-    work_items: [],
+    implementation_root_refs: ['CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]'],
+    source_artifacts: ['behavior-spec.json', 'skeleton-manifest.json'],
+    architecture_manifest_ref: 'skeleton-manifest.json',
+    foundation_summary: 'Test clean implementation foundation.',
+    code_hygiene_policy: {
+      max_lines_per_code_file: 500,
+      max_lines_per_test_file: 800,
+      max_files_per_iteration: 12,
+      split_large_files_by: ['module boundary', 'public type', 'feature area'],
+      exceptions: [],
+    },
+    work_items: [
+      {
+        work_item_id: 'work-test',
+        status: 'planned',
+        summary: 'Test verification work item.',
+        spec_ids: ['spec-test'],
+        architecture_area_refs: ['area-test'],
+        implementation_root_ref: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+        target_paths: ['src/test.js'],
+        test_paths: ['test/test.js'],
+        acceptance_criteria: ['Test command runs.'],
+      },
+    ],
+    planned_refactors: [],
     verification_strategy: [
       {
         command,

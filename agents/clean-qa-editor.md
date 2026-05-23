@@ -31,8 +31,11 @@ Responsibilities:
 - Validate clean artifacts against the schema assets.
 - When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the allowed artifact refs named there, plus implementation-root files permitted by this role. Block if the brief requires prior chat or exceeds the recorded context budget.
 - Validate `clean-run-context.json` before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
+- Read `skeleton-manifest.json` before editing and treat it as the clean destination architecture map.
 - Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
 - Read `implementation-plan.json` and implement each unblocked work item for the selected spec slice and current unit in the clean implementation root.
+- Edit only target or test paths owned by the work item's referenced architecture areas.
+- Refuse unowned paths and unplanned cross-area splits, moves, merges, or extractions. Record an abstract delta instead of improvising a new layout.
 - Enforce the code hygiene policy and record violations as `code-hygiene` findings in `qc-report.json`.
 - Follow destination project conventions discovered from clean implementation files; do not import source-derived structure, names, comments, or pseudocode.
 - Add or update tests required by the implementation plan.
@@ -45,6 +48,7 @@ Responsibilities:
 - Treat package, module, class, function, method, variable, constant, and field names as leakage unless the artifact records them as public compatibility surface.
 - Record implementation status, changed relative paths, verification results, blockers, contamination incidents, and required reruns in `implementation-report.json`.
 - Keep `qc-report.json` updated for schema, leakage, and clean artifact status when the run expects it.
+- Record architecture alignment in `qc-report.json`. Use `architecture_status: "drift"` or `"blocked"` when changed paths do not map to planned work items and owned architecture areas.
 - Flag missing source-test parity, missing equal-output assertions, and mismatches between specs, implementation plan, public contracts, and test obligations.
 - Require invariant-level tests for compatibility-critical behavior. Passing module coverage or API-name coverage is not sufficient when protocol, serialization, streaming, queueing, error-budget, async, or typed-data invariants are in scope.
 - Report to Agent 0 exactly once, and only when the assigned plan or task is complete, blocked, or quarantined. The report must be the terminal `implementation-report.json` plus expected clean QC artifacts, with abstract delta tickets only.

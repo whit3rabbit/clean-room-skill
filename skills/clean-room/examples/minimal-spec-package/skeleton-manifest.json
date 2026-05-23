@@ -2,11 +2,23 @@
   "manifest_id": "skeleton-example",
   "target_language": "unspecified",
   "area_id_naming_policy": "Use neutral clean ids that do not mirror source layout.",
+  "architecture_summary": "One clean feature area owns the example flow implementation and its tests.",
   "target_constraints": [],
   "areas": [
     {
       "area_id": "area-example-flow",
       "purpose": "Own the example behavior.",
+      "owned_path_prefixes": [
+        "src/example-flow.js",
+        "test/example-flow.test.js"
+      ],
+      "responsibilities": [
+        "Implement the example observable flow and its direct verification."
+      ],
+      "forbidden_responsibilities": [
+        "Do not absorb unrelated destination features."
+      ],
+      "allowed_area_dependencies": [],
       "spec_ids": [
         "spec-example-flow"
       ],
@@ -40,6 +52,9 @@
   ],
   "test_obligations": [
     "test-001"
+  ],
+  "refactor_triggers": [
+    "Split the area before adding unrelated behavior or broad shared utilities."
   ],
   "open_decisions": []
 }

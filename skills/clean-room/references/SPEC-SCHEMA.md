@@ -244,22 +244,27 @@ Capture:
 
 ## Skeleton Manifest Content
 
-Map clean behavior specs to eventual implementation areas without imposing a source-derived design:
+Map clean behavior specs to destination architecture areas without imposing a source-derived design:
 
+- architecture summary
 - destination area name
 - area id naming policy
+- owned relative path prefixes
+- area responsibilities and forbidden responsibilities
+- allowed dependencies between architecture areas
 - related behavior spec ids
 - public contract refs to preserve
 - target constraints supplied by the user or destination repo
 - dependency constraints
 - forbidden implementation material
+- refactor triggers
 - test mapping
 - tests to create
 - open decision status and owner
 
 Keep target language generic unless the user provides one.
 
-Map API, protocol, config, and data/schema compatibility into `public_contracts` and area-level `public_contract_refs`. Map source-test-derived scenarios and equal-output requirements into `test_mapping` and `test_obligations`. Do not add schema fields for parity unless the artifact schema is intentionally versioned.
+Map API, protocol, config, and data/schema compatibility into `public_contracts` and area-level `public_contract_refs`. Map source-test-derived scenarios and equal-output requirements into `test_mapping` and `test_obligations`. For code-development runs, every planned implementation or test path must fall under an owned path prefix for at least one referenced architecture area.
 
 ## Implementation Plan Content
 
@@ -267,9 +272,11 @@ Map API, protocol, config, and data/schema compatibility into `public_contracts`
 
 - clean implementation root refs such as `CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]`
 - clean source artifacts used for planning
+- `architecture_manifest_ref` pointing to the current `skeleton-manifest.json`
 - destination foundation summary
 - code hygiene policy from preflight
-- work items with relative target paths and test paths
+- work items with architecture area refs, relative target paths, and test paths
+- planned refactors for split, move, merge, or extract work
 - local clean-project patterns and dependency constraints
 - public contract refs and spec ids
 - argv-array verification commands with cwd set to implementation root refs
@@ -321,6 +328,7 @@ Capture:
 - artifact hashes
 - validator version
 - leakage scan summary
+- architecture alignment status and architecture findings
 - coverage status
 - required rerun status
 - contamination incidents
@@ -329,7 +337,7 @@ Capture:
 - untestable claims
 - missing source-test parity
 - missing equal-output assertions
-- mismatches between specs, public contracts, and test obligations
+- mismatches between specs, public contracts, architecture areas, changed paths, and test obligations
 - terminology issues
 - code hygiene violations
 - clean-side changes made

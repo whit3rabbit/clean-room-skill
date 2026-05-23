@@ -1,0 +1,13 @@
+{
+  "schema_kind": "implementation-plan",
+  "base": "implementation-plan.json",
+  "description": "Implementation plan work items must name their architecture areas.",
+  "remove": [
+    [
+      "work_items",
+      0,
+      "architecture_area_refs"
+    ]
+  ],
+  "expected_error": "'architecture_area_refs' is a required property"
+}

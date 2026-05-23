@@ -16,6 +16,8 @@
   "schema_status": "passed",
   "leakage_status": "passed",
   "leakage_scan_summary": "No blocked markers in example.",
+  "architecture_status": "aligned",
+  "architecture_findings": [],
   "coverage_status": "complete",
   "required_rerun": false,
   "contamination_incidents": [],
