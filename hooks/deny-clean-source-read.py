@@ -26,6 +26,13 @@ MCP_RESOURCE_TOOLS = {
     "read_mcp_resource",
 }
 READ_PATH_KEYS = ("file_path", "filePath", "path", "notebook_path", "notebookPath")
+CONTAMINATED_ONLY_SANITIZER_ARTIFACTS = {
+    "coverage-ledger.json": "coverage-ledger artifact",
+    "evidence-ledger.json": "evidence-ledger artifact",
+    "preflight-goal.json": "preflight-goal artifact",
+    "source-index.json": "source-index artifact",
+    "task-manifest.json": "task-manifest artifact",
+}
 
 
 def tool_name_for(payload: dict) -> str:
@@ -112,6 +119,7 @@ def main() -> int:
         )
         return 1
     source_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS")
+    contaminated_roots = env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
     clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
     implementation_roots = env_roots("CLEAN_ROOM_IMPLEMENTATION_ROOTS")
     allowed_roots = allowed_roots_for_role(role)
@@ -143,6 +151,14 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
+        if role == SANITIZER_ROLE and any(is_under(path, root) for root in contaminated_roots):
+            artifact_label = CONTAMINATED_ONLY_SANITIZER_ARTIFACTS.get(path.name)
+            if artifact_label:
+                print(
+                    f"clean-room policy denied role {role} reading {artifact_label} in {describe_path(path)}",
+                    file=sys.stderr,
+                )
+                return 1
         if role in SOURCE_DENIED_ROLES and path.name == "preflight-goal.json":
             print(
                 f"clean-room policy denied role {role} reading preflight-goal artifact in {describe_path(path)}",

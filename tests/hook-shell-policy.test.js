@@ -375,6 +375,56 @@ describe('clean-room shell hook policy', () => {
     assert.doesNotMatch(status.stdout, /AGENTS\.md/);
   });
 
+  test('Agent 4 polish runner disables repository git hooks when committing', () => {
+    const root = tempDir('clean-room-agent4-runner-hooks');
+    const env = {
+      ...policyEnv(root, 'clean-polish-reviewer'),
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    };
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    fs.writeFileSync(path.join(implementation, 'AGENTS.md'), '# Commands\n\n- npm test\n');
+    fs.writeFileSync(path.join(implementation, 'UNLISTED.md'), 'leave dirty\n');
+    const init = spawnSync('git', ['init'], {
+      cwd: implementation,
+      encoding: 'utf8',
+    });
+    assert.equal(init.status, 0, init.stderr);
+    const marker = path.join(implementation, 'prepare-hook-ran');
+    const hookPath = path.join(implementation, '.git', 'hooks', 'prepare-commit-msg');
+    fs.writeFileSync(hookPath, [
+      '#!/bin/sh',
+      `printf hook-ran > ${shellQuote(marker)}`,
+      'exit 42',
+      '',
+    ].join('\n'));
+    fs.chmodSync(hookPath, 0o755);
+    const report = writePolishReport(clean);
+
+    const result = spawnSync('python3', [AGENT4_RUNNER, '--report', report, '--commit'], {
+      cwd: implementation,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.commit.commit_status, 'committed');
+    assert.equal(fs.existsSync(marker), false);
+
+    const tree = spawnSync('git', ['ls-tree', '--name-only', 'HEAD'], {
+      cwd: implementation,
+      encoding: 'utf8',
+    });
+    assert.match(tree.stdout, /^AGENTS\.md$/m);
+    assert.doesNotMatch(tree.stdout, /UNLISTED\.md/);
+    const status = spawnSync('git', ['status', '--short'], {
+      cwd: implementation,
+      encoding: 'utf8',
+    });
+    assert.match(status.stdout, /\?\? UNLISTED\.md/);
+    assert.doesNotMatch(status.stdout, /AGENTS\.md/);
+  });
+
   test('Agent 4 polish runner rejects paths that escape implementation roots', () => {
     const root = tempDir('clean-room-agent4-runner-paths');
     const env = {
