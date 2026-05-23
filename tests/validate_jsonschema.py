@@ -37,6 +37,7 @@ SCHEMA_BY_ARTIFACT = {
     "skeleton-manifest": "skeleton-manifest.schema.json",
     "implementation-plan": "implementation-plan.schema.json",
     "implementation-report": "implementation-report.schema.json",
+    "polish-report": "polish-report.schema.json",
     "clean-room-result": "clean-room-result.schema.json",
     "qc-report": "qc-report.schema.json",
     "coverage-ledger": "coverage-ledger.schema.json",

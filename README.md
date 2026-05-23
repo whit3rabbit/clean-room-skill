@@ -126,11 +126,11 @@ In strict context-management mode, every `agent-commands.json` stage must set `c
 4. Analyze and sanitize.
    Source-reading roles produce neutral draft behavior specs. A source-denied sanitizer reviews handoff candidates before anything enters the clean domain.
 
-5. Plan and implement.
-   Clean roles read only approved clean artifacts and the clean destination foundation. Agent 2 writes `implementation-plan.json`; Agent 3 writes code/tests under the implementation root and reports under clean artifacts.
+5. Plan, implement, and polish.
+   Clean roles read only approved clean artifacts and the clean destination foundation. Agent 2 writes `implementation-plan.json`; Agent 3 writes code/tests under the implementation root and reports under clean artifacts. Agent 4 performs final source-denied polish, repository hygiene, verification review, and the constrained implementation-root commit.
 
 6. Verify and return.
-   Agent 0 performs contaminated-side coverage verification after Agent 3 reaches a terminal state, then writes `clean-room-result.json`.
+   Agent 0 performs contaminated-side coverage verification after Agent 3 reaches a terminal state and any configured Agent 4 polish review passes, then writes `clean-room-result.json`.
 
 Use recovery skills instead of chat history:
 

@@ -84,6 +84,7 @@
     "implementation_plan": "implementation-plan.json",
     "implementation_report": "implementation-report.json",
     "qc_report": "qc-report.json",
+    "polish_report": "polish-report.json",
     "open_questions": [
       "open-questions.json"
     ],
@@ -101,9 +102,15 @@
     ],
     "planner_role": "clean-architect",
     "implementer_role": "clean-qa-editor",
+    "polish_reviewer_role": "clean-polish-reviewer",
     "shell_verification": {
       "agent3_shell_allowed": true,
       "cwd_policy": "implementation-root"
+    },
+    "polish_commit": {
+      "agent4_shell_allowed": true,
+      "cwd_policy": "implementation-root",
+      "git_policy": "local-init-and-commit-only"
     }
   },
   "coordination_boundary": {

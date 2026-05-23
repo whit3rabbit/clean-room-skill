@@ -17,8 +17,9 @@ ROLES = {
     "contaminated-handoff-sanitizer",
     "clean-architect",
     "clean-qa-editor",
+    "clean-polish-reviewer",
 }
-CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
+CLEAN_ROLES = {"clean-architect", "clean-qa-editor", "clean-polish-reviewer"}
 SOURCE_DENIED_CONTAMINATED_ROLES = {"contaminated-handoff-sanitizer"}
 NONEMPTY_VARS = (
     "CLEAN_ROOM_ROLE",

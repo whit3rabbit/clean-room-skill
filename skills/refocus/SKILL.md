@@ -17,12 +17,12 @@ Use the canonical `clean-room` skill workflow and references in this plugin. Pre
 
 Compare current artifacts to the canonical gate checklist:
 
-- Scope gate recorded authorization, roots, boundaries, prohibited actions, evidence handling, selected target profile, Agent 0-3 pipeline, and Agent 1.5 sanitizer role for new runs.
+- Scope gate recorded authorization, roots, boundaries, prohibited actions, evidence handling, selected target profile, Agent 0-4 pipeline, and Agent 1.5 sanitizer role for new runs.
 - Preflight goal exists for new runs, validates against `preflight-goal.schema.json`, and is referenced by `task-manifest.json` with `preflight_goal_ref` and `preflight_goal_sha256`.
 - Task manifest records the required `handoff_sequence` and does not skip Stage 0.
 - Initialization snapshot exists when init preferences were used, and reusable `init-config.json` drift is reported instead of silently applied.
 - `clean-run-context.json` exists before clean roles run and excludes source roots, contaminated roots, source index refs, and ledger paths.
-- `clean-run-context.json` records artifact-only coordination: Agent 0 does not directly steer Agent 2 or Agent 3, and Agent 3 reports to Agent 0 only at terminal status.
+- `clean-run-context.json` records artifact-only coordination: Agent 0 does not directly steer Agent 2, Agent 3, or Agent 4, and clean implementation/polish roles report to Agent 0 only at terminal status.
 - When context management is enabled, the next role launch can be driven by a fresh `role-session-brief.json` inside the recorded budgets. `controller-status.json` remains contaminated-side only.
 - Implementation roots are recorded, separated, and not source-derived.
 - Source index preflight exists when required and remains contaminated-only.
@@ -34,6 +34,7 @@ Compare current artifacts to the canonical gate checklist:
 - Agent 3 produced `implementation-report.json` when the run reached implementation.
 - Non-terminal Agent 3 implementation reports were not used as Agent 0 feedback or guidance.
 - QC produced `qc-report.json` with schema, leakage, coverage, and abstract delta ticket status when the run reached that gate.
+- Agent 4 produced `polish-report.json` when the run reached final polish review.
 - Contaminated verification returned only abstract delta tickets.
 
 Validate schemas and handoff hashes before trusting the artifacts. Use `source-index.json` only on the contaminated side and only when referenced by the task manifest.

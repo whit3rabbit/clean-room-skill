@@ -1,0 +1,15 @@
+{
+  "schema_kind": "polish-report",
+  "base": "polish-report.json",
+  "set": [
+    {
+      "path": [
+        "changed_paths",
+        0,
+        "path"
+      ],
+      "value": "../source/secret.txt"
+    }
+  ],
+  "expected_error": "does not match"
+}

@@ -1,0 +1,13 @@
+{
+  "schema_kind": "polish-report",
+  "base": "polish-report.json",
+  "set": [
+    {
+      "path": [
+        "reviewer_role"
+      ],
+      "value": "clean-qa-editor"
+    }
+  ],
+  "expected_error": "clean-polish-reviewer"
+}

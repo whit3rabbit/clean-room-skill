@@ -224,6 +224,9 @@
         "agent_3": {
           "$ref": "#/$defs/agent_3_stage"
         },
+        "agent_4": {
+          "$ref": "#/$defs/agent_4_stage"
+        },
         "handoff_rules": {
           "type": "object",
           "additionalProperties": false,
@@ -275,39 +278,14 @@
       }
     },
     "handoff_sequence": {
-      "type": "array",
-      "minItems": 9,
-      "maxItems": 9,
-      "prefixItems": [
+      "oneOf": [
         {
-          "$ref": "#/$defs/handoff_preflight_stage"
+          "$ref": "#/$defs/handoff_sequence_legacy"
         },
         {
-          "$ref": "#/$defs/handoff_source_destination_discovery_stage"
-        },
-        {
-          "$ref": "#/$defs/handoff_agent_0_decomposition_stage"
-        },
-        {
-          "$ref": "#/$defs/handoff_agent_1_analysis_stage"
-        },
-        {
-          "$ref": "#/$defs/handoff_agent_1_5_sanitization_stage"
-        },
-        {
-          "$ref": "#/$defs/handoff_clean_handoff_stage"
-        },
-        {
-          "$ref": "#/$defs/handoff_clean_planning_stage"
-        },
-        {
-          "$ref": "#/$defs/handoff_clean_implementation_qc_stage"
-        },
-        {
-          "$ref": "#/$defs/handoff_agent_0_coverage_verification_stage"
+          "$ref": "#/$defs/handoff_sequence_with_polish"
         }
-      ],
-      "items": false
+      ]
     },
     "controller_policy": {
       "type": "object",
@@ -479,7 +457,8 @@
               "clean-planning",
               "report-review",
               "implementation",
-              "verification"
+              "verification",
+              "final-polish"
             ]
           },
           "workspace_id": {
@@ -550,6 +529,7 @@
               "implementation-plan",
               "implementation-report",
               "qc-report",
+              "polish-report",
               "coverage-ledger-summary",
               "open-questions",
               "test-plan",
@@ -765,7 +745,8 @@
         "contaminated-source-analyst",
         "contaminated-handoff-sanitizer",
         "clean-architect",
-        "clean-qa-editor"
+        "clean-qa-editor",
+        "clean-polish-reviewer"
       ]
     },
     "agent_0_stage": {
@@ -873,6 +854,27 @@
         }
       }
     },
+    "agent_4_stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "responsibility",
+        "trust_domain"
+      ],
+      "properties": {
+        "role": {
+          "const": "clean-polish-reviewer"
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_domain": {
+          "const": "clean"
+        }
+      }
+    },
     "handoff_stage_base": {
       "type": "object",
       "additionalProperties": false,
@@ -913,6 +915,79 @@
           ]
         }
       }
+    },
+    "handoff_sequence_legacy": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/handoff_preflight_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_source_destination_discovery_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_0_decomposition_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_1_analysis_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_1_5_sanitization_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_handoff_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_planning_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_implementation_qc_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_0_coverage_verification_stage"
+        }
+      ],
+      "items": false
+    },
+    "handoff_sequence_with_polish": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/handoff_preflight_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_source_destination_discovery_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_0_decomposition_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_1_analysis_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_1_5_sanitization_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_handoff_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_planning_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_implementation_qc_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_clean_polish_review_stage"
+        },
+        {
+          "$ref": "#/$defs/handoff_agent_0_coverage_verification_stage"
+        }
+      ],
+      "items": false
     },
     "handoff_preflight_stage": {
       "allOf": [
@@ -1021,6 +1096,20 @@
           "properties": {
             "stage": {
               "const": "clean-implementation-qc"
+            }
+          }
+        }
+      ]
+    },
+    "handoff_clean_polish_review_stage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/handoff_stage_base"
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "clean-polish-review"
             }
           }
         }

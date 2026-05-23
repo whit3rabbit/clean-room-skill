@@ -49,8 +49,9 @@ Before choosing work:
 - Preserve `loop_context` when present. In unattended inner-loop mode, selected work must remain inside `loop_context.approved_scope_refs`.
 - Stop if clean roles appear to require source, contaminated ledgers, contaminated chat history, raw diffs, source excerpts, `source-index.json`, or the full `task-manifest.json`.
 - Stop if Agent 3 appears to require writing code outside `CLEAN_ROOM_IMPLEMENTATION_ROOTS` or running shell outside the bounded Agent 3 shell policy.
+- Stop if Agent 4 appears to require reading source/contaminated material, writing outside `CLEAN_ROOM_IMPLEMENTATION_ROOTS` and `CLEAN_ROOM_CLEAN_ROOTS`, or running shell outside the bounded Agent 4 polish runner policy.
 - Stop if `clean-run-context.json` exposes source roots, contaminated roots, source index refs, coverage ledgers, or evidence ledgers.
-- Stop if Agent 0 appears to have steered Agent 2 or Agent 3 through direct chat, progress feedback, implementation hints, priority changes, or partial implementation reports instead of durable sanitized artifacts.
+- Stop if Agent 0 appears to have steered Agent 2, Agent 3, or Agent 4 through direct chat, progress feedback, implementation hints, priority changes, or partial implementation reports instead of durable sanitized artifacts.
 - Treat non-terminal Agent 3 `implementation-report.json` states as internal clean-side state, not Agent 0 feedback.
 - Stop if Agent 1.5 appears to require source roots, `source-index.json` contents, contaminated evidence ledgers, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 - If `context_management.mode` is `role-session-briefs`, verify the next role can be launched from a fresh context using `role-session-brief.json` and the recorded budgets. Do not use resume chat history as the brief.
@@ -61,7 +62,7 @@ Pick exactly one next safe action:
 
 - One pending, gap, or blocked unit from `task-manifest.json` and `coverage-ledger.json`, limited to `loop_context.approved_scope_refs` when present.
 - One blocked gate when a required artifact, schema validation, handoff hash, leakage review, authorization check, or root-separation check is missing or invalid.
-- A final package closeout when implementation is complete, coverage is complete, QC passed, and `clean-room-result.json` records a terminal inner-loop return when `loop_context` is present.
+- A final package closeout when implementation is complete, coverage is complete, QC passed, any configured polish review passed, and `clean-room-result.json` records a terminal inner-loop return when `loop_context` is present.
 
 Do not batch units. Do not advance state from memory. Do not reinterpret the source scope.
 

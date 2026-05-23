@@ -76,6 +76,7 @@ DENYLIST_ONLY_JSON_STRING_KEYS = {
     "manifest_id",
     "native_artifacts",
     "owner",
+    "owned_path_prefixes",
     "package_id",
     "path",
     "plan_id",

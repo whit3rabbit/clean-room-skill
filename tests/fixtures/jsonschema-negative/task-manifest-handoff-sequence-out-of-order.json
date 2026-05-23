@@ -12,5 +12,5 @@
       "value": "agent-0-decomposition"
     }
   ],
-  "expected_error": "was expected"
+  "expected_error": "is not valid under any of the given schemas"
 }

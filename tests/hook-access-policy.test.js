@@ -329,6 +329,13 @@ describe('clean-room access hook policy', () => {
     }, agent3Env);
     assert.equal(result.status, 0, result.stderr);
 
+    const agent4Env = { ...env, CLEAN_ROOM_ROLE: 'clean-polish-reviewer' };
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: implementation, file_path: 'AGENTS.md' },
+    }, agent4Env);
+    assert.equal(result.status, 0, result.stderr);
+
     const contaminatedEnv = { ...env, CLEAN_ROOM_ROLE: 'contaminated-source-analyst' };
     result = runHook('deny-contaminated-clean-write.py', {
       tool_name: 'Write',

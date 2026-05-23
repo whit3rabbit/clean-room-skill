@@ -23,7 +23,7 @@ CONTAMINATED_ROLES = {
     "contaminated-source-analyst",
     "contaminated-handoff-sanitizer",
 }
-CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
+CLEAN_ROLES = {"clean-architect", "clean-qa-editor", "clean-polish-reviewer"}
 
 
 def is_under(path: Path, root: Path) -> bool:
@@ -89,7 +89,9 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 1
-            if role == "clean-qa-editor" and any(is_under(path, root) for root in implementation_roots):
+            if role in {"clean-qa-editor", "clean-polish-reviewer"} and any(
+                is_under(path, root) for root in implementation_roots
+            ):
                 continue
             if not any(is_under(path, root) for root in clean_roots):
                 print(

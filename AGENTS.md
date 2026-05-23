@@ -127,7 +127,7 @@ Ask before changing:
 
 - The process separates contaminated source analysis from clean behavioral specification.
 - The outer loop evolves specs. The inner clean-room loop completes one approved spec slice, then returns `clean-room-result.json`.
-- `clean-room-skill run` executes only the inner clean-room loop. It requires schema-valid `loop_context`, selects at most one pending/gap unit inside `approved_scope_refs`, and uses a user-supplied `agent-commands` adapter with `shell: false`.
+- `clean-room-skill run` executes only the inner clean-room loop. It requires schema-valid `loop_context`, selects at most one pending/gap unit inside `approved_scope_refs`, supports optional `clean-polish-review`, and uses a user-supplied `agent-commands` adapter with `shell: false`.
 - Prompt rules are not a boundary. Use path separation, role-specific sessions, hooks, schema validation, and artifact quarantine.
 - Recovery entry points must reload durable artifacts, not prior chat history.
 - Never expose `source-index.json`, contaminated ledgers, source paths, private identifiers, or contaminated chat history to clean roles.
@@ -150,6 +150,7 @@ Ask before changing:
 - [Agent 1.5: Contaminated Handoff Sanitizer](agents/contaminated-handoff-sanitizer.md): reviews Agent 1 drafts from a source-denied contaminated context, scrubs identifying material, and approves or quarantines clean handoff candidates.
 - [Agent 2: Clean Architect](agents/clean-architect.md): reads clean inputs, maintains `skeleton-manifest.json` as the clean architecture map, and builds `implementation-plan.json`.
 - [Agent 3: Clean Implementer Verifier](agents/clean-qa-editor.md): implements only selected-slice work under implementation roots, records verification status, maintains QC, and emits one terminal report.
+- [Agent 4: Clean Polish Reviewer](agents/clean-polish-reviewer.md): performs final source-denied code polish, repo hygiene, verification review, writes `polish-report.json`, and may create one constrained implementation-root commit.
 - [Agent 3 shell variant](agents/clean-implementer-verifier-shell.md): shell-capable verification profile for isolated strict-hook homes; use only for bounded Agent 3 verification through the installed runner.
 - Leakage rules live in [skills/clean-room/references/LEAKAGE-RULES.md](skills/clean-room/references/LEAKAGE-RULES.md).
 
@@ -165,7 +166,7 @@ Set these before any clean-room role session:
 - `CLEAN_ROOM_ALLOWED_READ_ROOTS`
 - `CLEAN_ROOM_SCHEMA_DIR`
 
-Clean roles may read only clean roots, implementation roots, schema roots, and approved public/reference roots. Contaminated roles may read authorized source roots and write only contaminated artifacts. Shell-style tools should be disabled inside role sessions because they can bypass path-aware hooks. Normal repo maintenance commands are allowed outside role sessions.
+Clean roles may read only clean roots, implementation roots, schema roots, and approved public/reference roots. Contaminated roles may read authorized source roots and write only contaminated artifacts. Shell-style tools should be disabled inside role sessions because they can bypass path-aware hooks. Agent 3 and Agent 4 runner exceptions require their explicit `CLEAN_ROOM_ALLOW_AGENT*_SHELL` flags and cwd under implementation roots. Normal repo maintenance commands are allowed outside role sessions.
 
 ## Local Artifacts
 

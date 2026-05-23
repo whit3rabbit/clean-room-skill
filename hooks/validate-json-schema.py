@@ -32,6 +32,7 @@ SCHEMA_BY_ARTIFACT = {
     "skeleton-manifest": "skeleton-manifest.schema.json",
     "implementation-plan": "implementation-plan.schema.json",
     "implementation-report": "implementation-report.schema.json",
+    "polish-report": "polish-report.schema.json",
     "clean-room-result": "clean-room-result.schema.json",
     "qc-report": "qc-report.schema.json",
     "coverage-ledger": "coverage-ledger.schema.json",
@@ -62,6 +63,11 @@ TASK_MANIFEST_HANDOFF_SEQUENCE = [
     "clean-planning",
     "clean-implementation-qc",
     "agent-0-coverage-verification",
+]
+TASK_MANIFEST_HANDOFF_SEQUENCE_WITH_POLISH = [
+    *TASK_MANIFEST_HANDOFF_SEQUENCE[:-1],
+    "clean-polish-review",
+    TASK_MANIFEST_HANDOFF_SEQUENCE[-1],
 ]
 MAX_REPORTED_ERRORS = 20
 MAX_VALIDATION_ERRORS = MAX_REPORTED_ERRORS + 1
@@ -95,6 +101,8 @@ def artifact_kind(path: Path, data: dict) -> str | None:
         return "implementation-plan"
     if "report_id" in data and "implementer_role" in data:
         return "implementation-report"
+    if "report_id" in data and data.get("reviewer_role") == "clean-polish-reviewer":
+        return "polish-report"
     if "report_id" in data:
         return "qc-report"
     if "package_id" in data:
@@ -300,7 +308,8 @@ def task_manifest_handoff_sequence_errors(data: dict[str, Any]) -> list[str]:
     if not isinstance(sequence, list):
         return ["<root>: missing required field 'handoff_sequence'"]
     stages = [item.get("stage") if isinstance(item, dict) else None for item in sequence]
-    if stages != TASK_MANIFEST_HANDOFF_SEQUENCE:
+    stage_tuple = tuple(stages)
+    if stage_tuple not in {tuple(TASK_MANIFEST_HANDOFF_SEQUENCE), tuple(TASK_MANIFEST_HANDOFF_SEQUENCE_WITH_POLISH)}:
         return ["/handoff_sequence: stages must match the required clean-room handoff order"]
     return []
 

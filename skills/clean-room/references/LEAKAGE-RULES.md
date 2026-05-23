@@ -74,7 +74,7 @@ Before clean handoff, Agent 1.5 confirms from a fresh source-denied context:
 - `leakage_review.reviewer_role` is `contaminated-handoff-sanitizer`.
 - Clean roles receive `clean-run-context.json` and, when context management is enabled, `role-session-brief.json`; they do not receive `task-manifest.json`, full `preflight-goal.json`, `init-config.json`, `controller-status.json`, source indexes, or contaminated ledgers.
 - Agent 0 influences clean roles only through schema-valid durable sanitized artifacts. Direct manager chat, progress feedback, implementation hints, priority changes, and in-progress corrections are contamination risks.
-- Agent 3 reports to Agent 0 only after implementation is complete, blocked, or quarantined.
+- Agent 3 reports to Agent 0 only after implementation is complete, blocked, or quarantined. Agent 4 reports only through terminal `polish-report.json` after final clean polish review is complete, blocked, or quarantined.
 
 ## Contamination Response
 
@@ -93,11 +93,11 @@ Do not try to "forget" source material inside the same clean context and continu
 Use hook scripts as audit and guardrail support, not as the only boundary:
 
 - `hooks/deny-clean-source-read.py`: denies clean-role and Agent 1.5 reads from `CLEAN_ROOM_SOURCE_ROOTS`; clean roles may read only `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS`, while Agent 1.5 may read only assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
-- `hooks/deny-contaminated-clean-write.py`: enforces write roots. Agent 2 writes only under `CLEAN_ROOM_CLEAN_ROOTS`, Agent 3 writes reports under `CLEAN_ROOM_CLEAN_ROOTS` and implementation files under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and contaminated roles may write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+- `hooks/deny-contaminated-clean-write.py`: enforces write roots. Agent 2 writes only under `CLEAN_ROOM_CLEAN_ROOTS`, Agent 3 writes reports under `CLEAN_ROOM_CLEAN_ROOTS` and implementation files under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, Agent 4 writes polish reports under `CLEAN_ROOM_CLEAN_ROOTS` and implementation-root hygiene/commit files under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and contaminated roles may write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 - `hooks/check-artifact-leakage.py`: scans clean artifacts for high-risk leakage markers, obvious source-like identifiers, and terms from optional `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST` files.
 - For Agent 1.5, `hooks/check-artifact-leakage.py` also scans staged contaminated artifacts before promotion to clean handoff.
 - `hooks/validate-json-schema.py`: checks JSON syntax and common bundled schema constraints, including the conditional and bounded fields used by these schemas. It is not a full JSON Schema 2020-12 validator.
 - `hooks/require-clean-room-env.py`: fails closed when the role, root, or schema environment block is missing.
-- `hooks/deny-clean-room-shell.py`: denies shell-style tools for clean-room role sessions except installed Agent 3 verification-runner invocations when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and cwd is under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
+- `hooks/deny-clean-room-shell.py`: denies shell-style tools for clean-room role sessions except installed Agent 3 verification-runner invocations when `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` and installed Agent 4 polish-runner invocations when `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1`; both must run with cwd under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 
 Set `CLEAN_ROOM_ROLE`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, and `CLEAN_ROOM_SCHEMA_DIR` explicitly before running hooks. Set `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST` when the contaminated side has produced a private identifier list for hook-only scanning.

@@ -48,6 +48,10 @@
       "type": "string",
       "minLength": 1
     },
+    "polish_report_ref": {
+      "type": "string",
+      "minLength": 1
+    },
     "abstract_delta_tickets": {
       "type": "array",
       "items": {

@@ -4,7 +4,7 @@
 
 The Clean Room controller uses nested loops.
 
-The outer loop evolves specs. The inner clean-room loop completes one approved spec slice from sanitized handoff through implementation, QC, and contaminated-side coverage verification, then returns a terminal result to the outer loop.
+The outer loop evolves specs. The inner clean-room loop completes one approved spec slice from sanitized handoff through implementation, QC, optional final clean polish review, and contaminated-side coverage verification, then returns a terminal result to the outer loop.
 
 ## Outer Loop: Spec Development
 
@@ -44,6 +44,7 @@ The inner loop owns one approved spec slice:
 - Run source-denied handoff sanitization.
 - Run clean planning.
 - Run clean implementation and QC.
+- Run final clean polish review when configured.
 - Run contaminated-side coverage verification.
 - Return only a terminal clean-room result.
 
@@ -57,6 +58,7 @@ Inner loop states:
 - `CLEAN_PLAN`
 - `CLEAN_IMPLEMENT`
 - `CLEAN_QC`
+- `CLEAN_POLISH_REVIEW`
 - `CONTAMINATED_COVERAGE_VERIFY`
 - `RETURN_TERMINAL_RESULT`
 
@@ -64,7 +66,7 @@ The inner loop must not expand scope. If it finds missing behavior, ambiguity, p
 
 ## Return Contract
 
-The inner loop returns only after Agent 0 has consumed the terminal Agent 3 report and verified coverage from the contaminated side. An Agent 3 terminal `implementation-report.json` alone is not a clean-room return.
+The inner loop returns only after Agent 0 has consumed the terminal Agent 3 report, any configured Agent 4 `polish-report.json`, and verified coverage from the contaminated side. An Agent 3 terminal `implementation-report.json` alone is not a clean-room return.
 
 Valid return results:
 
@@ -75,7 +77,7 @@ Valid return results:
 - `iteration-limit-reached`
 - `no-progress-detected`
 
-The return artifact is `clean-room-result.json`. It contains the result, selected spec slice ref, coverage state, terminal implementation report ref, QC report ref, abstract delta tickets, and return timestamp. It must not contain source excerpts, raw diffs, source paths, private identifiers, or source-shaped pseudocode.
+The return artifact is `clean-room-result.json`. It contains the result, selected spec slice ref, coverage state, terminal implementation report ref, QC report ref, optional polish report ref, abstract delta tickets, and return timestamp. It must not contain source excerpts, raw diffs, source paths, private identifiers, or source-shaped pseudocode.
 
 ## Progress Contract
 
@@ -90,6 +92,7 @@ Expected durable artifacts include:
 - `implementation-plan.json`
 - `implementation-report.json`
 - `qc-report.json`
+- `polish-report.json`
 - abstract delta ticket artifacts
 - `clean-room-result.json`
 

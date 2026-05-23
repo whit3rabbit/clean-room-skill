@@ -10,7 +10,7 @@ from pathlib import Path
 from clean_room_paths import describe_path, env_roots, load_payload, path_is_under, payload_cwd, redact_text, resolve_payload_path
 
 
-CLEAN_ROLES = {"clean-architect", "clean-qa-editor"}
+CLEAN_ROLES = {"clean-architect", "clean-qa-editor", "clean-polish-reviewer"}
 SANITIZER_ROLE = "contaminated-handoff-sanitizer"
 SOURCE_DENIED_ROLES = CLEAN_ROLES | {SANITIZER_ROLE}
 ADDITIONAL_CLEAN_READ_ROOTS = "CLEAN_ROOM_ALLOWED_READ_ROOTS"

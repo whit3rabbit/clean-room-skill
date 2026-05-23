@@ -510,6 +510,48 @@ function writeCompleteCleanReports(workspace) {
   });
 }
 
+function writePolishReport(workspace, overrides = {}) {
+  writeJson(path.join(workspace.clean, 'polish-report.json'), {
+    report_id: 'polish-complete',
+    task_id: 'task-example',
+    spec_slice_ref: 'behavior-spec:unit-example-flow',
+    unit_id: 'unit-example-flow',
+    reviewer_role: 'clean-polish-reviewer',
+    reviewed_at: '2024-01-01T00:00:00Z',
+    reviewed_artifacts: ['implementation-report.json', 'qc-report.json'],
+    changed_paths: [
+      {
+        path: 'AGENTS.md',
+        kind: 'repo-hygiene',
+        action: 'created',
+        reason: 'Record commands and gotchas.',
+      },
+    ],
+    verification_results: [
+      {
+        command: ['npm', 'test'],
+        cwd: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+        status: 'passed',
+        output_summary: 'Polish verification passed.',
+      },
+    ],
+    findings: [],
+    git: {
+      repository_status: 'initialized',
+      commit_required: true,
+      commit_status: 'committed',
+      include_paths: ['AGENTS.md'],
+      commit_message: 'Complete clean-room spec slice behavior-spec:unit-example-flow',
+      commit_hash: '0123456789abcdef0123456789abcdef01234567',
+      status_summary: 'Committed listed paths only.',
+    },
+    residual_risks: [],
+    abstract_delta_tickets: [],
+    final_status: 'passed',
+    ...overrides,
+  });
+}
+
 function writeCoveredCoverageScript(root) {
   const script = path.join(root, 'write-covered-coverage.js');
   fs.writeFileSync(script, `
@@ -671,6 +713,31 @@ describe('clean-room run command', () => {
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /must include contaminated-coverage-verify/);
+  });
+
+  test('accepts legacy command configs without clean polish review', () => {
+    const workspace = baseWorkspace('clean-room-run-agent4-legacy');
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config, '--once']);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  test('validates clean polish review stage order', () => {
+    const workspace = baseWorkspace('clean-room-run-agent4-order');
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+      noOpStage('clean-implement-qc', 'clean-qa-editor', workspace.implementation),
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config, '--once']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-polish-review must run after clean-implement-qc/);
   });
 
   test('validates task manifest schema before deriving roots', () => {
@@ -1402,5 +1469,105 @@ describe('clean-room run command', () => {
         status: 'open',
       },
     ]);
+  });
+
+  test('polish report is required for completion when polish stage is configured', () => {
+    const workspace = baseWorkspace('clean-room-run-polish-required');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    const script = writeCoveredCoverageScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      noOpStage('clean-implement-qc', 'clean-qa-editor', workspace.implementation),
+      noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+      coverageStage(workspace.root, script),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-delta-required/);
+    const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
+    assert.equal(runResult.result, 'spec-delta-required');
+    assert.equal(runResult.polish_report_ref, undefined);
+    assert.equal(runResult.abstract_delta_tickets[0].ticket_id, 'delta-polish-review');
+  });
+
+  test('passing polish report allows completion and is returned by reference', () => {
+    const workspace = baseWorkspace('clean-room-run-polish-complete');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    writePolishReport(workspace);
+    const script = writeCoveredCoverageScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      noOpStage('clean-implement-qc', 'clean-qa-editor', workspace.implementation),
+      noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+      coverageStage(workspace.root, script),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-slice-complete/);
+    const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
+    assert.equal(runResult.result, 'spec-slice-complete');
+    assert.equal(runResult.polish_report_ref, 'polish-report.json');
+  });
+
+  test('strict context management accepts clean polish review briefs', () => {
+    const workspace = baseWorkspace('clean-room-run-polish-strict-context');
+    enableStrictContext(workspace);
+    const polishBrief = writeRoleSessionBrief(
+      workspace,
+      path.join(workspace.clean, 'polish-role-session-brief.json'),
+      'clean-polish-reviewer',
+      'clean-polish-review'
+    );
+    const coverageBrief = writeRoleSessionBrief(
+      workspace,
+      path.join(workspace.contaminated, 'coverage-role-session-brief.json'),
+      'contaminated-manager-verifier',
+      'contaminated-coverage-verify'
+    );
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      {
+        ...noOpStage('clean-implement-qc', 'clean-qa-editor', workspace.implementation),
+        context: {
+          fresh_session: true,
+          brief_path: writeRoleSessionBrief(
+            workspace,
+            path.join(workspace.clean, 'implementation-role-session-brief.json'),
+            'clean-qa-editor',
+            'clean-implement-qc'
+          ),
+        },
+      },
+      {
+        ...noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+        context: {
+          fresh_session: true,
+          brief_path: polishBrief,
+        },
+      },
+      {
+        ...noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+        context: {
+          fresh_session: true,
+          brief_path: coverageBrief,
+        },
+      },
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config, '--once']);
+
+    assert.equal(result.status, 0, result.stderr);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations[0].phases[1].role, 'clean-polish-reviewer');
+    assert.equal(ledger.iterations[0].phases[1].session_brief_ref, polishBrief);
   });
 });

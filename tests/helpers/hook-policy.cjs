@@ -16,6 +16,7 @@ const SCHEMA_DIR = path.join(ROOT, 'skills', 'clean-room', 'assets');
 const SOURCE_INDEX = path.join(ROOT, 'skills', 'clean-room', 'scripts', 'build_source_index.py');
 const TOOL_MANAGER = path.join(ROOT, 'skills', 'clean-room', 'scripts', 'clean_room_tool_manager.py');
 const AGENT3_RUNNER = path.join(HOOKS, 'agent3-verification-runner.py');
+const AGENT4_RUNNER = path.join(HOOKS, 'agent4-polish-runner.py');
 const TEST_TIMEOUT_MS = 30_000;
 const TMP_DIRS = [];
 
@@ -186,6 +187,7 @@ function writeImplementationPlan(cleanRoot, command, commandExtra = {}) {
 
 module.exports = {
   AGENT3_RUNNER,
+  AGENT4_RUNNER,
   assertNoPrivateLeak,
   CLEAN_EXAMPLES,
   CONTAMINATED_EXAMPLES,

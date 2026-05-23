@@ -173,6 +173,11 @@
       "responsibility": "Implement the clean plan in the clean implementation root, record verification status, and emit one terminal report for Agent 0.",
       "trust_domain": "clean"
     },
+    "agent_4": {
+      "role": "clean-polish-reviewer",
+      "responsibility": "Perform final clean polish review, repository hygiene, verification review, and constrained implementation-root commit before Agent 0 coverage verification.",
+      "trust_domain": "clean"
+    },
     "handoff_rules": {
       "allowed_inputs": [
         "clean-run-context.json",
@@ -186,6 +191,7 @@
         "skeleton-manifest.json",
         "implementation-plan.json",
         "implementation-report.json",
+        "polish-report.json",
         "qc-report.json",
         "abstract-delta-ticket"
       ],
@@ -299,6 +305,20 @@
         "implementation-report.json",
         "qc-report.json"
       ],
+      "next": "clean-polish-review"
+    },
+    {
+      "stage": "clean-polish-review",
+      "producer": "clean-polish-reviewer",
+      "required_inputs": [
+        "clean-run-context.json",
+        "implementation-plan.json",
+        "implementation-report.json",
+        "qc-report.json"
+      ],
+      "required_outputs": [
+        "polish-report.json"
+      ],
       "next": "agent-0-coverage-verification"
     },
     {
@@ -307,6 +327,7 @@
       "required_inputs": [
         "implementation-report.json",
         "qc-report.json",
+        "polish-report.json",
         "coverage-ledger.json"
       ],
       "required_outputs": [
@@ -351,6 +372,12 @@
       "profile_id": "clean-qa-implementation-profile",
       "profile_purpose": "implementation",
       "workspace_id": "implementation-workspace"
+    },
+    {
+      "role": "clean-polish-reviewer",
+      "profile_id": "clean-polish-review-profile",
+      "profile_purpose": "final-polish",
+      "workspace_id": "implementation-workspace"
     }
   ],
   "artifact_paths": {
@@ -371,6 +398,7 @@
       "handoff-package",
       "implementation-plan",
       "implementation-report",
+      "polish-report",
       "abstract-delta-ticket"
     ],
     "blocked_material": [
@@ -388,7 +416,8 @@
     "Use write tools only in contaminated artifact roots for contaminated roles.",
     "Agent 2 writes only clean artifacts and reads the clean implementation foundation.",
     "Agent 3 writes implementation code only under CLEAN_ROOM_IMPLEMENTATION_ROOTS and writes reports under clean artifacts.",
-    "Agent 3 may run verification shell commands only with CLEAN_ROOM_ALLOW_AGENT3_SHELL=1 and cwd under CLEAN_ROOM_IMPLEMENTATION_ROOTS."
+    "Agent 3 may run verification shell commands only with CLEAN_ROOM_ALLOW_AGENT3_SHELL=1 and cwd under CLEAN_ROOM_IMPLEMENTATION_ROOTS.",
+    "Agent 4 writes only clean polish artifacts and implementation-root hygiene changes, and may commit only through agent4-polish-runner.py with CLEAN_ROOM_ALLOW_AGENT4_SHELL=1."
   ],
   "model_policy": [
     "Use the initialization snapshot default model plus clean and contaminated overrides.",
@@ -442,6 +471,14 @@
         "clean-workspace",
         "implementation-workspace-read-write"
       ]
+    },
+    {
+      "role": "clean-polish-reviewer",
+      "trust_domain": "clean",
+      "allowed_access": [
+        "clean-workspace",
+        "implementation-workspace-read-write"
+      ]
     }
   ],
   "units": [
@@ -464,6 +501,7 @@
     "skeleton-manifest.json",
     "implementation-plan.json",
     "implementation-report.json",
+    "polish-report.json",
     "qc-report.json",
     "clean-room-result.json"
   ],

@@ -158,6 +158,9 @@
         "qc_report": {
           "$ref": "#/$defs/clean_path"
         },
+        "polish_report": {
+          "$ref": "#/$defs/clean_path"
+        },
         "open_questions": {
           "type": "array",
           "items": {
@@ -217,6 +220,9 @@
         "implementer_role": {
           "const": "clean-qa-editor"
         },
+        "polish_reviewer_role": {
+          "const": "clean-polish-reviewer"
+        },
         "shell_verification": {
           "type": "object",
           "additionalProperties": false,
@@ -230,6 +236,29 @@
             },
             "cwd_policy": {
               "const": "implementation-root"
+            }
+          }
+        },
+        "polish_commit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agent4_shell_allowed",
+            "cwd_policy",
+            "git_policy"
+          ],
+          "properties": {
+            "agent4_shell_allowed": {
+              "type": "boolean"
+            },
+            "cwd_policy": {
+              "const": "implementation-root"
+            },
+            "git_policy": {
+              "enum": [
+                "local-init-and-commit-only",
+                "disabled"
+              ]
             }
           }
         }

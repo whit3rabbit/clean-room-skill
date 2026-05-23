@@ -235,7 +235,7 @@ Minimal agent command adapter shape for advisory or disabled context management:
 }
 ```
 
-Supported phases are `contaminated-analysis`, `sanitize-handoff`, `clean-plan`, `clean-implement-qc`, and `contaminated-coverage-verify`. The coverage verification phase is required.
+Supported phases are `contaminated-analysis`, `sanitize-handoff`, `clean-plan`, `clean-implement-qc`, optional `clean-polish-review`, and `contaminated-coverage-verify`. The coverage verification phase is required. When present, `clean-polish-review` must run after `clean-implement-qc` and before `contaminated-coverage-verify`.
 
 When `task-manifest.json` sets `context_management.mode` to `role-session-briefs` and `context_management.enforcement` to `strict`, every configured stage must include `context.fresh_session: true` and `context.brief_path`. The runner validates the brief before spawn, passes only the brief path plus environment facts in the stage prompt, and records the brief ref/hash in `controller-run-ledger.json`.
 
@@ -284,6 +284,16 @@ Strict context-management adapter example:
       "context": {
         "fresh_session": true,
         "brief_path": "/tmp/clean-room/task-1234abcd/clean/session-briefs/iter-001-agent-3.json"
+      }
+    },
+    {
+      "phase": "clean-polish-review",
+      "role": "clean-polish-reviewer",
+      "cwd": "/tmp/clean-room/task-1234abcd/implementation",
+      "argv": ["agent-cli", "--fresh-session", "--role", "clean-polish-reviewer"],
+      "context": {
+        "fresh_session": true,
+        "brief_path": "/tmp/clean-room/task-1234abcd/clean/session-briefs/iter-001-agent-4.json"
       }
     },
     {

@@ -114,7 +114,8 @@
         "contaminated-source-analyst",
         "contaminated-handoff-sanitizer",
         "clean-architect",
-        "clean-qa-editor"
+        "clean-qa-editor",
+        "clean-polish-reviewer"
       ]
     },
     "phase": {
@@ -123,6 +124,7 @@
         "sanitize-handoff",
         "clean-plan",
         "clean-implement-qc",
+        "clean-polish-review",
         "contaminated-coverage-verify"
       ]
     },
@@ -174,6 +176,7 @@
             "handoff-package",
             "implementation-plan",
             "implementation-report",
+            "polish-report",
             "qc-report",
             "coverage-ledger-summary",
             "open-questions",

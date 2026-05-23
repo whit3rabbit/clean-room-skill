@@ -44,7 +44,7 @@ Private structure, comments, internal names, source file layout, private helper 
 
 ## Stage Ordering
 
-The controller must enforce this sequence:
+The controller must enforce the legacy sequence for existing packages:
 
 1. `preflight`
 2. `source-destination-discovery`
@@ -56,6 +56,8 @@ The controller must enforce this sequence:
 8. `clean-implementation-qc`
 9. `agent-0-coverage-verification`
 
+New code-development packages may insert `clean-polish-review` between `clean-implementation-qc` and `agent-0-coverage-verification`. When configured, Agent 4 must pass final polish review before Agent 0 performs coverage verification.
+
 Agent 1 cannot start until Agent 0 records the preflight hash, assigned unit, source scope, evidence policy, and neutral sanitizer brief template.
 
 Agent 1.5 cannot start until Agent 1 writes draft behavior specs with evidence refs only and no direct source excerpts.
@@ -63,6 +65,8 @@ Agent 1.5 cannot start until Agent 1 writes draft behavior specs with evidence r
 Agent 2 cannot start until Agent 1.5 writes a passed handoff package, approved behavior specs, leakage review status, and `clean-run-context.json`.
 
 Agent 3 cannot start until Agent 2 writes `implementation-plan.json` with relative paths, argv-array verification commands, target stack, and code hygiene policy from preflight.
+
+Agent 4 cannot start until Agent 3 writes terminal `implementation-report.json` and `qc-report.json`. Agent 4 receives only clean artifacts, implementation roots, schema roots, approved public references, and role-session briefs.
 
 When `context_management.enforcement` is `strict`, no role can start until Agent 0 writes a valid `role-session-brief.json` for that role, phase, unit, and spec slice. The brief must fit the recorded budgets and must not contain prior chat, copied artifact bodies, source paths, or contaminated ledgers.
 

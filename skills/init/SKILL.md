@@ -15,7 +15,7 @@ Initialize or revise durable Clean Room run preferences before source analysis s
 
 Before creating active artifacts, collect or confirm `preflight-goal.json`. Do not start attended or unattended execution until the goal contract records end goal, target stack, license policy, dependency policy, compatibility/exactness policy, feature add/remove policy, code hygiene limits, output policy, existing destination policy, and controller mode.
 
-Keep `preflight-goal.json` in the controller/contaminated artifact domain. Clean roles receive only the clean-safe `goal_contract` subset and `code_hygiene_policy` through `clean-run-context.json`.
+Keep `preflight-goal.json` in the controller/contaminated artifact domain. Clean roles receive only the clean-safe `goal_contract` subset, `code_hygiene_policy`, and optional Agent 4 local commit policy through `clean-run-context.json`.
 
 Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
@@ -42,7 +42,7 @@ Before writing active artifacts:
 
 - Confirm source roots, contaminated artifact roots, clean artifact roots, clean implementation roots, approved public reference roots, and schema directory are separated.
 - Confirm contaminated artifact roots, clean artifact roots, and clean implementation roots do not contain source-derived path names. Treat matches against source root basenames or meaningful non-generic source-name tokens as contamination risk.
-- Confirm Agent 2 and Agent 3 will launch in the clean domain, not from the source workspace.
+- Confirm Agent 2, Agent 3, and Agent 4 will launch in the clean domain, not from the source workspace.
 - Set clean isolation to `clean-workspace`. Docker or Podman may be recorded only as an optional Agent 3 verification backend; source and contaminated artifact roots must remain unmounted from clean verification containers.
 - If container verification is selected, record `execution_policy` with `backend`, `preferred_container_profile`, `network_policy`, `dependency_install_policy`, `allow_native_toolchain`, and bounded `resource_limits`. Use `network_policy: off` and `dependency_install_policy: offline` or `locked` for the first milestone.
 - Treat root changes, model policy changes, target profile changes, and rule reclassification as safety-sensitive. Require explicit confirmation before changing an existing run.
@@ -55,7 +55,7 @@ Create or update these artifacts:
 - `init-config.json`: reusable controller-side preferences. This may contain source roots and contaminated-only rules, so do not place it in clean-role readable roots.
 - `preflight-goal.json`: controller-side intent contract. This may contain source license notes and output roots, so do not place it in clean-role readable roots.
 - `task-manifest.json` `initialization_snapshot`: immutable per-run copy of the effective init choices used for resume and drift checks.
-- `clean-run-context.json`: sanitized clean-side context for Agent 2 and Agent 3. It contains only clean artifact paths, implementation root environment references, the target profile, clean-safe goal contract fields, code hygiene policy, approved public refs, model preferences, clean-safe rules, and optional context-management budgets. It must not include source roots, contaminated roots, source index refs, coverage ledgers, evidence ledgers, `preflight-goal.json`, `controller-status.json`, or the full task manifest.
+- `clean-run-context.json`: sanitized clean-side context for Agent 2, Agent 3, and Agent 4. It contains only clean artifact paths, implementation root environment references, the target profile, clean-safe goal contract fields, code hygiene policy, approved public refs, model preferences, clean-safe rules, optional Agent 4 local commit policy, and optional context-management budgets. It must not include source roots, contaminated roots, source index refs, coverage ledgers, evidence ledgers, `preflight-goal.json`, `controller-status.json`, or the full task manifest.
 
 ## Resume
 

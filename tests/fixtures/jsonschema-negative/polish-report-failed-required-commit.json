@@ -1,0 +1,14 @@
+{
+  "schema_kind": "polish-report",
+  "base": "polish-report.json",
+  "set": [
+    {
+      "path": [
+        "git",
+        "commit_status"
+      ],
+      "value": "failed"
+    }
+  ],
+  "expected_error": "committed"
+}

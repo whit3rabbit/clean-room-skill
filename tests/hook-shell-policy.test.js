@@ -7,6 +7,7 @@ const { describe, test } = require('node:test');
 const { spawnSync: nodeSpawnSync } = require('node:child_process');
 const {
   AGENT3_RUNNER,
+  AGENT4_RUNNER,
   assertNoPrivateLeak,
   copyExample,
   HOOKS,
@@ -49,6 +50,50 @@ function writeFakeContainerBackend(binDir, name, argvPath) {
   ].join('\n'));
   fs.chmodSync(toolPath, 0o755);
   return toolPath;
+}
+
+function writePolishReport(cleanRoot, overrides = {}) {
+  const reportPath = path.join(cleanRoot, 'polish-report.json');
+  fs.writeFileSync(reportPath, JSON.stringify({
+    report_id: 'polish-test',
+    task_id: 'task-test',
+    spec_slice_ref: 'behavior-spec:test',
+    unit_id: 'unit-test',
+    reviewer_role: 'clean-polish-reviewer',
+    reviewed_at: '2024-01-01T00:00:00Z',
+    reviewed_artifacts: ['implementation-report.json', 'qc-report.json'],
+    changed_paths: [
+      {
+        path: 'AGENTS.md',
+        kind: 'repo-hygiene',
+        action: 'created',
+        reason: 'Record clean commands.',
+      },
+    ],
+    verification_results: [
+      {
+        command: ['npm', 'test'],
+        cwd: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+        status: 'not-run',
+        output_summary: '',
+      },
+    ],
+    findings: [],
+    git: {
+      repository_status: 'initialized',
+      commit_required: true,
+      commit_status: 'committed',
+      include_paths: ['AGENTS.md'],
+      commit_message: 'Complete clean-room spec slice behavior-spec:test',
+      commit_hash: '0123456789abcdef0123456789abcdef01234567',
+      status_summary: '',
+    },
+    residual_risks: [],
+    abstract_delta_tickets: [],
+    final_status: 'passed',
+    ...overrides,
+  }, null, 2));
+  return reportPath;
 }
 
 describe('clean-room shell hook policy', () => {
@@ -174,6 +219,61 @@ describe('clean-room shell hook policy', () => {
     }
   });
 
+  test('shell policy allows only Agent 4 polish runner in implementation roots', () => {
+    const root = tempDir('clean-room-agent4-shell');
+    const env = policyEnv(root, 'clean-polish-reviewer');
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const report = writePolishReport(clean);
+    const runnerCommand = `python3 ${shellQuote(AGENT4_RUNNER)} --report ${shellQuote(report)} --status`;
+
+    let result = runHook('deny-clean-room-shell.py', {
+      tool_name: 'Shell',
+      tool_input: { cwd: implementation, command: runnerCommand },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CLEAN_ROOM_ALLOW_AGENT4_SHELL=1 is required/);
+
+    result = runHook('deny-clean-room-shell.py', {
+      tool_name: 'Shell',
+      tool_input: { cwd: clean, command: runnerCommand },
+    }, {
+      ...env,
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /outside implementation roots/);
+
+    result = runHook('deny-clean-room-shell.py', {
+      tool_name: 'Shell',
+      tool_input: { cwd: implementation, command: runnerCommand },
+    }, {
+      ...env,
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-clean-room-shell.py', {
+      tool_name: 'Shell',
+      tool_input: { cwd: implementation, command: 'git push origin main' },
+    }, {
+      ...env,
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /may only invoke the polish runner/);
+
+    result = runHook('deny-clean-room-shell.py', {
+      tool_name: 'Shell',
+      tool_input: { cwd: implementation, command: `${runnerCommand} | cat` },
+    }, {
+      ...env,
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /shell syntax is not allowed/);
+  });
+
   test('Agent 3 verification runner allows only bounded argv commands', (t) => {
     const root = tempDir('clean-room-agent3-runner');
     const env = {
@@ -238,6 +338,117 @@ describe('clean-room shell hook policy', () => {
     });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /blocked root/);
+  });
+
+  test('Agent 4 polish runner initializes git and commits only listed paths', () => {
+    const root = tempDir('clean-room-agent4-runner');
+    const env = {
+      ...policyEnv(root, 'clean-polish-reviewer'),
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    };
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    fs.writeFileSync(path.join(implementation, 'AGENTS.md'), '# Commands\n\n- npm test\n');
+    fs.writeFileSync(path.join(implementation, 'UNLISTED.md'), 'leave dirty\n');
+    const report = writePolishReport(clean);
+
+    const result = spawnSync('python3', [AGENT4_RUNNER, '--report', report, '--commit'], {
+      cwd: implementation,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.commit.commit_status, 'committed');
+    assert.match(output.commit.commit_hash, /^[0-9a-f]{40}$/);
+
+    const subject = spawnSync('git', ['log', '-1', '--pretty=%s'], {
+      cwd: implementation,
+      encoding: 'utf8',
+    });
+    assert.equal(subject.stdout.trim(), 'Complete clean-room spec slice behavior-spec:test');
+    const status = spawnSync('git', ['status', '--short'], {
+      cwd: implementation,
+      encoding: 'utf8',
+    });
+    assert.match(status.stdout, /\?\? UNLISTED\.md/);
+    assert.doesNotMatch(status.stdout, /AGENTS\.md/);
+  });
+
+  test('Agent 4 polish runner rejects paths that escape implementation roots', () => {
+    const root = tempDir('clean-room-agent4-runner-paths');
+    const env = {
+      ...policyEnv(root, 'clean-polish-reviewer'),
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    };
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
+    const report = writePolishReport(clean, {
+      changed_paths: [
+        {
+          path: '../source/secret.txt',
+          kind: 'repo-hygiene',
+          action: 'updated',
+          reason: 'bad path',
+        },
+      ],
+      git: {
+        repository_status: 'initialized',
+        commit_required: true,
+        commit_status: 'failed',
+        include_paths: ['../source/secret.txt'],
+        commit_message: 'Complete clean-room spec slice behavior-spec:test',
+        commit_hash: null,
+        status_summary: '',
+      },
+      final_status: 'blocked',
+    });
+
+    const result = spawnSync('python3', [AGENT4_RUNNER, '--report', report, '--commit'], {
+      cwd: implementation,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /must not contain/);
+  });
+
+  test('Agent 4 polish runner rejects verification argv paths outside implementation roots', () => {
+    const root = tempDir('clean-room-agent4-runner-verification-paths');
+    const env = {
+      ...policyEnv(root, 'clean-polish-reviewer'),
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    };
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
+    const report = writePolishReport(clean, {
+      verification_results: [
+        {
+          command: ['npm', 'test', '../source'],
+          cwd: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+          status: 'not-run',
+          output_summary: '',
+        },
+      ],
+      final_status: 'blocked',
+      git: {
+        repository_status: 'initialized',
+        commit_required: false,
+        commit_status: 'not-needed',
+        include_paths: [],
+        commit_message: '',
+        commit_hash: null,
+        status_summary: '',
+      },
+    });
+
+    const result = spawnSync('python3', [AGENT4_RUNNER, '--report', report, '--verify-index', '0'], {
+      cwd: implementation,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /blocked root|outside implementation root/);
   });
 
   test('Agent 3 verification runner builds hardened container argv without blocked mounts', () => {

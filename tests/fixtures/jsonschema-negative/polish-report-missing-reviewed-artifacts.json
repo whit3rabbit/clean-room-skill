@@ -1,0 +1,10 @@
+{
+  "schema_kind": "polish-report",
+  "base": "polish-report.json",
+  "remove": [
+    [
+      "reviewed_artifacts"
+    ]
+  ],
+  "expected_error": "reviewed_artifacts"
+}

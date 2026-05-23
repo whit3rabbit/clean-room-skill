@@ -17,14 +17,20 @@ ROLES = {
     "contaminated-handoff-sanitizer",
     "clean-architect",
     "clean-qa-editor",
+    "clean-polish-reviewer",
 }
 AGENT3_ROLE = "clean-qa-editor"
+AGENT4_ROLE = "clean-polish-reviewer"
 ALLOW_AGENT3_SHELL_ENV = "CLEAN_ROOM_ALLOW_AGENT3_SHELL"
+ALLOW_AGENT4_SHELL_ENV = "CLEAN_ROOM_ALLOW_AGENT4_SHELL"
 RUNNER_NAME = "agent3-verification-runner.py"
+AGENT4_RUNNER_NAME = "agent4-polish-runner.py"
 SHELL_META_CHARS = ("|", "&", ";", "<", ">", "`", "$", "\n", "\r")
 RUNNER_FLAGS_WITH_VALUE = {"--plan", "--command-index", "--timeout", "--backend"}
 RUNNER_FLAGS_WITHOUT_VALUE = {"--all"}
 RUNNER_BACKENDS = {"host", "docker", "podman"}
+AGENT4_FLAGS_WITH_VALUE = {"--report", "--verify-index", "--timeout"}
+AGENT4_FLAGS_WITHOUT_VALUE = {"--init-git", "--status", "--verify-all", "--commit"}
 
 
 def tool_input_for(payload: dict) -> dict:
@@ -53,14 +59,14 @@ def split_shell_command(command: str) -> tuple[list[str], str | None]:
     return argv, None
 
 
-def expected_runner_path() -> Path:
-    return Path(__file__).resolve().parent / RUNNER_NAME
+def expected_runner_path(runner_name: str = RUNNER_NAME) -> Path:
+    return Path(__file__).resolve().parent / runner_name
 
 
-def resolves_to_expected_runner(raw_path: str, cwd: Path) -> bool:
+def resolves_to_expected_runner(raw_path: str, cwd: Path, runner_name: str = RUNNER_NAME) -> bool:
     path = Path(raw_path).expanduser()
     resolved = path.resolve() if path.is_absolute() else (cwd / path).resolve()
-    return resolved == expected_runner_path()
+    return resolved == expected_runner_path(runner_name)
 
 
 def validate_runner_args(argv: list[str], cwd: Path, blocked_roots: list[Path]) -> tuple[bool, str]:
@@ -131,6 +137,63 @@ def command_invokes_runner(argv: list[str], cwd: Path, blocked_roots: list[Path]
     return validate_runner_args(argv[runner_arg_index + 1 :], cwd, blocked_roots)
 
 
+def validate_agent4_runner_args(argv: list[str], cwd: Path, blocked_roots: list[Path]) -> tuple[bool, str]:
+    seen_action = False
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        if any(str(root) in arg for root in blocked_roots):
+            return False, "polish runner arguments reference a blocked root"
+        if arg.startswith("file:"):
+            return False, "file URLs are not allowed for Agent 4 polish"
+        if arg in AGENT4_FLAGS_WITHOUT_VALUE:
+            seen_action = True
+            index += 1
+            continue
+        if arg not in AGENT4_FLAGS_WITH_VALUE:
+            return False, "unexpected Agent 4 polish runner argument"
+        if index + 1 >= len(argv):
+            return False, f"{arg} requires a value"
+        value = argv[index + 1]
+        if any(str(root) in value for root in blocked_roots):
+            return False, "polish runner arguments reference a blocked root"
+        if arg == "--report":
+            try:
+                report_path = Path(value).expanduser()
+                resolved = report_path.resolve() if report_path.is_absolute() else (cwd / report_path).resolve()
+            except OSError as exc:
+                return False, f"invalid polish report path: {exc}"
+            clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+            if not any(path_is_under(resolved, root) for root in clean_roots):
+                return False, "polish report path is outside clean roots"
+            if any(path_is_under(resolved, root) for root in blocked_roots):
+                return False, "polish report path is under a blocked root"
+        elif arg in {"--verify-index", "--timeout"} and not value.isdigit():
+            return False, f"{arg} must be numeric"
+        index += 2
+    if not seen_action:
+        return False, "Agent 4 polish runner requires an action"
+    return True, ""
+
+
+def command_invokes_agent4_runner(argv: list[str], cwd: Path, blocked_roots: list[Path]) -> tuple[bool, str]:
+    executable = Path(argv[0]).name
+    runner_arg_index = None
+    if executable in {"python", "python3"}:
+        if len(argv) < 2:
+            return False, "python runner command is missing the polish runner script"
+        if Path(argv[1]).name != AGENT4_RUNNER_NAME:
+            return False, "Agent 4 may only invoke the polish runner"
+        runner_arg_index = 1
+    elif executable == AGENT4_RUNNER_NAME:
+        runner_arg_index = 0
+    else:
+        return False, "Agent 4 may only invoke the polish runner"
+    if not resolves_to_expected_runner(argv[runner_arg_index], cwd, AGENT4_RUNNER_NAME):
+        return False, "Agent 4 polish runner path is not the installed runner"
+    return validate_agent4_runner_args(argv[runner_arg_index + 1 :], cwd, blocked_roots)
+
+
 def agent3_shell_allowed() -> tuple[bool, str]:
     if os.environ.get(ALLOW_AGENT3_SHELL_ENV) != "1":
         return False, f"{ALLOW_AGENT3_SHELL_ENV}=1 is required"
@@ -159,10 +222,47 @@ def agent3_shell_allowed() -> tuple[bool, str]:
     return True, ""
 
 
+def agent4_shell_allowed() -> tuple[bool, str]:
+    if os.environ.get(ALLOW_AGENT4_SHELL_ENV) != "1":
+        return False, f"{ALLOW_AGENT4_SHELL_ENV}=1 is required"
+    payload, payload_error = load_payload()
+    if payload_error:
+        return False, payload_error
+    try:
+        cwd = payload_cwd(payload)
+    except OSError as exc:
+        return False, f"invalid shell cwd: {redact_text(exc)}"
+    implementation_roots = env_roots("CLEAN_ROOM_IMPLEMENTATION_ROOTS")
+    if not implementation_roots:
+        return False, "CLEAN_ROOM_IMPLEMENTATION_ROOTS has no configured roots"
+    if not any(path_is_under(cwd, root) for root in implementation_roots):
+        return False, f"shell cwd is outside implementation roots: {describe_path(cwd)}"
+    command = shell_command_for(payload)
+    if command is None:
+        return False, "Agent 4 shell command must invoke the polish runner"
+    argv, split_error = split_shell_command(command)
+    if split_error:
+        return False, split_error
+    blocked_roots = env_roots("CLEAN_ROOM_SOURCE_ROOTS") + env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
+    allowed, reason = command_invokes_agent4_runner(argv, cwd, blocked_roots)
+    if not allowed:
+        return False, reason
+    return True, ""
+
+
 def main() -> int:
     role = os.environ.get("CLEAN_ROOM_ROLE", "")
     if role == AGENT3_ROLE:
         allowed, reason = agent3_shell_allowed()
+        if allowed:
+            return 0
+        print(
+            f"clean-room policy denied shell tool use for role {role}: {redact_text(reason)}",
+            file=sys.stderr,
+        )
+        return 1
+    if role == AGENT4_ROLE:
+        allowed, reason = agent4_shell_allowed()
         if allowed:
             return 0
         print(

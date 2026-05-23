@@ -721,9 +721,11 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(codexHome, 'skills', 'init', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(codexHome, 'agents', 'clean-architect.toml')));
+    assert.ok(fs.existsSync(path.join(codexHome, 'agents', 'clean-polish-reviewer.toml')));
     assert.ok(fs.existsSync(path.join(codexHome, 'agents', 'contaminated-handoff-sanitizer.toml')));
     assert.ok(fs.existsSync(path.join(codexHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
     assert.ok(fs.existsSync(path.join(codexHome, 'hooks', 'clean-room', 'agent3-verification-runner.py')));
+    assert.ok(fs.existsSync(path.join(codexHome, 'hooks', 'clean-room', 'agent4-polish-runner.py')));
     assert.ok(fs.existsSync(path.join(codexHome, 'clean-room-install-manifest.json')));
     assert.equal(readJson(path.join(codexHome, 'clean-room-install-manifest.json')).phase, 'complete');
 
@@ -772,6 +774,7 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(claudeHome, 'agents', 'clean-architect.md')), false);
     assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
     assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'agent3-verification-runner.py')));
+    assert.ok(fs.existsSync(path.join(claudeHome, 'hooks', 'clean-room', 'agent4-polish-runner.py')));
     const manifest = readJson(path.join(claudeHome, 'clean-room-install-manifest.json'));
     assert.equal(manifest.claude_plugin.plugin_id, CLAUDE_PLUGIN_ID);
     assert.equal(manifest.claude_plugin.source, claudePluginSource());
@@ -965,6 +968,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'plugin.json')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'clean-architect.md')));
+    assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'clean-polish-reviewer.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'contaminated-handoff-sanitizer.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'hooks', 'clean-room', 'clean-room-hook.py')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'clean-room-install-manifest.json')));
@@ -1033,6 +1037,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'plugin.json')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'clean-architect.md')));
+    assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'clean-polish-reviewer.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'contaminated-handoff-sanitizer.md')));
     assert.ok(fs.existsSync(path.join(geminiHome, 'commands', 'clean-room', 'clean-room.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-clean-room.md')));

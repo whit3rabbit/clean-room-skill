@@ -76,7 +76,10 @@ describe('clean-room leakage hook policy', () => {
     const root = tempDir('clean-room-leakage-negative');
     const env = policyEnv(root, 'clean-architect');
     const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'path-field.json');
-    fs.writeFileSync(filePath, JSON.stringify({ path: 'specs/com.example.product/spec.md' }));
+    fs.writeFileSync(filePath, JSON.stringify({
+      path: 'specs/com.example.product/spec.md',
+      owned_path_prefixes: ['test/example-flow.test.js'],
+    }));
 
     const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
     assert.equal(result.status, 0, result.stderr);

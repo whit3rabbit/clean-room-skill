@@ -18,6 +18,7 @@ Use these canonical artifact names unless the surrounding project already has a 
 - `skeleton-manifest.json`
 - `implementation-plan.json`
 - `implementation-report.json`
+- `polish-report.json`
 - `clean-room-result.json`
 - `qc-report.json`
 - `contamination-incident.json`
@@ -49,7 +50,7 @@ Capture:
 - required `handoff_sequence`
 - optional initialization snapshot copied from `init-config.json`
 - user-selected output format profile
-- Agent 0-3 pipeline responsibilities, required Agent 1.5 sanitizer role, and handoff rules
+- Agent 0-4 pipeline responsibilities, required Agent 1.5 sanitizer role, and handoff rules
 - artifact paths and retention policy
 - contaminated artifact roots for `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`
 - clean implementation roots for `CLEAN_ROOM_IMPLEMENTATION_ROOTS`
@@ -105,7 +106,7 @@ Capture:
 - user rules split into `clean_safe` and `contaminated_only`
 - reconfiguration policy requiring confirmation for root, schema, and model changes
 
-`clean-run-context.json` is the only run context Agent 2 and Agent 3 should read. It may contain clean artifact paths, implementation root environment references, target profile, native artifact expectations, clean-safe goal contract fields, code hygiene policy, approved public references, clean-safe rules, clean-side model preferences, and the artifact-only coordination boundary. It must not contain source roots, contaminated artifact roots, source index refs, coverage ledgers, evidence ledgers, contaminated-only rules, full `preflight-goal.json`, or the full `task-manifest.json`.
+`clean-run-context.json` is the only run context Agent 2, Agent 3, and Agent 4 should read. It may contain clean artifact paths, implementation root environment references, target profile, native artifact expectations, clean-safe goal contract fields, code hygiene policy, approved public references, clean-safe rules, clean-side model preferences, optional Agent 4 local commit policy, and the artifact-only coordination boundary. It must not contain source roots, contaminated artifact roots, source index refs, coverage ledgers, evidence ledgers, contaminated-only rules, full `preflight-goal.json`, or the full `task-manifest.json`.
 
 `context_management` is optional on `task-manifest.json` and `clean-run-context.json`. When present with `mode: "role-session-briefs"`, it records advisory or strict enforcement plus budgets for prompt characters, brief characters, artifact refs, and referenced artifact bytes. Strict mode requires a fresh role session and a valid `role-session-brief.json` for each stage.
 
@@ -130,7 +131,7 @@ Do not send `source-index.json`, file paths, import/export listings, dependency 
 
 `controller_policy` is optional. Missing policy means `attended`.
 
-- `attended`: agent zero pauses for human review at scope gate, handoff, QC deltas, blocked units, and final coverage.
+- `attended`: agent zero pauses for human review at scope gate, handoff, QC deltas, polish deltas, blocked units, and final coverage.
 - `unattended`: agent zero runs a bounded inner clean-room loop only after preflight allows unattended mode with no open questions. It uses `max_iterations`, one unit per iteration, fresh role context, schema and leakage validation before advancing state, and hard stop conditions.
 
 `loop_context` records the parent/child controller relationship when an outer spec-development loop invokes the inner clean-room loop. Capture:
@@ -151,7 +152,7 @@ The inner loop may select only units named by `approved_scope_refs`. If a needed
 
 `run_state` is optional for compatibility with older manifests. When present, it records `generation`, `started_at`, optional `previous_generation_ref`, and `restart_reason`. Valid restart reasons are `user-requested`, `contamination`, `scope-change`, and `invalid-state`.
 
-Agent zero generates the durable tasklist as `task-manifest.json` `units`. It may use `source-index.json` batches to keep assigned source-reading context small while preserving source relationships. It tracks source-side progress in `coverage-ledger.json` `source_units`, source-side evidence in `evidence-ledger.json`, terminal clean-side feedback in `implementation-report.json` and `qc-report.json`, and loop-back work as abstract delta tickets. Do not use prior chat history or live clean-role feedback as the source of truth for the next iteration.
+Agent zero generates the durable tasklist as `task-manifest.json` `units`. It may use `source-index.json` batches to keep assigned source-reading context small while preserving source relationships. It tracks source-side progress in `coverage-ledger.json` `source_units`, source-side evidence in `evidence-ledger.json`, terminal clean-side feedback in `implementation-report.json`, `qc-report.json`, and `polish-report.json`, and loop-back work as abstract delta tickets. Do not use prior chat history or live clean-role feedback as the source of truth for the next iteration.
 
 Agent zero may also maintain `controller-status.json` as compact contaminated-side resume state. It records only current gate, selected unit, coverage state, implementation state, QC state, blockers, latest artifact refs, and next safe action. It must not be placed in clean roots or used as clean-role input.
 
@@ -168,20 +169,21 @@ Every real task must record the user's actual target profile. Do not default sil
 
 ## Agent Pipeline
 
-`task-manifest.json` records the required Agent 0-3 handoff contract. New manifests must include schema field `agent_1_5` for the source-denied sanitizer:
+`task-manifest.json` records the required Agent 0-4 handoff contract. New manifests must include schema field `agent_1_5` for the source-denied sanitizer. `agent_4` is optional for compatibility with older manifests, but new code-development manifests should include it:
 
 - Agent 0: `contaminated-manager-verifier`; controller, scope manager, coverage verifier, and receiver of Agent 3's terminal report.
 - Agent 1: `contaminated-source-analyst`; source reader and neutral draft task/spec generator.
 - Agent 1.5: `contaminated-handoff-sanitizer`; source-denied contaminated reviewer that sanitizes draft specs before clean handoff.
 - Agent 2: `clean-architect`; clean-domain implementation planner using approved handoff artifacts and clean implementation roots.
 - Agent 3: `clean-qa-editor`; clean implementer/verifier that writes code only under implementation roots and emits one terminal report for Agent 0.
+- Agent 4: `clean-polish-reviewer`; clean final reviewer that writes `polish-report.json`, implementation-root repo hygiene changes, and one constrained local commit when configured.
 
 Agent 1.5 may read only Agent 0's neutral sanitizer brief, assigned draft artifacts, schema assets, and explicit public or destination reference roots. Do not give it source roots, `source-index.json`, evidence ledger contents, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
-Agent 2 and Agent 3 must start in the clean domain and read `clean-run-context.json`, approved clean artifacts, schemas, approved public references, and clean implementation roots only. They must not read source roots, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`. Agent 0 may influence them only through schema-valid durable sanitized artifacts. Agent 3 reports back to Agent 0 only after the plan or task is complete, blocked, or quarantined, with abstract findings or delta tickets only.
+Agent 2, Agent 3, and Agent 4 must start in the clean domain and read `clean-run-context.json`, approved clean artifacts, schemas, approved public references, and clean implementation roots only. They must not read source roots, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`. Agent 0 may influence them only through schema-valid durable sanitized artifacts. Agents 3 and 4 report back to Agent 0 only after their assigned clean work is complete, blocked, or quarantined, with abstract findings or delta tickets only.
 
 When context management is enabled, each role starts by reading `CLEAN_ROOM_SESSION_BRIEF_PATH`. The brief carries role, phase, unit, spec slice, fresh-context requirement, compact status, next action, allowed artifact refs with SHA-256, and forbidden inputs. Roles may load only the named artifact refs unless their role policy already permits direct source or destination inspection. If more context is needed than the brief budget permits, split the unit or return an abstract delta.
 
-`handoff_sequence` must record these stages in order: `preflight`, `source-destination-discovery`, `agent-0-decomposition`, `agent-1-analysis`, `agent-1-5-sanitization`, `clean-handoff`, `clean-planning`, `clean-implementation-qc`, and `agent-0-coverage-verification`.
+`handoff_sequence` must record either the legacy compatible order `preflight`, `source-destination-discovery`, `agent-0-decomposition`, `agent-1-analysis`, `agent-1-5-sanitization`, `clean-handoff`, `clean-planning`, `clean-implementation-qc`, and `agent-0-coverage-verification`, or the new code-development order with `clean-polish-review` inserted before `agent-0-coverage-verification`.
 
 ## Behavior Spec Content
 
@@ -302,9 +304,23 @@ Container metadata is declarative policy, not a shell escape hatch. Clean verifi
 
 Do not include raw source excerpts, contaminated evidence, or source stack traces. Agent 3 does not declare source coverage complete, does not report progress to Agent 0, and does not request Agent 0 guidance during implementation. Agent 0 verifies coverage from the contaminated side after the terminal report.
 
+## Polish Report Content
+
+`polish-report.json` is Agent 4's final clean review artifact. Capture:
+
+- reviewed artifacts
+- security, docs/comments, exception handling, resource leak, race/concurrency, repo hygiene, verification, leakage, and correctness findings
+- changed relative paths, including `AGENTS.md` and `.gitignore` when touched
+- argv-array verification command results
+- git repository status, commit-required flag, commit status, included paths, commit message, and commit hash
+- residual risks and abstract delta tickets
+- final status
+
+Do not include source excerpts, contaminated evidence, source paths, private identifiers, raw diffs, or source-shaped pseudocode. A passing polish report requires the constrained local commit to have succeeded.
+
 ## Clean-Room Result Content
 
-`clean-room-result.json` is the inner loop return artifact. It is written only after Agent 0 consumes the terminal Agent 3 report and verifies coverage from the contaminated side.
+`clean-room-result.json` is the inner loop return artifact. It is written only after Agent 0 consumes the terminal Agent 3 report, any configured Agent 4 polish report, and verifies coverage from the contaminated side.
 
 Capture:
 
@@ -314,6 +330,7 @@ Capture:
 - coverage state
 - terminal implementation report ref
 - QC report ref
+- optional polish report ref
 - abstract delta tickets
 - return timestamp
 

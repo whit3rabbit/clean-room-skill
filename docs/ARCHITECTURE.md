@@ -51,7 +51,7 @@ To assist in logical unit decomposition, the workflow supports an optional sourc
 
 *   **Execution Boundary**: This tooling runs exclusively in the contaminated domain before clean-room role sessions are initialized.
 *   **Traversal Bounds**: Source indexing enforces file count, per-file byte, total byte, batch token, and segment caps. It validates file size again after reading, skips files that change during read, records directory walk errors, and prunes traversal after global limits are exhausted with an aggregate skipped entry.
-*   **Agent 0 Use**: Agent 0 consumes `source-index.json` only to create neutral `task-manifest.json` units and per-unit `source_index_refs`. The index stays contaminated-only and does not cross to Agent 1.5, Agent 2, Agent 3, or clean handoff packages.
+*   **Agent 0 Use**: Agent 0 consumes `source-index.json` only to create neutral `task-manifest.json` units and per-unit `source_index_refs`. The index stays contaminated-only and does not cross to Agent 1.5, Agent 2, Agent 3, Agent 4, or clean handoff packages.
 *   **Tool Trust Policy**: By default, tool discovery operates in `stat-only` mode and does not execute third-party binaries. It queries version strings only when explicitly invoked with `--probe-tools`. Tools discovered under `/opt/homebrew` or `/usr/local` remain stat-only unless `--allow-user-toolchain-probes` is also supplied. Project-local directories (such as `.bin` or `node_modules/.bin`) are ignored unless the environment variable `RE_SKILLS_TRUST_PROJECT_TOOLS=1` or the flag `--allow-working-project-tools` is supplied.
 *   **Local Tool Install Safety**: Explicit npm-backed helper installs are strict-version pinned and serialized with a cache-local lock before mutating `~/.cache/re-skills/clean-room-tools/npm`. Prefix creation failures, subprocess timeouts, and subprocess launch errors are returned as structured JSON facts instead of raw tracebacks.
 
@@ -94,8 +94,9 @@ flowchart LR
     publicrefs["Allowed public refs<br/>CLEAN_ROOM_ALLOWED_READ_ROOTS"]
     architect["Agent 2: clean-architect<br/>Plan implementation from clean specs and foundation"]
     qa["Agent 3: clean-qa-editor<br/>Implement, record verification, terminal report"]
+    polish["Agent 4: clean-polish-reviewer<br/>Final code polish, repo hygiene, local commit"]
     outputs["Clean artifacts<br/>implementation-plan.json<br/>qc-report.json<br/>test plan notes"]
-    imploutputs["Implementation outputs<br/>code and tests<br/>implementation-report.json"]
+    imploutputs["Implementation outputs<br/>code, tests, AGENTS.md, .gitignore<br/>implementation-report.json<br/>polish-report.json"]
   end
 
   subgraph guardrails["Guardrails and audit"]
@@ -128,6 +129,10 @@ flowchart LR
   implroots --> qa
   qa --> imploutputs
   qa --> outputs
+  imploutputs --> polish
+  outputs --> polish
+  polish --> imploutputs
+  polish -. terminal polish report only<br/>abstract delta tickets .-> manager
   qa -. terminal report only<br/>abstract delta tickets .-> manager
 
   blocked -. quarantine do not hand off .-> ledgers
@@ -137,10 +142,10 @@ flowchart LR
   denyread -. clean roles may read implementation roots .-> implroots
   denyread -. Agent 1.5 cannot read source roots, clean roots, implementation roots, source-index.json, or preflight-goal.json .-> sanitizer
   denywrite -. contaminated writes only to contaminated artifact roots .-> ledgers
-  denywrite -. Agent 2 writes clean artifacts only; Agent 3 writes implementation roots .-> cleanroots
-  denywrite -. Agent 3 writes code and tests only here .-> implroots
+  denywrite -. Agent 2 writes clean artifacts only; Agents 3 and 4 write implementation roots .-> cleanroots
+  denywrite -. Agents 3 and 4 write code, tests, docs, and repo hygiene only here .-> implroots
   denyshell -. no shell-style tools in role sessions .-> manager
-  denyshell -. no shell for Agent 2; explicit Agent 3 verification runner only .-> architect
+  denyshell -. no shell for Agent 2; explicit Agent 3 and Agent 4 runners only .-> architect
   scan -. post-write checks .-> outputs
   scan -. Agent 1.5 staged-output checks .-> staged
 
@@ -149,7 +154,7 @@ flowchart LR
   classDef wallClass fill:#f8fafc,stroke:#475569,color:#111827;
   classDef guardClass fill:#f0fdf4,stroke:#15803d,color:#111827;
   class source,preflight,manager,analyst,sanitizer,brief,ledgers,drafts,staged contaminatedDomain;
-  class cleanroots,implroots,publicrefs,architect,qa,outputs,imploutputs cleanDomain;
+  class cleanroots,implroots,publicrefs,architect,qa,polish,outputs,imploutputs cleanDomain;
   class handoff,blocked wallClass;
   class env,denyread,denywrite,denyshell,scan guardClass;
 ```
@@ -158,7 +163,7 @@ flowchart LR
 
 ## Agent Roles
 
-The architecture delegates work across five distinct custom role agents to enforce separation between source reading, independent sanitization, clean planning, and clean implementation.
+The architecture delegates work across six distinct custom role agents to enforce separation between source reading, independent sanitization, clean planning, clean implementation, and final clean polish review.
 
 ### [Agent 0: Contaminated Manager Verifier](../agents/contaminated-manager-verifier.md)
 *   **Domain**: Contaminated (Source-readable)
@@ -169,8 +174,8 @@ The architecture delegates work across five distinct custom role agents to enfor
     *   Decomposes source scope into stable, neutral units that do not mirror private source layout.
     *   Controls execution flow and nested loop state.
     *   Provides Agent 1.5 only a neutral sanitizer brief containing domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
-    *   Produces `clean-run-context.json` for Agent 2 and Agent 3 instead of handing over the full `task-manifest.json` or full `preflight-goal.json`.
-    *   Influences Agent 2 and Agent 3 only through durable sanitized artifacts, never direct chat, progress feedback, implementation hints, or priority changes.
+    *   Produces `clean-run-context.json` for Agent 2, Agent 3, and Agent 4 instead of handing over the full `task-manifest.json` or full `preflight-goal.json`.
+    *   Influences Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts, never direct chat, progress feedback, implementation hints, or priority changes.
     *   Performs final verification of clean specification and implementation coverage against the source scope.
     *   Writes the inner-loop `clean-room-result.json` only after contaminated-side coverage verification.
     *   Consumes Agent 3 reports only after Agent 3 reaches a terminal state, then sends only abstract delta tickets into a fresh clean artifact cycle.
@@ -222,13 +227,24 @@ The architecture delegates work across five distinct custom role agents to enfor
     *   Does not report progress or ask Agent 0 for guidance during implementation.
     *   Emits one terminal report for Agent 0 only when the assigned spec slice is complete, blocked, or quarantined.
 
+### [Agent 4: Clean Polish Reviewer](../agents/clean-polish-reviewer.md)
+*   **Domain**: Clean (Source-denied)
+*   **Write Target**: Clean polish reports in `CLEAN_ROOM_CLEAN_ROOTS`; code, docs, repo hygiene files, and local git metadata in `CLEAN_ROOM_IMPLEMENTATION_ROOTS`
+*   **Responsibilities**:
+    *   Reviews final clean implementation for security, docs/comments, exception handling, resource leaks, race conditions, missing tests, and repository hygiene.
+    *   Creates or updates implementation-root `AGENTS.md` with gotchas and build/test/dev commands discovered from clean implementation files.
+    *   Updates `.gitignore` only for real generated outputs, dependencies, caches, or build/test artifacts.
+    *   Writes `polish-report.json`.
+    *   Uses `agent4-polish-runner.py` only with `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1`, cwd under implementation roots, and strict hooks.
+    *   May initialize git and create one local commit containing only paths listed in `polish-report.json`; it must not push, tag, reset, clean, or delete branches.
+
 ### Nested Controller Loop
 
 ![Nested Controller Loop](assets/4.png)
 
-The outer loop owns spec development: scope, behavior specs, acceptance criteria, and abstract delta resolution. The inner clean-room loop owns one approved spec slice. It repeats analyze, sanitize, plan, implement, QC, and contaminated-side coverage verification until it can return `spec-slice-complete`, `spec-slice-blocked`, `spec-delta-required`, `contamination-suspected`, `iteration-limit-reached`, or `no-progress-detected`.
+The outer loop owns spec development: scope, behavior specs, acceptance criteria, and abstract delta resolution. The inner clean-room loop owns one approved spec slice. It repeats analyze, sanitize, plan, implement, QC, optional final polish review, and contaminated-side coverage verification until it can return `spec-slice-complete`, `spec-slice-blocked`, `spec-delta-required`, `contamination-suspected`, `iteration-limit-reached`, or `no-progress-detected`.
 
-Agent 3's terminal report is not enough to return. Agent 0 must consume that report, verify contaminated-side coverage, and then write `clean-room-result.json`.
+Agent 3's terminal report is not enough to return. If configured, Agent 4 must produce a passing `polish-report.json`. Agent 0 must then consume the terminal clean reports, verify contaminated-side coverage, and write `clean-room-result.json`.
 
 `clean-room-skill run` is the executable v1 inner-loop runner. It requires preflight refs, the required handoff sequence, unattended `controller_policy`, schema-valid `loop_context`, and a user-supplied agent command adapter. It does not automate outer spec development. The runner:
 
@@ -237,6 +253,7 @@ Agent 3's terminal report is not enough to return. Agent 0 must consume that rep
 *   Selects at most one pending or gap unit inside `loop_context.approved_scope_refs`.
 *   Spawns configured role commands with `shell: false`, bounded output, and bounded timeout.
 *   In strict context-management mode, requires each configured stage to provide `context.fresh_session: true` and `context.brief_path`, then validates the session brief before spawn.
+*   Supports the optional `clean-polish-review` phase between `clean-implement-qc` and `contaminated-coverage-verify`.
 *   Validates schema, leakage, and handoff integrity before advancing state.
 *   Records controller memory in contaminated-side `controller-run-ledger.json`.
 *   Writes `clean-room-result.json` before returning to the outer spec loop.
@@ -259,7 +276,7 @@ Every clean-room role session requires a populated environment block before any 
 
 When context management is enabled, role sessions also receive `CLEAN_ROOM_SESSION_BRIEF_PATH`, `CLEAN_ROOM_ROLE_SESSION_ID`, and, in strict mode, `CLEAN_ROOM_FRESH_CONTEXT_REQUIRED=1`. The brief is the low-context launch packet: compact status, next action, allowed artifact refs with SHA-256, and forbidden inputs. `controller-status.json` stays contaminated-side and is not clean input.
 
-Note: Even though clean and source-denied roles (such as Agent 1.5, 2, and 3) are restricted from accessing contaminated or source workspaces, they must still be configured with the full environment block. The hook guardrails require these paths to validate that tool inputs do not cross-pollinate or violate boundary constraints.
+Note: Even though clean and source-denied roles (such as Agent 1.5, 2, 3, and 4) are restricted from accessing contaminated or source workspaces, they must still be configured with the full environment block. The hook guardrails require these paths to validate that tool inputs do not cross-pollinate or violate boundary constraints.
 
 ---
 
@@ -273,10 +290,11 @@ Post-write hook failures are deny-by-default and redacted. If an artifact disapp
 
 *   [clean-room-hook.py](../hooks/clean-room-hook.py): The main safe/strict dispatch wrapper for the policy checks.
 *   [agent3-verification-runner.py](../hooks/agent3-verification-runner.py): Runs Agent 3 argv-array verification commands with `shell=False`, sanitized env, bounded output, timeout, root traversal checks, and a small allowlist covering npm, pnpm, yarn, bun, and deno test commands; pytest directly or through `python -m` / `python3 -m`; `cargo test`; `go test`; and `zig build test`.
+*   [agent4-polish-runner.py](../hooks/agent4-polish-runner.py): Runs Agent 4 bounded status, verification, git init, staging, and one local commit from implementation roots only, using paths and policy recorded in `polish-report.json`.
 *   [require-clean-room-env.py](../hooks/require-clean-room-env.py): Fails closed if the required role and root environment variables are missing, if trust-domain roots overlap, or if clean, implementation, or contaminated artifact root names appear source-derived.
-*   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions except installed Agent 3 verification-runner invocations under implementation roots.
+*   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions except installed Agent 3 verification-runner invocations under implementation roots and installed Agent 4 polish-runner invocations under implementation roots.
 *   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles and Agent 1.5 cannot read source roots or unapproved paths; clean roles may read implementation roots, and source-denied roles are denied direct `preflight-goal.json` reads. Agent 1.5 is also denied clean roots, implementation roots, and direct `source-index.json` reads.
-*   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots. Agent 2 writes clean artifacts only, Agent 3 writes implementation files and clean reports, and contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+*   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots. Agent 2 writes clean artifacts only, Agent 3 writes implementation files and clean reports, Agent 4 writes clean polish reports and implementation-root polish changes, and contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 *   [check-artifact-leakage.py](../hooks/check-artifact-leakage.py): Scans clean artifacts and Agent 1.5 staged contaminated artifacts for high-risk leakage markers, source-like identifiers, and private identifier denylist terms. The private identifier denylist (loaded via `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST`) is subject to hard limits to protect hook execution performance: a maximum of 1,000,000 bytes per file, 20,000 total terms, and 512 characters per individual term.
 *   [validate-json-schema.py](../hooks/validate-json-schema.py): Verifies JSON syntax and structural conformance against schemas under `CLEAN_ROOM_SCHEMA_DIR`, including controller-side `preflight-goal.schema.json` and `init-config.schema.json`. Under clean roots, any unrecognized JSON files that do not conform to canonical schemas will trigger a failure unless they are explicitly registered in the path-separated `CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST` environment variable.
 *   [validate-handoff-package.py](../hooks/validate-handoff-package.py): Verifies that handoff packages stay within clean roots, do not reference contaminated paths, `task-manifest.json`, `preflight-goal.json`, or `source-index.json`, and match declared `sha256` checksums.

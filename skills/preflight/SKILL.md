@@ -60,4 +60,4 @@ clean-room-skill preflight --template --bootstrap ~/Documents/CleanRoom/task-xxx
 
 Agent 0 must record `preflight_goal_ref`, `preflight_goal_sha256`, and the required `handoff_sequence` in `task-manifest.json`.
 
-Clean roles receive only the clean-safe goal subset through `clean-run-context.json` `goal_contract` plus `code_hygiene_policy`. Do not send the full `preflight-goal.json` to Agent 1.5, Agent 2, Agent 3, or clean handoff packages.
+Clean roles receive only the clean-safe goal subset through `clean-run-context.json` `goal_contract` plus `code_hygiene_policy` and optional Agent 4 local commit policy. Do not send the full `preflight-goal.json` to Agent 1.5, Agent 2, Agent 3, Agent 4, or clean handoff packages.
