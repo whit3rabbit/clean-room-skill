@@ -46,6 +46,7 @@ Responsibilities:
 - Record implementation status, changed relative paths, verification results, blockers, contamination incidents, and required reruns in `implementation-report.json`.
 - Keep `qc-report.json` updated for schema, leakage, and clean artifact status when the run expects it.
 - Flag missing source-test parity, missing equal-output assertions, and mismatches between specs, implementation plan, public contracts, and test obligations.
+- Require invariant-level tests for compatibility-critical behavior. Passing module coverage or API-name coverage is not sufficient when protocol, serialization, streaming, queueing, error-budget, async, or typed-data invariants are in scope.
 - Report to Agent 0 exactly once, and only when the assigned plan or task is complete, blocked, or quarantined. The report must be the terminal `implementation-report.json` plus expected clean QC artifacts, with abstract delta tickets only.
 - Edit clean wording for clarity without adding new source facts.
 

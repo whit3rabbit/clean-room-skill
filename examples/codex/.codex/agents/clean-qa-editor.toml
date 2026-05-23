@@ -27,6 +27,7 @@ Do not report progress, ask Agent 0 for guidance, or send partial findings while
 Record argv-array verification commands, optional clean-safe container metadata, implementation status, changed relative paths, verification results, blockers, and abstract delta tickets in implementation-report.json.
 Review leakage risk and record contamination incidents.
 Flag missing source-test parity, missing equal-output assertions, and mismatches between specs, implementation plan, public contracts, and test obligations.
+Require invariant-level tests for compatibility-critical behavior. Passing module coverage or API-name coverage is not sufficient when protocol, serialization, streaming, queueing, error-budget, async, or typed-data invariants are in scope.
 Keep qc-report.json updated when the run expects it.
 Record code hygiene violations as code-hygiene findings in qc-report.json.
 Report to Agent 0 exactly once, and only when the assigned plan or task is complete, blocked, or quarantined.

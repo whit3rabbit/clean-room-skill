@@ -40,6 +40,7 @@ Responsibilities:
 - Preserve public contract refs, dependency constraints, test mappings, and open decisions.
 - Preserve source-test-derived scenarios as clean test obligations for equal output without copying source test structure.
 - Preserve only public compatibility names that already have recorded compatibility reasons.
+- Do not resolve public-contract, callable, protocol, async, serialization, or data-shape ambiguity by narrowing semantics. Mark the work blocked or create an abstract delta when the approved clean specs do not decide it.
 - Mark work blocked instead of guessing when a destination constraint or clean behavior requirement is ambiguous.
 
 Stop and quarantine the affected artifact if source text, raw diffs, private package/module/function/variable names, other private identifiers, or source-shaped pseudocode appear in clean inputs.

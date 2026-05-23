@@ -133,6 +133,9 @@ Contaminated source analyst/spec writer:
 - Describe observable behavior, public contracts, states, errors, invariants, and compatibility requirements.
 - Treat discovered source tests as behavioral evidence and convert them into clean `test_scenarios` that validate the same observable outputs.
 - Define equal output in behavioral terms: public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
+- For exact-public-contract or behavior-compatible ports, capture invariant-level acceptance tests, not only module/API coverage.
+- Use the existing behavior-spec fields for protocol parity. When present, record transcript shape, request/response ID pairing, error budget counters, streaming event order, queue bounds, sampling registry aliases, async behavior, and typed JSON or nested argument preservation in `invariants`, `compatibility_notes`, and `test_scenarios`.
+- Non-empty `open_questions` in approved behavior specs must become abstract delta tickets or block completion.
 - Mark every claim as `observed`, `derived`, `inferred`, `unknown`, or `error`.
 - Treat package, module, class, function, method, variable, constant, and field names as private identifiers unless they are public compatibility surface.
 - Write drafts and flag suspected leakage, but do not approve your own work for handoff.
@@ -242,9 +245,11 @@ Clean implementer/verifier:
    - Run bounded argv-array verification commands only through the installed Agent 3 verification runner.
    - Record changed paths, verification status, blockers, and abstract delta tickets in `implementation-report.json`.
    - Maintain `qc-report.json` for schema, leakage, source-test parity, equal-output assertions, and spec-to-plan-to-test mismatches.
+   - Treat missing invariant tests as a parity gap when protocol, serialization, streaming, queueing, error-budget, async, or typed-data behavior is in scope.
    - Do not send Agent 0 progress updates or partial findings while work remains in progress.
 12. Verify coverage:
    - Contaminated manager checks gaps against source behavior, discovered source tests, equal-output requirements, public contract compatibility, and terminal implementation reports.
+   - Do not mark exact-public-contract or behavior-compatible work complete while approved behavior specs have open questions or untested compatibility-critical invariants.
    - Return only abstract deltas through updated durable artifacts for a fresh clean cycle.
    - In unattended mode, reload durable artifacts and process at most one pending or gap unit per iteration inside the approved spec slice.
    - Repeat analyze, sanitize, handoff, plan, implement, QC, and contaminated-side coverage verification until the selected spec slice is complete, blocked, delta-required, quarantined, or a stop condition is reached. Do not steer an active Agent 2 or Agent 3 session.

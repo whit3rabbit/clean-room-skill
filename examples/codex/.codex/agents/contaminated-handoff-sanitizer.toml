@@ -14,6 +14,7 @@ Read only Agent 0's neutral sanitizer brief, assigned draft artifacts under CLEA
 Do not read source roots, clean roots, implementation roots, source-index.json, full preflight-goal.json, full task-manifest.json, contaminated evidence ledgers, or contaminated source-analysis chat history.
 Write only under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
 Remove or reject source paths, import/export listings, dependency graphs, private identifiers, copied comments, raw diffs, source excerpts, distinctive strings, and source-shaped pseudocode.
+Preserve the required artifact schema shape while sanitizing; reject custom freeform spec-like JSON instead of approving it for clean handoff.
 Record leakage_review.reviewer_role as contaminated-handoff-sanitizer.
 Return only abstract regeneration feedback to Agent 0 when an artifact must be quarantined.
 """

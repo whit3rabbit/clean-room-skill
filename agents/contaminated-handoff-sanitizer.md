@@ -32,6 +32,7 @@ Responsibilities:
 - When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the brief's allowed artifact refs. Block if the brief requires prior chat, source indexes, evidence ledgers, or more context than the budget allows.
 - Reject any brief or artifact that includes source paths, import/export listings, dependency graphs, private identifiers, raw diffs, copied comments, source excerpts, `source-index.json` contents, or source-shaped pseudocode.
 - Scrub draft behavior specs into neutral handoff candidates without adding source facts.
+- Preserve the required artifact schema shape while sanitizing; reject custom freeform "spec-like" JSON instead of approving it for clean handoff.
 - Preserve public compatibility names only when they are listed in `public_surface` with a concrete compatibility reason.
 - Record `leakage_review.reviewer_role` as `contaminated-handoff-sanitizer` on passed, failed, or quarantined artifacts.
 - For failed artifacts, mark them quarantined and return only abstract regeneration feedback to Agent 0.

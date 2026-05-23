@@ -36,6 +36,7 @@ Responsibilities:
 - Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
 - Send Agent 1 draft specs to Agent 1.5 for independent source-denied sanitization before clean handoff.
 - Compare clean artifacts and terminal implementation reports against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility for coverage gaps.
+- Reject `complete` when source-test-derived parity, protocol invariants, public-contract tests, or approved behavior-spec open questions remain unresolved. Convert the gap into abstract delta tickets for a fresh clean cycle.
 - Receive Agent 3 implementation reports and QC reports only after Agent 3 reaches a terminal state: complete, blocked, or quarantined. Do not consume partial Agent 3 reports as controller feedback.
 - Convert terminal implementation gaps into abstract delta tickets for the next clean run. Do not steer an in-progress Agent 3 loop.
 - Send only `clean-run-context.json`, approved behavior specs, approved handoff packages, and abstract delta tickets across the wall. Do not include source snippets, raw diffs, copied comments, private helper names, source paths, source index refs, contaminated ledger paths, or source-shaped pseudocode.

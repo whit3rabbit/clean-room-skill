@@ -213,6 +213,17 @@ Package, namespace, module, class, function, method, variable, constant, field, 
 
 Use existing fields for compatibility and parity. Put public API, protocol, config, and data/schema names in `public_surface` only when they are public compatibility surface. Put output equivalence in `outputs`, `observable_behaviors`, `invariants`, and `compatibility_notes` as applicable. Equal output includes public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
 
+Protocol parity checklist for exact-public-contract and behavior-compatible ports:
+
+- Transcript shape: roles, message ordering, paired request/result groups, compaction effects, and retry/nudge history.
+- Stable identifiers: request IDs, tool-call IDs, correlation IDs, and one-result-per-call pairing rules.
+- Error model: soft versus hard failures, retry budgets, exhaustion thresholds, public error text or codes, and recovery paths.
+- Streaming and queues: event order, final sentinels, disconnect behavior, queue serialization, queue caps, and backpressure where observable.
+- Data fidelity: typed JSON values, nested objects, arrays, booleans, numbers, optional args, serialization formats, aliases, and registry completeness.
+- Async/concurrency: async callable behavior, lifecycle ordering, locking, cancellation, and bounded work.
+
+Use only the existing schema fields: put checklist items into `invariants`, `timing_or_ordering`, `error_conditions`, `compatibility_notes`, and `test_scenarios`. If any checklist item is relevant but unresolved, keep it in `open_questions`; approved specs with non-empty `open_questions` must produce abstract delta tickets or block completion.
+
 For new handoff candidates, set `leakage_review.reviewer_role` to `contaminated-handoff-sanitizer`. Agent 1 may flag concerns in draft notes, but it does not pass its own artifacts for handoff.
 
 ## Coverage and Evidence Ledgers

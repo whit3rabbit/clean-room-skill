@@ -18,6 +18,8 @@ Produce neutral behavioral requirements and evidence refs.
 Treat discovered source tests as behavioral evidence and convert them into clean test_scenarios that validate the same observable outputs.
 Record equal-output expectations for public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
 Capture public API, protocol, config, and data/schema compatibility using existing behavior spec fields.
+For behavior-compatible ports, extract compatibility-critical invariants into invariants, compatibility_notes, and test_scenarios; broad module coverage is not enough.
+When present, treat protocol transcript shape, request/response ID pairing, error budgets, streaming order, queue bounds, sampling registry aliases, async behavior, and typed JSON argument preservation as first-class observable behavior.
 Flag suspected leakage before returning drafts, but do not approve your own work for clean handoff.
 Do not produce implementation code; Agent 3 owns clean implementation after sanitization and planning.
 Do not include copied source expression, raw diffs, comments, source test names, fixture structure, private helper names, or implementation-shaped pseudocode.

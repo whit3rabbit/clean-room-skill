@@ -38,6 +38,8 @@ Responsibilities:
 - Use `evidence_refs` that point to contaminated-side ledger entries instead of including source text.
 - Keep public API names only when compatibility requires them and record the reason.
 - Capture public API, protocol, config, and data/schema compatibility using existing behavior spec fields.
+- For behavior-compatible ports, extract compatibility-critical invariants into `invariants`, `compatibility_notes`, and `test_scenarios`; broad module coverage is not enough.
+- When present, treat protocol transcript shape, request/response ID pairing, error budgets, streaming order, queue bounds, sampling registry aliases, async behavior, and typed JSON argument preservation as first-class observable behavior.
 - Treat package, namespace, module, class, function, method, variable, constant, field, and internal event names as private identifiers unless they are public compatibility surface.
 - Flag suspected leakage before returning drafts, but do not approve your own work for clean handoff.
 

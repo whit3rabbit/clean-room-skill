@@ -12,6 +12,8 @@ const ROOT = path.resolve(__dirname, '..');
 const INSTALL = path.join(ROOT, 'bin', 'install.js');
 const TASK_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'task-manifest.json');
 const PREFLIGHT_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json');
+const BEHAVIOR_SPEC_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'behavior-spec.json');
+const CLEAN_CONTEXT_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'clean-run-context.json');
 const TEST_TIMEOUT_MS = 30_000;
 const TMP_DIRS = [];
 
@@ -301,6 +303,125 @@ function writeQcReport(clean, reviewedAt) {
     abstract_delta_tickets: [],
     final_status: 'passed-with-gaps',
   });
+}
+
+function validBehaviorSpec(overrides = {}) {
+  return {
+    ...readJson(BEHAVIOR_SPEC_FIXTURE),
+    ...overrides,
+  };
+}
+
+function writeCleanRunContext(workspace, behaviorSpecs = ['behavior-spec.json']) {
+  const context = readJson(CLEAN_CONTEXT_FIXTURE);
+  context.clean_artifacts = {
+    ...context.clean_artifacts,
+    clean_root: './',
+    handoff_package: 'handoff-package.json',
+    behavior_specs: behaviorSpecs,
+    skeleton_manifest: 'skeleton-manifest.json',
+    implementation_plan: 'implementation-plan.json',
+    implementation_report: 'implementation-report.json',
+    qc_report: 'qc-report.json',
+  };
+  writeJson(path.join(workspace.clean, 'clean-run-context.json'), context);
+}
+
+function writeHandoffPackage(workspace, artifactPaths) {
+  writeJson(path.join(workspace.clean, 'handoff-package.json'), {
+    package_id: 'handoff-test',
+    task_id: 'task-example',
+    from_domain: 'contaminated',
+    to_domain: 'clean',
+    created_by_role: 'contaminated-handoff-sanitizer',
+    artifacts: artifactPaths.map((artifactPath, index) => ({
+      artifact_id: `artifact-${index + 1}`,
+      artifact_type: path.basename(artifactPath) === 'clean-run-context.json' ? 'clean-run-context' : 'behavior-spec',
+      path: artifactPath,
+      sha256: fileSha256(path.join(workspace.clean, artifactPath)),
+    })),
+    excluded_material: [],
+    leakage_review: {
+      status: 'passed',
+      reviewer_role: 'contaminated-handoff-sanitizer',
+      notes: 'Test handoff package contains schema-shaped clean artifacts.',
+    },
+  });
+}
+
+function writeCompleteCleanReports(workspace) {
+  writeJson(path.join(workspace.clean, 'implementation-report.json'), {
+    report_id: 'implementation-report-complete',
+    task_id: 'task-example',
+    plan_ref: 'implementation-plan.json',
+    implementer_role: 'clean-qa-editor',
+    updated_at: '2024-01-01T00:00:00Z',
+    implementation_status: 'complete',
+    agent0_reporting: {
+      report_state: 'terminal-report',
+      terminal_report_target: 'agent_0',
+      interim_updates_allowed: false,
+    },
+    completed_work_items: ['wi-test'],
+    blocked_work_items: [],
+    changed_paths: [],
+    verification_results: [
+      {
+        command: ['npm', 'test'],
+        cwd: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+        status: 'passed',
+        output_summary: 'Test verification passed.',
+      },
+    ],
+    findings: [],
+    abstract_delta_tickets: [],
+    final_status: 'complete',
+  });
+  writeJson(path.join(workspace.clean, 'qc-report.json'), {
+    report_id: 'qc-complete',
+    reviewer_role: 'clean-qa-editor',
+    reviewed_at: '2024-01-01T00:00:00Z',
+    reviewed_artifacts: ['implementation-report.json', 'behavior-spec.json'],
+    artifact_hashes: [],
+    schema_validator_version: 'test',
+    schema_status: 'passed',
+    leakage_status: 'passed',
+    leakage_scan_summary: 'No blocked markers in test.',
+    coverage_status: 'complete',
+    required_rerun: false,
+    contamination_incidents: [],
+    findings: [],
+    abstract_delta_tickets: [],
+    final_status: 'passed',
+  });
+}
+
+function writeCoveredCoverageScript(root) {
+  const script = path.join(root, 'write-covered-coverage.js');
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+const path = require('node:path');
+const contaminated = process.env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.split(path.delimiter)[0];
+fs.writeFileSync(path.join(contaminated, 'coverage-ledger.json'), JSON.stringify({
+  ledger_id: 'coverage-test',
+  task_id: 'task-example',
+  updated_by_role: 'contaminated-manager-verifier',
+  source_units: [{
+    unit_id: 'unit-example-flow',
+    coverage_state: 'covered',
+    evidence_refs: []
+  }],
+  behavior_spec_refs: ['spec-example-flow'],
+  coverage_status: 'complete',
+  abstract_delta_tickets: [],
+  review_history: [{
+    reviewer_role: 'contaminated-manager-verifier',
+    status: 'test',
+    notes: ''
+  }]
+}, null, 2) + '\\n');
+`);
+  return script;
 }
 
 function writeTimestampOnlyQcScript(root) {
@@ -948,5 +1069,90 @@ describe('clean-room run command', () => {
       },
     ]);
     assert.equal(JSON.stringify(runResult).includes('src/'), false);
+  });
+
+  test('rejects clean-run-context behavior spec references that do not exist', () => {
+    const workspace = baseWorkspace('clean-room-run-missing-context-spec');
+    writeCleanRunContext(workspace, ['missing-behavior-spec.json']);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /behavior spec does not exist/);
+  });
+
+  test('rejects schema-invalid behavior specs referenced by clean-run-context', () => {
+    const workspace = baseWorkspace('clean-room-run-invalid-context-spec');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), {
+      unit: 'unit-example-flow',
+      summary: 'This is not the behavior-spec schema.',
+    });
+    writeCleanRunContext(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /schema check failed/);
+  });
+
+  test('rejects handoff packages that omit clean-run-context behavior specs', () => {
+    const workspace = baseWorkspace('clean-room-run-handoff-omits-spec');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json']);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /does not include clean-run-context behavior spec/);
+  });
+
+  test('rejects handoff packages with stale behavior spec hashes', () => {
+    const workspace = baseWorkspace('clean-room-run-handoff-stale-hash');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    const handoffPath = path.join(workspace.clean, 'handoff-package.json');
+    const handoff = readJson(handoffPath);
+    handoff.artifacts.find((item) => item.path === 'behavior-spec.json').sha256 =
+      '0000000000000000000000000000000000000000000000000000000000000000';
+    writeJson(handoffPath, handoff);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /sha256 mismatch/);
+  });
+
+  test('open questions in approved behavior specs force spec delta instead of completion', () => {
+    const workspace = baseWorkspace('clean-room-run-open-question-delta');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec({
+      open_questions: ['The approved behavior spec still has an unresolved compatibility question.'],
+    }));
+    writeCleanRunContext(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    const script = writeCoveredCoverageScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      coverageStage(workspace.root, script),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-delta-required/);
+    const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
+    assert.equal(runResult.result, 'spec-delta-required');
+    assert.equal(runResult.coverage_state, 'complete');
+    assert.deepEqual(runResult.abstract_delta_tickets, [
+      {
+        ticket_id: 'delta-open-questions',
+        kind: 'ambiguity',
+        summary: '1 approved behavior spec(s) still contain open questions.',
+        requested_clean_change: 'Resolve or remove approved behavior spec open questions before marking the spec slice complete.',
+        status: 'open',
+      },
+    ]);
   });
 });
