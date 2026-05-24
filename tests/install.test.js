@@ -615,6 +615,28 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), false);
   });
 
+  test('preflight rejects symlinked bootstrap task root', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-symlink');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const realTaskRoot = path.join(root, 'real-task-root');
+    const symlinkTaskRoot = path.join(artifactBase, 'task-bootstrap-symlink');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.mkdirSync(path.dirname(symlinkTaskRoot), { recursive: true });
+
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', root, '--task-id', 'real-task-root']);
+    assert.equal(init.status, 0, init.stderr);
+
+    fs.symlinkSync(realTaskRoot, symlinkTaskRoot, 'dir');
+
+    const result = runInstall(['preflight', '--template', '--bootstrap', symlinkTaskRoot]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /bootstrap scaffold is invalid/);
+    assert.match(result.stderr, /bootstrap task root must not be a symbolic link/);
+    assert.equal(fs.existsSync(path.join(realTaskRoot, 'contaminated', 'preflight-goal.json')), false);
+  });
+
   test('preflight rejects bootstrap and output together', () => {
     const root = tempDir('clean-room-preflight-bootstrap-output');
     const output = path.join(root, 'preflight-goal.json');
@@ -1652,6 +1674,19 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stderr, /managed install path must not contain symlinks/);
     assert.equal(fs.existsSync(path.join(outside, 'clean-room')), false);
     assert.equal(fs.existsSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md')), false);
+  });
+
+  test('install rejects symlinked install root', (t) => {
+    const root = tempDir('clean-room-root-symlink');
+    const realCodexHome = path.join(root, 'real-codex');
+    const linkedCodexHome = path.join(root, 'linked-codex');
+    fs.mkdirSync(realCodexHome, { recursive: true });
+    if (!symlinkDirOrSkip(t, realCodexHome, linkedCodexHome)) return;
+
+    const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: linkedCodexHome });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /managed install root must not be a symlink/);
+    assert.equal(fs.existsSync(path.join(realCodexHome, 'skills', 'clean-room', 'SKILL.md')), false);
   });
 
   test('uninstall removes only managed files and clean-room hooks', () => {

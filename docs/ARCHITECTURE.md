@@ -19,7 +19,7 @@ The Clean Room workflow acts as an engineering risk-reduction process by establi
 To maintain compliance and mitigate leakage risks, the workflow utilizes strictly separated workspaces, worktrees, repositories, or profiles for contaminated and clean work:
 
 *   **Contaminated Source Workspace**: Source-readable, read-only where practical. Contains the codebase under analysis.
-*   **Contaminated Artifact Workspace**: Holds intermediate outputs like preflight goals, init configs, source indexes, task manifests, controller status, coverage ledgers, evidence ledgers, draft specs, contaminated-role session briefs, and abstract delta tickets. Configure via `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+*   **Contaminated Artifact Workspace**: Holds intermediate outputs like preflight goals, init configs, source indexes, visual indexes, task manifests, controller status, coverage ledgers, evidence ledgers, draft specs, contaminated-role session briefs, and abstract delta tickets. Configure via `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 *   **Clean Artifact Workspace**: Houses sanitized clean run contexts, approved behavioral specifications, handoff packages, clean-role session briefs, skeleton manifests, implementation plans, implementation reports, QC reports, and test plans. Configure via `CLEAN_ROOM_CLEAN_ROOTS`.
 *   **Clean Implementation Workspace**: Houses clean destination code and tests. Configure via `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 *   **Clean Allowed Reference Workspace**: Public documentation, specifications, or destination constraints explicitly approved for clean and source-denied role reads. Configure via `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
@@ -41,17 +41,17 @@ The initialization wizard and `require-clean-room-env.py` audit clean, implement
 
 ![Stage 0 Goal Contract](assets/3.png)
 
-Every new run starts with `preflight-goal.json` before source discovery, source indexing, Agent 0 decomposition, attended execution, or unattended execution. The contract records end goal, target stack, license policy, dependency policy, compatibility exactness, feature changes, code hygiene, output policy, controller mode, and open questions.
+Every new run starts with `preflight-goal.json` before source discovery, source indexing, visual indexing, Agent 0 decomposition, attended execution, or unattended execution. The contract records end goal, target stack, license policy, dependency policy, compatibility exactness, feature changes, code hygiene, output policy, controller mode, and open questions.
 
 `preflight-goal.json` is controller/contaminated-side only. Clean roles receive only clean-safe `goal_contract` fields and `code_hygiene_policy` through `clean-run-context.json`.
 
 ### Contaminated Source-Index Preflight Tooling
 
-To assist in logical unit decomposition, the workflow supports an optional source-index preflight stage using `build_source_index.py` and `clean_room_tool_manager.py`.
+To assist in logical unit decomposition, the workflow supports an optional source-index preflight stage using `build_source_index.py` and `clean_room_tool_manager.py`. When no indexable source code exists and screenshots/images are the authorized evidence, the workflow supports a fallback visual-index preflight stage using `build_visual_index.py`.
 
 *   **Execution Boundary**: This tooling runs exclusively in the contaminated domain before clean-room role sessions are initialized.
 *   **Traversal Bounds**: Source indexing enforces file count, per-file byte, total byte, batch token, and segment caps. It validates file size again after reading, skips files that change during read, records directory walk errors, and prunes traversal after global limits are exhausted with an aggregate skipped entry.
-*   **Agent 0 Use**: Agent 0 consumes `source-index.json` only to create neutral `task-manifest.json` units and per-unit `source_index_refs`. The index stays contaminated-only and does not cross to Agent 1.5, Agent 2, Agent 3, Agent 4, or clean handoff packages.
+*   **Agent 0 Use**: Agent 0 consumes `source-index.json` only to create neutral `task-manifest.json` units and per-unit `source_index_refs`. In visual fallback runs, Agent 0 consumes `visual-index.json` only to create neutral units and per-unit `visual_index_refs`. Both indexes stay contaminated-only and do not cross to Agent 1.5, Agent 2, Agent 3, Agent 4, or clean handoff packages.
 *   **Tool Trust Policy**: By default, tool discovery operates in `stat-only` mode and does not execute third-party binaries. It queries version strings only when explicitly invoked with `--probe-tools`. Tools discovered under `/opt/homebrew` or `/usr/local` remain stat-only unless `--allow-user-toolchain-probes` is also supplied. Project-local directories (such as `.bin` or `node_modules/.bin`) are ignored unless the environment variable `RE_SKILLS_TRUST_PROJECT_TOOLS=1` or the flag `--allow-working-project-tools` is supplied.
 *   **Local Tool Install Safety**: Explicit npm-backed helper installs are strict-version pinned and serialized with a cache-local lock before mutating `~/.cache/re-skills/clean-room-tools/npm`. Prefix creation failures, subprocess timeouts, and subprocess launch errors are returned as structured JSON facts instead of raw tracebacks.
 
@@ -78,7 +78,7 @@ flowchart LR
     sanitizer["Agent 1.5: contaminated-handoff-sanitizer<br/>Source-denied, scrub identifying material"]
     brief["Neutral sanitizer brief<br/>domain, target profile, unit intent,<br/>public allowlist, blocked categories"]
     preflight["preflight-goal.json<br/>goal, stack, policy, hygiene"]
-    ledgers["Contaminated artifacts<br/>CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS<br/>init-config.json<br/>source-index.json<br/>task-manifest.json<br/>coverage-ledger.json<br/>evidence-ledger.json"]
+    ledgers["Contaminated artifacts<br/>CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS<br/>init-config.json<br/>source-index.json<br/>visual-index.json<br/>task-manifest.json<br/>coverage-ledger.json<br/>evidence-ledger.json"]
     drafts["Agent 1 draft specs<br/>assigned paths only for Agent 1.5"]
     staged["Sanitized handoff candidates<br/>Agent 1.5-reviewed behavior-spec.json"]
   end
@@ -140,7 +140,7 @@ flowchart LR
   env -. required for every role session .-> architect
   denyread -. clean and source-denied roles cannot read source roots .-> cleanroots
   denyread -. clean roles may read implementation roots .-> implroots
-  denyread -. Agent 1.5 cannot read source roots, clean roots, implementation roots, source-index.json, or preflight-goal.json .-> sanitizer
+  denyread -. Agent 1.5 cannot read source/visual roots, clean roots, implementation roots, source-index.json, visual-index.json, or preflight-goal.json .-> sanitizer
   denywrite -. contaminated writes only to contaminated artifact roots .-> ledgers
   denywrite -. Agent 2 writes clean artifacts only; Agents 3 and 4 write implementation roots .-> cleanroots
   denywrite -. Agents 3 and 4 write code, tests, docs, and repo hygiene only here .-> implroots
@@ -293,11 +293,11 @@ Post-write hook failures are deny-by-default and redacted. If an artifact disapp
 *   [agent4-polish-runner.py](../hooks/agent4-polish-runner.py): Runs Agent 4 bounded status, verification, git init, staging, and one local commit from implementation roots only, using paths and policy recorded in `polish-report.json`.
 *   [require-clean-room-env.py](../hooks/require-clean-room-env.py): Fails closed if the required role and root environment variables are missing, if trust-domain roots overlap, or if clean, implementation, or contaminated artifact root names appear source-derived.
 *   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions except installed Agent 3 verification-runner invocations under implementation roots and installed Agent 4 polish-runner invocations under implementation roots.
-*   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles and Agent 1.5 cannot read source roots or unapproved paths; clean roles may read implementation roots, and source-denied roles are denied direct `preflight-goal.json` reads. Agent 1.5 is also denied clean roots, implementation roots, and direct `source-index.json` reads.
+*   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles and Agent 1.5 cannot read source or visual roots or unapproved paths; clean roles may read implementation roots, and source-denied roles are denied direct `preflight-goal.json` reads. Agent 1.5 is also denied clean roots, implementation roots, and direct `source-index.json` or `visual-index.json` reads.
 *   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots. Agent 2 writes clean artifacts only, Agent 3 writes implementation files and clean reports, Agent 4 writes clean polish reports and implementation-root polish changes, and contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 *   [check-artifact-leakage.py](../hooks/check-artifact-leakage.py): Scans clean artifacts and Agent 1.5 staged contaminated artifacts for high-risk leakage markers, source-like identifiers, and private identifier denylist terms. The private identifier denylist (loaded via `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST`) is subject to hard limits to protect hook execution performance: a maximum of 1,000,000 bytes per file, 20,000 total terms, and 512 characters per individual term.
 *   [validate-json-schema.py](../hooks/validate-json-schema.py): Verifies JSON syntax and structural conformance against schemas under `CLEAN_ROOM_SCHEMA_DIR`, including controller-side `preflight-goal.schema.json` and `init-config.schema.json`. Under clean roots, any unrecognized JSON files that do not conform to canonical schemas will trigger a failure unless they are explicitly registered in the path-separated `CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST` environment variable.
-*   [validate-handoff-package.py](../hooks/validate-handoff-package.py): Verifies that handoff packages stay within clean roots, do not reference contaminated paths, `task-manifest.json`, `preflight-goal.json`, or `source-index.json`, and match declared `sha256` checksums.
+*   [validate-handoff-package.py](../hooks/validate-handoff-package.py): Verifies that handoff packages stay within clean roots, do not reference contaminated paths, `task-manifest.json`, `preflight-goal.json`, `source-index.json`, or `visual-index.json`, and match declared `sha256` checksums.
 
 For detailed guidelines on the clean-room process, refer to:
 *   [CONTROLLER-LOOP.md](../skills/clean-room/references/CONTROLLER-LOOP.md)

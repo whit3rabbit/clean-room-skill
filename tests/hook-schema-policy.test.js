@@ -254,6 +254,16 @@ describe('clean-room schema hook policy', () => {
     assert.match(result.stderr, /source-index\.json is not a clean-role artifact/);
   });
 
+  test('visual-index JSON is rejected under clean roots', () => {
+    const root = tempDir('clean-room-visual-index-clean');
+    const env = policyEnv(root, 'clean-architect');
+    const visualIndex = copyExample('visual-index.json', env.CLEAN_ROOM_CLEAN_ROOTS);
+
+    const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: visualIndex } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /visual-index\.json is not a clean-role artifact/);
+  });
+
   test('init-config JSON is rejected under clean roots', () => {
     const root = tempDir('clean-room-init-config-clean');
     const env = policyEnv(root, 'clean-architect');
@@ -333,6 +343,13 @@ describe('clean-room schema hook policy', () => {
         },
         message: /forbidden clean-run-context artifact path/,
       },
+      {
+        name: 'visual-index-artifact',
+        mutate(data) {
+          data.clean_artifacts.behavior_specs[0] = 'visual-index.json';
+        },
+        message: /does not match pattern/,
+      },
     ];
 
     for (const item of cases) {
@@ -354,7 +371,7 @@ describe('clean-room schema hook policy', () => {
     const env = policyEnv(root, 'clean-architect');
     const context = copyExample('clean-run-context.json', env.CLEAN_ROOM_CLEAN_ROOTS);
 
-    const result = runHook('validate-json-schema.py', {
+    let result = runHook('validate-json-schema.py', {
       tool_name: 'Write',
       tool_input: { file_path: context },
     }, {
@@ -373,13 +390,22 @@ describe('clean-room schema hook policy', () => {
     data.allowed_artifacts[0].path = '../contaminated/source-index.json';
     fs.writeFileSync(brief, JSON.stringify(data));
 
-    const result = runHook('validate-json-schema.py', {
+    let result = runHook('validate-json-schema.py', {
       tool_name: 'Write',
       tool_input: { file_path: brief },
     }, env);
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /role-session-brief artifact path must not contain '\.\.'/);
+
+    data.allowed_artifacts[0].path = 'visual-index.json';
+    fs.writeFileSync(brief, JSON.stringify(data));
+    result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: brief },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /forbidden role-session-brief artifact path/);
   });
 
   test('handoff integrity verifies referenced artifact path and sha256', () => {
@@ -450,6 +476,59 @@ describe('clean-room schema hook policy', () => {
     result = runHook('validate-handoff-package.py', { tool_name: 'Write', tool_input: { file_path: handoff } }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /task-manifest\.json must not be included/);
+
+    const visualIndex = copyExample('visual-index.json', env.CLEAN_ROOM_CLEAN_ROOTS);
+    fs.writeFileSync(handoff, JSON.stringify({
+      package_id: 'package-test',
+      task_id: 'task-test',
+      from_domain: 'contaminated',
+      to_domain: 'clean',
+      created_by_role: 'contaminated-handoff-sanitizer',
+      artifacts: [
+        {
+          artifact_id: 'visual-index',
+          artifact_type: 'visual-index',
+          path: 'visual-index.json',
+          sha256: sha256(visualIndex),
+        },
+      ],
+      excluded_material: ['source_excerpt'],
+      leakage_review: {
+        status: 'passed',
+        reviewer_role: 'contaminated-handoff-sanitizer',
+        notes: 'fixture',
+      },
+    }));
+    result = runHook('validate-handoff-package.py', { tool_name: 'Write', tool_input: { file_path: handoff } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /visual-index\.json must not be included/);
+
+    const screenshot = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'screen.png');
+    fs.writeFileSync(screenshot, 'png');
+    fs.writeFileSync(handoff, JSON.stringify({
+      package_id: 'package-test',
+      task_id: 'task-test',
+      from_domain: 'contaminated',
+      to_domain: 'clean',
+      created_by_role: 'contaminated-handoff-sanitizer',
+      artifacts: [
+        {
+          artifact_id: 'screen',
+          artifact_type: 'behavior-spec',
+          path: 'screen.png',
+          sha256: sha256(screenshot),
+        },
+      ],
+      excluded_material: ['source_excerpt'],
+      leakage_review: {
+        status: 'passed',
+        reviewer_role: 'contaminated-handoff-sanitizer',
+        notes: 'fixture',
+      },
+    }));
+    result = runHook('validate-handoff-package.py', { tool_name: 'Write', tool_input: { file_path: handoff } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /raw screenshots\/images must not be included/);
   });
 
   test('handoff integrity reports unreadable referenced artifacts without traceback', () => {

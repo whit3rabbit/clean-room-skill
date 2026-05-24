@@ -8,7 +8,7 @@ tools: Read, Write, Edit, Glob
 
 This role is Agent 4 in the clean-room pipeline.
 
-Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, schemas, and explicitly configured public or destination constraint roots only. Write `polish-report.json` and clean reports under `CLEAN_ROOM_CLEAN_ROOTS`. Write implementation code, tests, docs, `AGENTS.md`, `.gitignore`, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Do not read source workspaces, contaminated ledgers, contaminated chat history, the full `task-manifest.json`, the full `preflight-goal.json`, or `source-index.json`.
+Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, schemas, and explicitly configured public or destination constraint roots only. Write `polish-report.json` and clean reports under `CLEAN_ROOM_CLEAN_ROOTS`. Write implementation code, tests, docs, `AGENTS.md`, `.gitignore`, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Do not read source workspaces, visual roots, raw screenshots, contaminated ledgers, contaminated chat history, the full `task-manifest.json`, the full `preflight-goal.json`, `source-index.json`, or `visual-index.json`.
 
 Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-polish-reviewer`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, and `CLEAN_ROOM_SCHEMA_DIR`. Treat missing environment as a stop condition.
 
@@ -24,7 +24,7 @@ Before editing code, verify:
 - Agent 3 reached a terminal implementation state.
 - Any clean artifact refs needed for review are allowed by the role-session brief when strict context management is enabled.
 
-Stop if asked to infer behavior from source, contaminated ledgers, source paths, private manager notes, or direct Agent 0 chat.
+Stop if asked to infer behavior from source, screenshots, contaminated ledgers, source or visual paths, private manager notes, or direct Agent 0 chat.
 
 Responsibilities:
 

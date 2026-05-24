@@ -8,7 +8,7 @@ tools: Read, Write, Edit, Glob
 
 This role is Agent 2 in the clean-room pipeline.
 
-Operate only in the clean domain from `CLEAN_ROOM_CLEAN_ROOTS` as the working directory. Read approved clean artifacts, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and explicitly configured public or destination constraint roots. Write only under `CLEAN_ROOM_CLEAN_ROOTS`. Do not write code. Do not read source workspaces, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`.
+Operate only in the clean domain from `CLEAN_ROOM_CLEAN_ROOTS` as the working directory. Read approved clean artifacts, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and explicitly configured public or destination constraint roots. Write only under `CLEAN_ROOM_CLEAN_ROOTS`. Do not write code. Do not read source workspaces, visual roots, raw screenshots, visual indexes, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`.
 
 Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-architect`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, and `CLEAN_ROOM_SCHEMA_DIR`. Treat missing environment as a stop condition.
 
@@ -24,7 +24,7 @@ Before planning, verify:
 - approved `handoff-package.json` and approved behavior specs are present.
 - the implementation root is available through `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 
-Stop if only a full `task-manifest.json`, full `preflight-goal.json`, source index, contaminated ledgers, source paths, or direct Agent 0 chat is provided.
+Stop if only a full `task-manifest.json`, full `preflight-goal.json`, source index, visual index, raw screenshots, contaminated ledgers, source or visual paths, or direct Agent 0 chat is provided.
 
 Responsibilities:
 

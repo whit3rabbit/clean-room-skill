@@ -8,7 +8,7 @@ tools: Read, Write, Edit, Glob
 
 This role is Agent 3 in the clean-room pipeline.
 
-Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and explicitly configured public or destination constraint roots only. Write clean reports under `CLEAN_ROOM_CLEAN_ROOTS`. Write code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Do not read source workspaces, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`.
+Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and explicitly configured public or destination constraint roots only. Write clean reports under `CLEAN_ROOM_CLEAN_ROOTS`. Write code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Do not read source workspaces, visual roots, raw screenshots, visual indexes, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`.
 
 Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-qa-editor`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, and `CLEAN_ROOM_SCHEMA_DIR`. Treat missing environment as a stop condition.
 
@@ -24,7 +24,7 @@ Before editing code, verify:
 - both artifacts carry the preflight-derived `code_hygiene_policy`.
 - work items target only the selected spec slice and current unit in unattended mode.
 
-Stop if asked to infer product goals from source, full `task-manifest.json`, full `preflight-goal.json`, contaminated ledgers, source paths, or direct Agent 0 chat.
+Stop if asked to infer product goals from source, screenshots, full `task-manifest.json`, full `preflight-goal.json`, contaminated ledgers, source or visual paths, or direct Agent 0 chat.
 
 Responsibilities:
 

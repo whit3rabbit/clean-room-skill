@@ -21,15 +21,15 @@ Compare current artifacts to the canonical gate checklist:
 - Preflight goal exists for new runs, validates against `preflight-goal.schema.json`, and is referenced by `task-manifest.json` with `preflight_goal_ref` and `preflight_goal_sha256`.
 - Task manifest records the required `handoff_sequence` and does not skip Stage 0.
 - Initialization snapshot exists when init preferences were used, and reusable `init-config.json` drift is reported instead of silently applied.
-- `clean-run-context.json` exists before clean roles run and excludes source roots, contaminated roots, source index refs, and ledger paths.
+- `clean-run-context.json` exists before clean roles run and excludes source roots, visual roots, contaminated roots, source index refs, visual index refs, and ledger paths.
 - `clean-run-context.json` records artifact-only coordination: Agent 0 does not directly steer Agent 2, Agent 3, or Agent 4, and clean implementation/polish roles report to Agent 0 only at terminal status.
 - When context management is enabled, the next role launch can be driven by a fresh `role-session-brief.json` inside the recorded budgets. `controller-status.json` remains contaminated-side only.
 - Implementation roots are recorded, separated, and not source-derived.
-- Source index preflight exists when required and remains contaminated-only.
+- Source index or visual-index fallback preflight exists when required and remains contaminated-only.
 - Decomposition produced neutral `task-manifest.json` units.
 - Contaminated analysis wrote draft behavior specs without implementation code.
 - Agent 1.5 sanitization ran before handoff, or older artifacts clearly predate the Agent 1.5 gate and require review before reuse.
-- Handoff package excludes full `task-manifest.json`, `source-index.json`, source paths, raw diffs, copied comments, private identifiers, source-shaped pseudocode, and contaminated ledgers.
+- Handoff package excludes full `task-manifest.json`, `source-index.json`, `visual-index.json`, raw screenshots, source or visual paths, raw diffs, copied comments, copied visible words, private identifiers, exact UI palettes/layouts/iconography, source-shaped pseudocode, and contaminated ledgers.
 - Agent 2 produced clean-only `implementation-plan.json` when the run reached that gate.
 - Agent 3 produced `implementation-report.json` when the run reached implementation.
 - Non-terminal Agent 3 implementation reports were not used as Agent 0 feedback or guidance.
@@ -37,7 +37,7 @@ Compare current artifacts to the canonical gate checklist:
 - Agent 4 produced `polish-report.json` when the run reached final polish review.
 - Contaminated verification returned only abstract delta tickets.
 
-Validate schemas and handoff hashes before trusting the artifacts. Use `source-index.json` only on the contaminated side and only when referenced by the task manifest.
+Validate schemas and handoff hashes before trusting the artifacts. Use `source-index.json` or `visual-index.json` only on the contaminated side and only when referenced by the task manifest.
 
 ## Findings
 

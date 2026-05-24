@@ -31,6 +31,7 @@ CONTAMINATED_ONLY_SANITIZER_ARTIFACTS = {
     "evidence-ledger.json": "evidence-ledger artifact",
     "preflight-goal.json": "preflight-goal artifact",
     "source-index.json": "source-index artifact",
+    "visual-index.json": "visual-index artifact",
     "task-manifest.json": "task-manifest artifact",
 }
 
@@ -162,6 +163,12 @@ def main() -> int:
         if role in SOURCE_DENIED_ROLES and path.name == "preflight-goal.json":
             print(
                 f"clean-room policy denied role {role} reading preflight-goal artifact in {describe_path(path)}",
+                file=sys.stderr,
+            )
+            return 1
+        if role in SOURCE_DENIED_ROLES and path.name == "visual-index.json":
+            print(
+                f"clean-room policy denied role {role} reading visual-index artifact in {describe_path(path)}",
                 file=sys.stderr,
             )
             return 1

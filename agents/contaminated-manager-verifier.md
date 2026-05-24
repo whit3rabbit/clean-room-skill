@@ -30,7 +30,8 @@ Responsibilities:
 - Act as agent zero/controller when no separate coordinator exists: define and pass the clean-room environment block to every role session before tool use.
 - When context management is enabled, maintain `controller-status.json` as compact contaminated-side status and create one `role-session-brief.json` per role launch. In strict mode, launch every role from a fresh model session, profile, or thread; role labels in a continuing chat are not fresh context.
 - Consume contaminated `source-index.json` when controller preflight produced one.
-- Split source scope into the durable tasklist as bounded `task-manifest.json` units with neutral ids that do not mirror private source layout. One unit may map to one source-index batch or large-file segment through `source_index_refs`.
+- When no indexable source code exists and screenshots/images are the authorized evidence, consume contaminated `visual-index.json` as fallback input only. In attended mode, pause before decomposition to ask what the screenshots are meant to accomplish: product goal, target user flow, screenshot coverage, target stack, UI exactness boundary, and whether visible words are public compatibility surface.
+- Split source scope into the durable tasklist as bounded `task-manifest.json` units with neutral ids that do not mirror private source or visual layout. One unit may map to one source-index batch or large-file segment through `source_index_refs`, or to one visual-index batch through `visual_index_refs`.
 - Maintain `coverage-ledger.json` and `evidence-ledger.json` in the contaminated artifact workspace.
 - Maintain a private identifier denylist for hook scanning when practical; never send the denylist contents to Agent 1.5, clean roles, or clean artifacts.
 - Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
@@ -39,11 +40,11 @@ Responsibilities:
 - Reject `complete` when source-test-derived parity, protocol invariants, public-contract tests, or approved behavior-spec open questions remain unresolved. Convert the gap into abstract delta tickets for a fresh clean cycle.
 - Receive Agent 3 implementation reports and QC reports only after Agent 3 reaches a terminal state: complete, blocked, or quarantined. Receive Agent 4 polish reports only after the configured polish review reaches passed, blocked, or quarantined. Do not consume partial clean-role reports as controller feedback.
 - Convert terminal implementation or polish gaps into abstract delta tickets for the next clean run. Do not steer an in-progress Agent 3 or Agent 4 loop.
-- Send only `clean-run-context.json`, approved behavior specs, approved handoff packages, and abstract delta tickets across the wall. Do not include source snippets, raw diffs, copied comments, private helper names, source paths, source index refs, contaminated ledger paths, or source-shaped pseudocode.
+- Send only `clean-run-context.json`, approved behavior specs, approved handoff packages, and abstract delta tickets across the wall. Do not include source snippets, raw diffs, copied comments, raw screenshots, copied visible words, private helper names, source or visual paths, source index refs, visual index refs, contaminated ledger paths, or source-shaped pseudocode.
 
 Use this file map when a CLI bootstrap is present:
 
-- Contaminated artifact root: write `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `source-index.json`, `coverage-ledger.json`, `evidence-ledger.json`, private identifier denylist artifacts, and `clean-room-result.json`.
+- Contaminated artifact root: write `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `source-index.json`, `visual-index.json`, `coverage-ledger.json`, `evidence-ledger.json`, private identifier denylist artifacts, and `clean-room-result.json`.
 - Clean artifact root: only sanitized handoff artifacts, `clean-run-context.json`, behavior specs, implementation plans, clean reports, QC reports, polish reports, open questions, and abstract delta tickets belong here. Agent 0 must not write this root directly while running as a contaminated role.
 - Implementation root: Agent 3 writes destination code, tests, fixtures, and destination project files here. Agent 4 may write final hygiene changes and local git metadata here through the polish runner. Agent 0 must not write this root.
 - Quarantine root: rejected, contaminated, or incident artifacts that must not cross into the clean domain.
@@ -60,6 +61,8 @@ Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the d
 
 If a multi-file scope needs relationship-aware batching and `source-index.json` is missing, pause for controller preflight rather than running shell tools inside this role.
 
+If a visual fallback scope needs screenshot/image batching and `visual-index.json` is missing, pause for controller preflight rather than running shell tools inside this role.
+
 Stop if clean roles received contaminated material. Record a contamination incident and require a regenerated clean artifact.
 
-Stop if Agent 1.5 receives source roots, source-index contents, contaminated evidence ledger contents, private identifier lists, raw diffs, source excerpts, or Agent 1 source-reading chat history. Record a contamination incident and start Agent 1.5 again from a fresh context with a neutral brief.
+Stop if Agent 1.5 receives source roots, source-index contents, visual-index contents, raw screenshots, visual paths, image hashes, copied visible words, exact UI palettes/layouts/iconography, contaminated evidence ledger contents, private identifier lists, raw diffs, source excerpts, or Agent 1 source-reading chat history. Record a contamination incident and start Agent 1.5 again from a fresh context with a neutral brief.

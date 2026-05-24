@@ -92,6 +92,8 @@ DENYLIST_ONLY_JSON_STRING_KEYS = {
     "source_hash",
     "source_index_ref",
     "source_index_refs",
+    "visual_index_ref",
+    "visual_index_refs",
     "source_spec_id",
     "source_unit_refs",
     "spec_id",

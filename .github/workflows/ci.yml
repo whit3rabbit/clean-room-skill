@@ -66,7 +66,9 @@ jobs:
         run: python3 -m compileall -q hooks skills/clean-room/scripts
 
       - name: Smoke test source index CLI
-        run: python3 skills/clean-room/scripts/build_source_index.py --help >/dev/null
+        run: |
+          python3 skills/clean-room/scripts/build_source_index.py --help >/dev/null
+          python3 skills/clean-room/scripts/build_visual_index.py --help >/dev/null
 
       - name: Validate example schemas
         run: |

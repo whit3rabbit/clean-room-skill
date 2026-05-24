@@ -14,7 +14,8 @@ Block these from clean artifacts:
 - full `task-manifest.json`
 - full `preflight-goal.json`
 - `init-config.json`
-- source roots, contaminated roots, source index refs, coverage ledger refs, and evidence ledger refs
+- source roots, visual roots, contaminated roots, source index refs, visual index refs, coverage ledger refs, and evidence ledger refs
+- raw screenshots, `visual-index.json`, visual paths, image hashes, copied visible words, exact palettes, exact iconography, exact spacing/layout reproduction, and distinctive visual expression
 - copied comments
 - decompiled output
 - private package, module, class, helper, method, function, variable, constant, or field names
@@ -36,6 +37,7 @@ Allow these only when needed for compatibility or testing:
 - public file formats
 - externally visible error codes
 - interoperability-relevant strings
+- visible UI words only when recorded as public compatibility surface in preflight
 
 When keeping a public name, record why it is compatibility-relevant.
 
@@ -72,7 +74,8 @@ Before clean handoff, Agent 1.5 confirms from a fresh source-denied context:
 - Every retained public name has a compatibility reason.
 - Every uncertain behavior is marked as an open question.
 - `leakage_review.reviewer_role` is `contaminated-handoff-sanitizer`.
-- Clean roles receive `clean-run-context.json` and, when context management is enabled, `role-session-brief.json`; they do not receive `task-manifest.json`, full `preflight-goal.json`, `init-config.json`, `controller-status.json`, source indexes, or contaminated ledgers.
+- Clean roles receive `clean-run-context.json` and, when context management is enabled, `role-session-brief.json`; they do not receive `task-manifest.json`, full `preflight-goal.json`, `init-config.json`, `controller-status.json`, source indexes, visual indexes, raw screenshots, or contaminated ledgers.
+- Visual fallback handoffs do not include raw screenshots, visual indexes, visual paths, image hashes, copied visible words, exact palettes, exact iconography, or exact layout measurements.
 - Agent 0 influences clean roles only through schema-valid durable sanitized artifacts. Direct manager chat, progress feedback, implementation hints, priority changes, and in-progress corrections are contamination risks.
 - Agent 3 reports to Agent 0 only after implementation is complete, blocked, or quarantined. Agent 4 reports only through terminal `polish-report.json` after final clean polish review is complete, blocked, or quarantined.
 
@@ -92,7 +95,7 @@ Do not try to "forget" source material inside the same clean context and continu
 
 Use hook scripts as audit and guardrail support, not as the only boundary:
 
-- `hooks/deny-clean-source-read.py`: denies clean-role and Agent 1.5 reads from `CLEAN_ROOM_SOURCE_ROOTS`; clean roles may read only `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS`, while Agent 1.5 may read only assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
+- `hooks/deny-clean-source-read.py`: denies clean-role and Agent 1.5 reads from `CLEAN_ROOM_SOURCE_ROOTS`, which must include visual evidence roots during visual fallback; clean roles may read only `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS`, while Agent 1.5 may read only assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
 - `hooks/deny-contaminated-clean-write.py`: enforces write roots. Agent 2 writes only under `CLEAN_ROOM_CLEAN_ROOTS`, Agent 3 writes reports under `CLEAN_ROOM_CLEAN_ROOTS` and implementation files under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, Agent 4 writes polish reports under `CLEAN_ROOM_CLEAN_ROOTS` and implementation-root hygiene/commit files under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and contaminated roles may write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 - `hooks/check-artifact-leakage.py`: scans clean artifacts for high-risk leakage markers, obvious source-like identifiers, and terms from optional `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST` files.
 - For Agent 1.5, `hooks/check-artifact-leakage.py` also scans staged contaminated artifacts before promotion to clean handoff.

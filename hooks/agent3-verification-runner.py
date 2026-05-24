@@ -384,13 +384,14 @@ def build_container_argv(
         context,
         fallback_timeout,
     )
+    runtime_network = "none" if network == "off" else network
     validate_container_mount_roots(cwd, blocked_roots)
     container_argv = [
         container_executable(backend),
         "run",
         "--rm",
         "--network",
-        network,
+        runtime_network,
         "--read-only",
         "--cap-drop",
         "ALL",

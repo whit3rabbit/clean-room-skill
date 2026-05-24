@@ -9,6 +9,7 @@ Ask only enough to fill `preflight-goal.json`:
 - End goal: clean reimplementation, behavior-compatible port, API-compatible clone, modernization, partial extraction, or spec/test generation only.
 - Target stack: language, runtime, framework, package manager, and test framework.
 - Exactness: public APIs, CLI behavior, config files, output formats, error codes, UI behavior, or behavior-only.
+- Visual fallback: when no source code is available, confirm what authorized screenshots are meant to accomplish, the target user flow, screenshot coverage, target stack, UI exactness boundary, and whether visible words are public compatibility surface.
 - Forbidden mirroring: internal names, private structure, comments, source file layout, private helper behavior, and dependencies.
 - Feature policy: preserve, remove, add, and non-goals.
 - Dependency policy: allow new dependencies, prefer standard library, allow/block dependencies, and native/system dependency approval.
@@ -61,6 +62,8 @@ New code-development packages may insert `clean-polish-review` between `clean-im
 Agent 1 cannot start until Agent 0 records the preflight hash, assigned unit, source scope, evidence policy, and neutral sanitizer brief template.
 
 Agent 1.5 cannot start until Agent 1 writes draft behavior specs with evidence refs only and no direct source excerpts.
+
+For visual fallback runs, Agent 1.5 also cannot receive `visual-index.json`, raw screenshots, visual paths, image hashes, copied visible words, exact palettes, or distinctive UI layout/iconography.
 
 Agent 2 cannot start until Agent 1.5 writes a passed handoff package, approved behavior specs, leakage review status, and `clean-run-context.json`.
 

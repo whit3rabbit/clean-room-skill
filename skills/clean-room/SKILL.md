@@ -11,7 +11,7 @@ metadata:
 
 ## Overview
 
-Produce clean behavioral specifications from authorized source analysis, then implement them in a separate clean destination code root. Keep contaminated source access separate from clean planning, clean implementation, and verification.
+Produce clean behavioral specifications from authorized source analysis, then implement them in a separate clean destination code root. When no indexable source code exists and the user authorizes screenshots or images as evidence, produce clean behavioral specifications from contaminated visual observations instead. Keep contaminated source or visual evidence separate from clean planning, clean implementation, and verification.
 
 This skill is not legal advice and does not create a legal safe harbor. Treat it as an engineering risk-reduction workflow for preserving a documented separation between source analysis, clean artifacts, and clean implementation code.
 
@@ -21,7 +21,7 @@ This skill is not legal advice and does not create a legal safe harbor. Treat it
 2. Confirm authorization, source scope, destination scope, allowed actions, prohibited actions, and evidence handling rules.
 3. Separate contaminated artifacts, clean artifacts, and clean implementation code into different workspaces, worktrees, or repositories. Prefer separate agent profiles or homes when platform support exists.
 4. Keep contaminated chat history, raw source, raw diffs, source excerpts, comments, distinctive identifiers, and implementation-shaped pseudocode out of clean artifacts.
-5. Produce structured artifacts for the audit trail: preflight goal, init config, clean run context, role session briefs, controller status, source index, task manifest, evidence ledger references, coverage ledger summaries, behavioral spec, handoff package, skeleton manifest, implementation plan, implementation report, QC report, open questions, incident records, and test plan.
+5. Produce structured artifacts for the audit trail: preflight goal, init config, clean run context, role session briefs, controller status, source index or visual index, task manifest, evidence ledger references, coverage ledger summaries, behavioral spec, handoff package, skeleton manifest, implementation plan, implementation report, QC report, open questions, incident records, and test plan.
 6. Write clean implementation code only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, never in source or contaminated artifact roots.
 7. Treat `allowed-tools` and skill frontmatter as convenience, not as a security boundary. Enforce separation with workspace paths, profiles, role agents, hooks, schema validation, and artifact quarantine.
 
@@ -29,7 +29,7 @@ This skill is not legal advice and does not create a legal safe harbor. Treat it
 
 Use these roles conceptually. If the host supports subagents, map each role to a separate agent or profile. If not, run the phases manually and keep artifacts separated.
 
-- Agent 0 / contaminated manager/verifier: consumes the contaminated source index, decomposes the source scope into logical batches, tracks coverage, assigns source-reading work, maintains compact controller status, creates low-context role session briefs, and checks final clean artifacts and terminal clean reports against source behavior, discovered source tests, equal-output requirements, and public contract compatibility. It may read source but must influence Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts, never direct chat, coaching, or in-progress feedback.
+- Agent 0 / contaminated manager/verifier: consumes the contaminated source index, or fallback visual index when no source code is available, decomposes scope into logical batches, tracks coverage, assigns source-reading or visual-evidence work, maintains compact controller status, creates low-context role session briefs, and checks final clean artifacts and terminal clean reports against source behavior, discovered source tests, equal-output requirements, and public contract compatibility. It may read source or visual evidence but must influence Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts, never direct chat, coaching, or in-progress feedback.
 - Agent 1 / contaminated source analyst/spec writer: reads source in a read-only manner and writes neutral draft tasks and behavioral specs. It treats discovered source tests as behavioral evidence and converts them into clean `test_scenarios` for the same observable outputs. It must avoid code, copied comments, distinctive identifiers unless public API compatibility requires them, source test names or fixture structure, and source-shaped pseudocode. It does not approve its own drafts for handoff.
 - Agent 1.5 / contaminated handoff sanitizer: works in a fresh source-denied contaminated context, reads only Agent 0's neutral brief plus assigned draft artifacts, scrubs identifying material, and approves or quarantines handoff candidates.
 - Agent 2 / clean architect/planner: starts from the clean workspace, reads `clean-run-context.json`, approved clean handoff artifacts, and the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`; then writes `implementation-plan.json` with relative destination paths, tests, constraints, risks, and argv-array verification commands. It writes no code.
@@ -44,9 +44,11 @@ Agent zero/controller must set and pass the clean-room environment block into ev
 
 When `context_management.mode` is `role-session-briefs`, every role session starts from `CLEAN_ROOM_SESSION_BRIEF_PATH` plus the environment block. In `strict` enforcement, the controller must start a fresh model session, profile, or thread for each role, pass `CLEAN_ROOM_FRESH_CONTEXT_REQUIRED=1`, and keep the stage prompt, session brief, artifact ref count, and referenced artifact bytes inside the recorded budgets. Do not clear or delete durable artifacts to save tokens. Clear only model/chat context between roles.
 
-`preflight-goal.json` is required before source indexing or Agent 0 decomposition. It records the end goal, target stack, license policy, dependency policy, compatibility/exactness policy, feature policy, code hygiene limits, output policy, and controller mode. It is controller/contaminated-side only; clean roles receive only the clean-safe `goal_contract` subset and `code_hygiene_policy` through `clean-run-context.json`.
+`preflight-goal.json` is required before source indexing, visual indexing, or Agent 0 decomposition. It records the end goal, target stack, license policy, dependency policy, compatibility/exactness policy, feature policy, code hygiene limits, output policy, and controller mode. It is controller/contaminated-side only; clean roles receive only the clean-safe `goal_contract` subset and `code_hygiene_policy` through `clean-run-context.json`.
 
 When source scope is larger than a single obvious unit, run `scripts/build_source_index.py` as source-index preflight before starting clean-room role sessions. The resulting `source-index.json` is contaminated-only input for Agent 0. It may contain source paths, import/export names, dependency relationships, large-file segment spans, and optional local AST/indexing tool status, so do not place it in clean handoff packages or expose it to Agent 1.5, Agent 2, Agent 3, or Agent 4.
+
+When no indexable source code is available and the user authorizes screenshots or image folders as the only evidence, run `scripts/build_visual_index.py` as visual-index preflight. Treat `visual-index.json` and all indexed images as contaminated-only source evidence. Do not OCR, copy visible words, extract exact palettes, duplicate distinctive layouts, or pass screenshots, visual paths, hashes, or visual-index contents to Agent 1.5 or clean roles. Visual roots must be included in `CLEAN_ROOM_SOURCE_ROOTS` for role sessions so clean and source-denied reads fail closed.
 
 Optional AST/indexing helpers are detected before the controller loop through `scripts/clean_room_tool_manager.py --status` or through the dependency report embedded by `build_source_index.py`. No dependency is installed implicitly. Local installs require an explicit exact version, for example `scripts/clean_room_tool_manager.py --install-local ast-grep --version <exact-version>`, write under `~/.cache/re-skills/clean-room-tools/`, serialize npm prefix mutation with a cache-local lock, and return structured JSON error facts for setup failures. Target-project `.local/bin`, `.bin`, and `node_modules/.bin` are ignored unless `--allow-working-project-tools` or `RE_SKILLS_TRUST_PROJECT_TOOLS=1` is set.
 
@@ -94,7 +96,7 @@ Gather only the setup facts needed to decide whether the workflow may start, or 
 
 - Authorization statement, requester, allowed actions, prohibited actions, and evidence handling.
 - Artifact base root. Default to `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
-- Source roots, contaminated artifact root, clean artifact root, clean implementation root, quarantine root, and optional public or destination reference roots.
+- Source roots or fallback visual evidence roots, contaminated artifact root, clean artifact root, clean implementation root, quarantine root, and optional public or destination reference roots.
 - Target stack and destination constraints from `preflight-goal.json`.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.
 - Default model plus optional clean, contaminated, or per-role overrides.
@@ -112,10 +114,10 @@ For `unattended` mode, require explicit authorization, separated roots, finite b
 Default sequence:
 
 1. Preflight goal contract: create or validate `preflight-goal.json`.
-2. Source and destination discovery: record reusable preferences in controller-side `init-config.json` when requested, choose a neutral task ID when needed, and run source-index preflight when needed.
+2. Source and destination discovery: record reusable preferences in controller-side `init-config.json` when requested, choose a neutral task ID when needed, and run source-index preflight when needed. If no indexable source code exists and screenshots are explicitly authorized as the only evidence, run visual-index preflight instead.
 3. Agent 0 decomposition: record authorization, boundaries, preflight goal hash, selected target profile, model policy, `run_state`, `handoff_sequence`, Agent 0-4 handoff contract, and required Agent 1.5 sanitizer role in `task-manifest.json`.
 4. Clean context gate: create sanitized `clean-run-context.json` for Agent 2, Agent 3, and Agent 4. Include only clean artifact paths, implementation root environment references, target profile, clean-safe goal contract fields, code hygiene policy, approved public refs, clean-safe rules, clean-side model preferences, optional context-management budgets, and the artifact-only coordination boundary.
-5. Contaminated spec writing: Agent 1 produces one or more draft `behavior-spec.json` artifacts from observed behavior, discovered source tests, public API contracts, error conditions, invariants, state transitions, and compatibility requirements. Source tests are behavioral evidence: convert them into clean `test_scenarios` that validate the same observable outputs without copying source test names, fixtures, private helpers, or source-shaped structure. For behavior-compatible ports, include compatibility-critical protocol, serialization, streaming, queueing, error-budget, async, and typed-data invariants when present.
+5. Contaminated spec writing: Agent 1 produces one or more draft `behavior-spec.json` artifacts from observed behavior, discovered source tests, public API contracts, error conditions, invariants, state transitions, and compatibility requirements. Source tests are behavioral evidence: convert them into clean `test_scenarios` that validate the same observable outputs without copying source test names, fixtures, private helpers, or source-shaped structure. For visual fallback, Agent 1 uses assigned `visual_index_refs` and `view_image` only in the contaminated role to describe UI intent, state, hierarchy, accessibility expectations, interaction purpose, and broad style goals without copying visible words or exact visual expression. For behavior-compatible ports, include compatibility-critical protocol, serialization, streaming, queueing, error-budget, async, and typed-data invariants when present.
 6. Source-denied sanitization: Agent 1.5 receives only a neutral brief and assigned draft paths, removes identifying information, preserves the required artifact schema shape, records `leakage_review.reviewer_role` as `contaminated-handoff-sanitizer`, and quarantines failed artifacts.
 7. Clean handoff: move only Agent 1.5-approved structured artifacts plus `clean-run-context.json` to the clean workspace. Do not hand off the full `task-manifest.json`. For each role launch, Agent 0 writes a compact `role-session-brief.json` for that role and phase; the brief carries status, next action, allowed artifact refs with hashes, and forbidden inputs. It is not a replacement for durable artifacts.
 8. Clean planning: Agent 2 starts from the clean artifact root, reads `clean-run-context.json`, approved handoff artifacts, any existing `skeleton-manifest.json`, and the clean implementation foundation, then updates `skeleton-manifest.json` as the durable destination architecture map and produces `implementation-plan.json` with code hygiene policy. Use `implementation-plan.json` as the code-development work contract, and require every planned target/test path to be owned by a referenced architecture area.
@@ -133,6 +135,7 @@ Use the JSON schemas in `assets/` as the contract for machine-readable artifacts
 - `init-config.schema.json`
 - `clean-run-context.schema.json`
 - `source-index.schema.json`
+- `visual-index.schema.json`
 - `coverage-ledger.schema.json`
 - `evidence-ledger.schema.json`
 - `handoff-package.schema.json`
@@ -176,6 +179,7 @@ Allowed clean-side artifact content:
 Blocked clean-side content:
 
 - Source files, source excerpts, copied comments, raw diffs, stack traces containing source lines, and decompiled output.
+- Raw screenshots, `visual-index.json`, visual paths, image hashes, copied visible text, exact palettes, exact iconography, exact spacing/layout reproduction, and distinctive visual expression.
 - Pseudocode that mirrors source structure, function ordering, private helper names, or distinctive control flow.
 - Nonessential package, module, class, function, method, variable, constant, field, internal identifiers, magic strings, log messages, UI copy, formatting, and naming schemes.
 - Patent, trade-secret, or licensing conclusions presented as verified legal findings.
@@ -187,8 +191,8 @@ Identifier rule: package names, namespace/module paths, class names, function or
 Finish the clean implementation loop when:
 
 - `preflight-goal.json` records the user-approved goal contract before source discovery or decomposition.
-- `task-manifest.json` defines source scope, clean scope, selected target profile, required preflight goal ref/hash, required handoff sequence, Agent 0-4 pipeline, Agent 1.5 sanitizer role, handoff rules, optional `initialization_snapshot`, optional `source_index_ref`, and units.
-- `clean-run-context.json` exists for Agent 2, Agent 3, and Agent 4, records artifact-only coordination, clean-safe goal contract fields, code hygiene policy, and Agent 4 commit policy when configured, and does not contain source roots, contaminated roots, source index refs, ledger paths, `preflight-goal.json`, or the full task manifest.
+- `task-manifest.json` defines source scope, clean scope, selected target profile, required preflight goal ref/hash, required handoff sequence, Agent 0-4 pipeline, Agent 1.5 sanitizer role, handoff rules, optional `initialization_snapshot`, optional `source_index_ref` or fallback `visual_index_ref`, and units.
+- `clean-run-context.json` exists for Agent 2, Agent 3, and Agent 4, records artifact-only coordination, clean-safe goal contract fields, code hygiene policy, and Agent 4 commit policy when configured, and does not contain source roots, visual roots, contaminated roots, source index refs, visual index refs, ledger paths, `preflight-goal.json`, or the full task manifest.
 - Every in-scope unit has a behavior spec or an explicit out-of-scope record.
 - Source tests and compatibility-critical invariants discovered in scope are represented as clean, leakage-safe `test_scenarios` or explicit coverage gaps.
 - Approved behavior specs with non-empty `open_questions` must produce abstract delta tickets or block completion.

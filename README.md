@@ -1,6 +1,6 @@
 # Clean Room
 
-Clean Room is an agent workflow for turning authorized source analysis into clean behavioral specs, clean implementation plans, and clean destination code.
+Clean Room is an agent workflow for turning authorized source analysis into clean behavioral specs, clean implementation plans, and clean destination code. When no indexable source code is available, it can use authorized screenshots/images as contaminated fallback evidence for behavior specs.
 
 It is a POC based on ideas from [malus.sh](https://malus.sh/blog.html). It is an engineering risk-reduction workflow, not legal advice, and it does not create a legal safe harbor.
 
@@ -20,10 +20,10 @@ The workflow creates clean behavioral spec packages and clean implementation out
 
 Core boundary:
 
-- Contaminated roles may read authorized source and write contaminated artifacts.
+- Contaminated roles may read authorized source or fallback visual evidence and write contaminated artifacts.
 - Source-denied roles may read only clean artifacts, implementation roots, schemas, and approved public/reference roots.
 - Clean implementation code is written only under the clean implementation root.
-- Raw source, source paths, private identifiers, raw diffs, copied comments, and source-shaped pseudocode must not cross into clean handoff artifacts.
+- Raw source, raw screenshots, source or visual paths, private identifiers, raw diffs, copied comments, copied UI text, and source-shaped pseudocode must not cross into clean handoff artifacts.
 
 For the full boundary model, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). For CLI and troubleshooting details, see [docs/REFERENCE.md](docs/REFERENCE.md).
 

@@ -38,6 +38,7 @@ SCHEMA_BY_ARTIFACT = {
     "coverage-ledger": "coverage-ledger.schema.json",
     "evidence-ledger": "evidence-ledger.schema.json",
     "source-index": "source-index.schema.json",
+    "visual-index": "visual-index.schema.json",
     "handoff-package": "handoff-package.schema.json",
     "contamination-incident": "contamination-incident.schema.json",
     "role-session-brief": "role-session-brief.schema.json",
@@ -46,6 +47,7 @@ SCHEMA_BY_ARTIFACT = {
 CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST_ENV = "CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST"
 FORBIDDEN_CLEAN_CONTEXT_ARTIFACT_NAMES = {
     "source-index.json",
+    "visual-index.json",
     "coverage-ledger.json",
     "evidence-ledger.json",
     "task-manifest.json",
@@ -114,6 +116,8 @@ def artifact_kind(path: Path, data: dict) -> str | None:
     if "status_id" in data and data.get("updated_by_role") == "contaminated-manager-verifier":
         return "controller-status"
     if "index_id" in data and data.get("domain") == "contaminated" and "recommended_batches" in data:
+        if "images" in data:
+            return "visual-index"
         return "source-index"
     if "ledger_id" in data:
         if data.get("domain") == "contaminated" and "entries" in data:
@@ -545,7 +549,7 @@ def main() -> int:
                 print_repair_hint()
                 return 1
             continue
-        if in_clean_root and kind in {"source-index", "init-config", "preflight-goal", "controller-status"}:
+        if in_clean_root and kind in {"source-index", "visual-index", "init-config", "preflight-goal", "controller-status"}:
             print(
                 f"clean-room schema check failed for {describe_path(path)}: {kind}.json is not a clean-role artifact",
                 file=sys.stderr,

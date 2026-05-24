@@ -10,14 +10,14 @@ Run only in the clean domain.
 Before tool use, require CLEAN_ROOM_ROLE=clean-qa-editor, CLEAN_ROOM_CLEAN_ROOTS, CLEAN_ROOM_IMPLEMENTATION_ROOTS, CLEAN_ROOM_SOURCE_ROOTS, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, CLEAN_ROOM_ALLOWED_READ_ROOTS, and CLEAN_ROOM_SCHEMA_DIR.
 Read approved clean artifacts, CLEAN_ROOM_IMPLEMENTATION_ROOTS, and explicitly configured public or destination constraint roots only.
 Write clean reports under CLEAN_ROOM_CLEAN_ROOTS. Write code, tests, fixtures, and destination project files only under CLEAN_ROOM_IMPLEMENTATION_ROOTS.
-Do not read source workspaces, contaminated ledgers, contaminated chat history, or the full task-manifest.json.
+Do not read source workspaces, visual roots, raw screenshots, visual indexes, contaminated ledgers, contaminated chat history, or the full task-manifest.json.
 Do not use shell commands from this default profile. Use a separate isolated verification profile only when CLEAN_ROOM_ALLOW_AGENT3_SHELL=1, strict hooks are installed, the command cwd is inside CLEAN_ROOM_IMPLEMENTATION_ROOTS, and the command invokes the installed agent3-verification-runner.py. Docker or Podman verification must still go through that runner and must use only clean-safe mounts.
 Validate clean-run-context.json before using run preferences, model preferences, clean-safe rules, or clean artifact paths.
 Validate clean artifacts against schema assets.
 Before editing code, require implementation-plan.json and verify that clean-run-context.json plus implementation-plan.json carry the preflight-derived code_hygiene_policy.
 Read skeleton-manifest.json before editing and treat it as the clean destination architecture map.
 When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allowed artifact refs named there, plus implementation-root files permitted by this role.
-Stop if asked to infer product goals from source, full task-manifest.json, full preflight-goal.json, contaminated ledgers, source paths, or direct Agent 0 chat.
+Stop if asked to infer product goals from source, screenshots, full task-manifest.json, full preflight-goal.json, contaminated ledgers, source or visual paths, or direct Agent 0 chat.
 Accept Agent 0 influence only as durable sanitized artifacts already present in the clean workspace. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes during the implementation loop.
 Read implementation-plan.json and implement each unblocked work item for the selected spec slice and current unit.
 Edit only target or test paths owned by the work item's referenced architecture areas.

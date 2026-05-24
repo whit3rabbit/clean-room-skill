@@ -671,6 +671,24 @@ describe('clean-room run command', () => {
     assert.match(result.stderr, /preflight goal sha256 mismatch/);
   });
 
+  test('rejects preflight goal symlink outside contaminated root', () => {
+    const workspace = baseWorkspace('clean-room-run-preflight-symlink');
+    const outside = path.join(workspace.root, 'outside-preflight.json');
+    const preflightPath = path.join(workspace.contaminated, 'preflight-goal.json');
+    fs.writeFileSync(outside, '{"goal_id":"outside"}\n');
+    fs.rmSync(preflightPath);
+    fs.symlinkSync(outside, preflightPath);
+    const manifest = readJson(workspace.manifestPath);
+    manifest.preflight_goal_sha256 = fileSha256(outside);
+    writeJson(workspace.manifestPath, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preflight goal must resolve under contaminated artifact root/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
   test('rejects attended manifests and missing loop context', () => {
     const workspace = baseWorkspace('clean-room-run-invalid-manifest');
     const manifest = readJson(workspace.manifestPath);
@@ -687,6 +705,23 @@ describe('clean-room run command', () => {
     result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /requires task-manifest loop_context/);
+  });
+
+  test('run rejects overlapping source and contaminated roots', () => {
+    const workspace = baseWorkspace('clean-room-run-overlap-source-contaminated');
+    const manifest = readJson(workspace.manifestPath);
+    manifest.artifact_paths.contaminated_artifacts = workspace.source;
+    manifest.artifact_paths.contaminated_artifact_roots = [workspace.source];
+    manifest.initialization_snapshot.effective_roots.contaminated_artifact_roots = [workspace.source];
+    writeJson(workspace.manifestPath, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /source roots and contaminated artifact roots must be separate/);
+    assert.equal(fs.existsSync(path.join(workspace.source, '.clean-room-run.lock')), false);
+    assert.equal(fs.existsSync(path.join(workspace.source, 'controller-run-ledger.json')), false);
+    assert.equal(fs.existsSync(path.join(workspace.source, 'clean-room-result.json')), false);
   });
 
   test('rejects max-iterations above the manifest cap', () => {
@@ -1433,6 +1468,42 @@ describe('clean-room run command', () => {
         ticket_id: 'delta-architecture-drift',
         kind: 'implementation-gap',
         summary: 'Implementation report changed paths do not map to planned work items and owned architecture areas.',
+        requested_clean_change: 'Revise skeleton-manifest.json and implementation-plan.json, then rerun clean implementation inside owned architecture areas.',
+        status: 'open',
+      },
+    ]);
+  });
+
+  test('unreported implementation changes return spec delta', () => {
+    const workspace = baseWorkspace('clean-room-run-unreported-implementation-change');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    const implementationScript = writeImplementationChangeScript(workspace.root);
+    const coverageScript = writeCoveredCoverageScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      {
+        phase: 'clean-implement-qc',
+        role: 'clean-qa-editor',
+        cwd: workspace.implementation,
+        argv: [process.execPath, implementationScript],
+      },
+      coverageStage(workspace.root, coverageScript),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-delta-required/);
+    const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
+    assert.equal(runResult.result, 'spec-delta-required');
+    assert.deepEqual(runResult.abstract_delta_tickets, [
+      {
+        ticket_id: 'delta-architecture-drift',
+        kind: 'implementation-gap',
+        summary: 'Implementation report changed paths did not match observed implementation-root file changes. Re-run clean implementation with accurate changed_paths.',
         requested_clean_change: 'Revise skeleton-manifest.json and implementation-plan.json, then rerun clean implementation inside owned architecture areas.',
         status: 'open',
       },

@@ -10,8 +10,8 @@ This process reduces engineering risk. It does not resolve patent, trade-secret,
 
 Use separate locations for each trust domain:
 
-- Contaminated source workspace: source-readable, read-only where practical, no clean implementation output.
-- Contaminated artifact workspace: preflight goals, init configs, source indexes, task manifests, draft behavior specs, coverage ledgers, and abstract delta tickets. Configure it with `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+- Contaminated source workspace: source-readable, read-only where practical, no clean implementation output. In visual fallback runs, authorized screenshot/image roots are source evidence roots.
+- Contaminated artifact workspace: preflight goals, init configs, source indexes, visual indexes, task manifests, draft behavior specs, coverage ledgers, and abstract delta tickets. Configure it with `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 - Clean artifact workspace: sanitized clean run contexts, behavior specs that passed leakage review, skeleton manifests, implementation plans, implementation reports, QC reports, and test plans. Configure it with `CLEAN_ROOM_CLEAN_ROOTS`.
 - Clean implementation workspace: clean destination code and tests. Configure it with `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 - Clean allowed reference workspace: public documentation or destination constraints explicitly configured for clean and source-denied role reads.
@@ -31,7 +31,7 @@ Use host-level policy where available:
 - Codex agent templates live in `examples/codex/.codex/agents/`.
 - Codex plugin hooks may require enabling plugin hook support in the user or project config before they run.
 
-For clean roles, configure read hooks as deny-by-default. `CLEAN_ROOM_CLEAN_ROOTS` is the clean artifact allowlist, `CLEAN_ROOM_IMPLEMENTATION_ROOTS` is the clean destination foundation allowlist, and `CLEAN_ROOM_SCHEMA_DIR` is readable for bundled schemas. For Agent 1.5, configure reads as source-denied: assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS` are allowed; source roots, clean roots, implementation roots, and `source-index.json` are denied. `CLEAN_ROOM_ALLOWED_READ_ROOTS` is the extra clean/source-denied read allowlist for public documentation or destination constraints. `CLEAN_ROOM_SOURCE_ROOTS` remains denied for source-denied roles even if a source path is also listed elsewhere.
+For clean roles, configure read hooks as deny-by-default. `CLEAN_ROOM_CLEAN_ROOTS` is the clean artifact allowlist, `CLEAN_ROOM_IMPLEMENTATION_ROOTS` is the clean destination foundation allowlist, and `CLEAN_ROOM_SCHEMA_DIR` is readable for bundled schemas. For Agent 1.5, configure reads as source-denied: assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS` are allowed; source roots, visual roots, clean roots, implementation roots, `source-index.json`, and `visual-index.json` are denied. `CLEAN_ROOM_ALLOWED_READ_ROOTS` is the extra clean/source-denied read allowlist for public documentation or destination constraints. `CLEAN_ROOM_SOURCE_ROOTS` remains denied for source-denied roles even if a source path is also listed elsewhere.
 
 For all roles, configure write hooks as deny-by-default. Agent 2 writes only under `CLEAN_ROOM_CLEAN_ROOTS`. Agent 3 writes clean reports under `CLEAN_ROOM_CLEAN_ROOTS` and code/tests only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Agent 4 writes polish reports under `CLEAN_ROOM_CLEAN_ROOTS` and final hygiene/commit state only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Contaminated roles may write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`. Source roots should remain read-only for contaminated roles.
 
@@ -61,9 +61,11 @@ Do not grant shell-style tools to Agent 0, Agent 1, Agent 1.5, Agent 2, or the d
 
 Agent 3 verification may use `--backend docker` or `--backend podman` only for verification/build commands from `implementation-plan.json`. Container backends mount the selected implementation root read/write, clean artifact roots read-only, schemas read-only, and approved public/reference roots read-only. They must not mount `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, a Docker socket, or privileged host paths. For the first Docker milestone, use `network: "off"` and `dependency_mode: "offline"` or `"locked"`; reject networked dependency installation.
 
-Create or validate `preflight-goal.json` before source discovery, source indexing, Agent 0 decomposition, attended execution, or unattended execution. Treat it as controller/contaminated-side only. It may contain source license notes and output roots, so it must not cross to Agent 1.5, clean roles, or clean handoff packages. Clean roles receive only clean-safe goal fields and `code_hygiene_policy` through `clean-run-context.json`.
+Create or validate `preflight-goal.json` before source discovery, source indexing, visual indexing, Agent 0 decomposition, attended execution, or unattended execution. Treat it as controller/contaminated-side only. It may contain source license notes and output roots, so it must not cross to Agent 1.5, clean roles, or clean handoff packages. Clean roles receive only clean-safe goal fields and `code_hygiene_policy` through `clean-run-context.json`.
 
 Run `scripts/build_source_index.py` only as source-index controller preflight before clean-room role sessions. Treat `source-index.json` as contaminated-only: it may record source paths, private import/export identifiers, file metrics, skipped-entry coverage gaps, large-file line spans, optional AST/indexing tool status, and dependency relationships. The indexer enforces file and byte limits after read, records files that change during read as skipped, reports directory walk errors, and prunes traversal after global limits with an aggregate skipped entry. Agent 0 may consume it to create neutral `task-manifest.json` units, but it must not cross to Agent 1.5, clean roles, or clean handoff packages.
+
+Run `scripts/build_visual_index.py` only when no indexable source code exists and the user has authorized screenshot/image folders as the only evidence. Treat `visual-index.json` and raw images as contaminated-only: the index records visual paths, media types, dimensions, bytes, hashes, skipped-entry coverage gaps, and batches for Agent 0. It must not cross to Agent 1.5, clean roles, or clean handoff packages. Do not OCR, copy visible words, extract exact palettes, or preserve distinctive UI expression in clean artifacts. Include visual roots in `CLEAN_ROOM_SOURCE_ROOTS` so clean and source-denied roles cannot read raw screenshots.
 
 Use `scripts/clean_room_tool_manager.py --status` when the controller needs to inspect optional AST/indexing helpers before indexing. It checks env overrides, `~/.cache/re-skills/clean-room-tools/`, skill-local tools, system PATH roots, and user toolchain PATH roots. It does not install anything unless the user explicitly runs `--install-local` with a strict SemVer version. Local npm-backed installs hold a cache-local lock before mutating the shared npm prefix and return structured JSON error facts for prefix creation failures, subprocess timeouts, and subprocess launch errors. Target-project `.local/bin`, `.bin`, and `node_modules/.bin` stay untrusted unless `--allow-working-project-tools` or `RE_SKILLS_TRUST_PROJECT_TOOLS=1` is set. Tools discovered under `/opt/homebrew` or `/usr/local` remain stat-only during `--probe-tools` unless `--allow-user-toolchain-probes` is also set.
 
@@ -80,7 +82,7 @@ The task manifest records `preflight_goal_ref`, `preflight_goal_sha256`, the req
 - Agent 3 is the clean implementer/verifier and emits one terminal implementation report for Agent 0.
 - Agent 4 is the clean polish reviewer and emits one terminal polish report before contaminated coverage verification when configured.
 
-Agent 1.5 runs in the contaminated domain but must not read source roots, `source-index.json`, contaminated evidence ledgers, or Agent 1 source-reading chat history.
+Agent 1.5 runs in the contaminated domain but must not read source roots, visual roots, `source-index.json`, `visual-index.json`, contaminated evidence ledgers, raw screenshots, or Agent 1 source-reading chat history.
 Agent 2, Agent 3, and Agent 4 are clean-domain roles. They may read `clean-run-context.json`, approved behavior specs, handoff packages, schemas, approved public references, and clean implementation roots only. Agent 2 writes implementation plans, not code. Agent 3 writes implementation code only under implementation roots. Agent 4 writes final polish changes, `AGENTS.md`, `.gitignore`, and local commits only under implementation roots. They must not read source workspaces, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`. Agent 0 may influence these roles only through durable sanitized artifacts, not direct messages, implementation hints, progress feedback, or priority changes.
 
 ## Controller Modes
@@ -94,7 +96,7 @@ The outer loop evolves specs, resolves abstract deltas, and chooses the next app
 
 `task-manifest.json` may also include `run_state` to record the run generation, start timestamp, optional previous generation reference, and restart reason. It may include `initialization_snapshot`, an immutable copy of the effective `init-config.json` choices for resumability. New runs use generation `1`; start-over recovery increments generation or creates a fresh task id when prior state is not trusted.
 
-The durable tasklist is `task-manifest.json` `units`, generated by agent zero during decomposition. For multi-file scopes, the task manifest may reference contaminated `source-index.json` batches through `source_index_ref` and per-unit `source_index_refs`. Progress is tracked in contaminated-side `coverage-ledger.json` and `evidence-ledger.json`; clean-side feedback returns only after terminal Agent 3/4 status through `implementation-report.json`, `qc-report.json`, `polish-report.json`, and abstract delta tickets. Prior chat is not a source of truth for the next iteration.
+The durable tasklist is `task-manifest.json` `units`, generated by agent zero during decomposition. For multi-file scopes, the task manifest may reference contaminated `source-index.json` batches through `source_index_ref` and per-unit `source_index_refs`. For visual fallback scopes, it may reference contaminated `visual-index.json` batches through `visual_index_ref` and per-unit `visual_index_refs`. Progress is tracked in contaminated-side `coverage-ledger.json` and `evidence-ledger.json`; clean-side feedback returns only after terminal Agent 3/4 status through `implementation-report.json`, `qc-report.json`, `polish-report.json`, and abstract delta tickets. Prior chat is not a source of truth for the next iteration.
 
 `controller-status.json` is Agent 0 compact memory for resume and handoff preparation. Keep it contaminated-side only. It may summarize current gate, selected unit, coverage state, clean implementation state, QC state, blockers, latest artifact refs, and next safe action. It must not be treated as clean input.
 
@@ -106,7 +108,7 @@ Use recovery entry points only when durable artifacts already exist:
 - `start-over`: require explicit confirmation, archive or quarantine current artifacts without deletion, then return to the preflight gate with a fresh `task_id`.
 - `refocus`: compare current artifacts to declared scope and preflight goal, identify missed gates or open deltas, and steer Agent 0 back to the earliest required gate without expanding scope.
 
-All recovery flows preserve the clean-room wall. Source indexes, private identifiers, contaminated evidence ledgers, and contaminated chat history remain out of Agent 1.5, clean roles, and clean handoff packages.
+All recovery flows preserve the clean-room wall. Source indexes, visual indexes, raw screenshots, private identifiers, contaminated evidence ledgers, and contaminated chat history remain out of Agent 1.5, clean roles, and clean handoff packages.
 
 ## Role Duties
 
@@ -120,7 +122,8 @@ Contaminated manager/verifier:
 - Record optional `context_management` budgets in `task-manifest.json` and `clean-run-context.json` when low-context handoffs are enabled.
 - Maintain contaminated-side `controller-status.json` and create one compact `role-session-brief.json` per role launch.
 - Consume contaminated `source-index.json` when present.
-- Split work into bounded logical units that can map to one source-index batch.
+- For visual fallback only, consume contaminated `visual-index.json` and pause in attended mode to ask what the screenshots are meant to accomplish, including product goal, target user flow, screenshot coverage, target stack, UI exactness boundary, and whether visible words are public compatibility surface.
+- Split work into bounded logical units that can map to one source-index or visual-index batch.
 - Track coverage in `coverage-ledger.json`.
 - Track contaminated evidence references in `evidence-ledger.json`.
 - Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
@@ -131,6 +134,7 @@ Contaminated source analyst/spec writer:
 
 - Verify Agent 0 provided the preflight goal hash, assigned unit, source scope, evidence handling policy, target stack, and compatibility policy before reading source.
 - Read only the source needed for the assigned unit.
+- In visual fallback units, use assigned `visual_index_refs` and `view_image` only from the contaminated role. Describe UI intent, screen states, hierarchy, accessibility expectations, interaction purpose, and broad style goals without copying visible text, exact palettes, exact iconography, spacing, or distinctive layout expression.
 - Describe observable behavior, public contracts, states, errors, invariants, and compatibility requirements.
 - Treat discovered source tests as behavioral evidence and convert them into clean `test_scenarios` that validate the same observable outputs.
 - Define equal output in behavioral terms: public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
@@ -144,9 +148,9 @@ Contaminated source analyst/spec writer:
 Contaminated handoff sanitizer:
 
 - Start from a fresh source-denied context with no Agent 1 source-reading chat history.
-- Verify Agent 0 provided only a neutral sanitizer brief and assigned draft artifact paths; reject any full preflight goal, source index, or evidence ledger input.
+- Verify Agent 0 provided only a neutral sanitizer brief and assigned draft artifact paths; reject any full preflight goal, source index, visual index, raw screenshot, or evidence ledger input.
 - Read only Agent 0's neutral brief, assigned draft artifacts, schema assets, and explicit public or destination reference roots.
-- Remove source expression, source paths, import/export listings, dependency graphs, source test names, fixture structure, private helpers, copied comments, raw diffs, distinctive strings, and source-shaped structure before handoff.
+- Remove source expression, source paths, visual paths, image hashes, copied visible words, import/export listings, dependency graphs, source test names, fixture structure, private helpers, copied comments, raw diffs, distinctive strings, exact UI palettes/layouts/iconography, and source-shaped structure before handoff.
 - Preserve public names only when listed in `public_surface` with compatibility reasons.
 - Record `leakage_review.reviewer_role` as `contaminated-handoff-sanitizer`.
 - Quarantine failed artifacts and return only abstract regeneration feedback to Agent 0.
@@ -216,16 +220,18 @@ Clean polish reviewer:
 4. Clean context:
    - Create `clean-run-context.json` for Agent 2, Agent 3, and Agent 4.
    - Include only clean artifact paths, implementation root environment references, target profile, native artifact expectations, approved public references, clean-safe goal contract fields, code hygiene policy, clean-safe rules, clean-side model preferences, and optional context-management budgets.
-   - Do not include source roots, contaminated roots, source index refs, coverage ledgers, evidence ledgers, contaminated-only rules, `preflight-goal.json`, or the full task manifest.
+   - Do not include source roots, contaminated roots, source index refs, visual index refs, coverage ledgers, evidence ledgers, contaminated-only rules, `preflight-goal.json`, or the full task manifest.
 5. Source index preflight:
    - Run `scripts/build_source_index.py` outside clean-room role sessions when source scope is larger than a single obvious unit.
    - Write `source-index.json` under the contaminated artifact workspace.
    - Keep dependency detection pre-loop and bounded; do not install Homebrew, npm, SDK, pip, or local-download tools implicitly.
    - Validate the source index schema before Agent 0 consumes it.
+   - If no indexable source code exists and screenshots are authorized as the only evidence, run `scripts/build_visual_index.py` instead, write `visual-index.json` under the contaminated artifact workspace, and validate its schema before Agent 0 consumes it.
 6. Decompose:
    - Create the tasklist as bounded source units with neutral ids in `task-manifest.json`.
    - Prefer behavior or public surface groupings over source-file mirroring.
    - Use source-index dependency groups, `recommended_batches`, `large_items`, and `file_segments` to keep Agent 1 context small while preserving import/export relationships.
+   - For visual fallback, use visual-index `recommended_batches` to keep Agent 1 screenshot review bounded; do not derive unit ids from screenshot filenames.
 7. Analyze:
    - Start from a fresh role session brief when context management is enabled.
    - Read source in the contaminated workspace.
@@ -234,6 +240,7 @@ Clean polish reviewer:
    - Record equal-output expectations for public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
    - Include only compatibility-relevant public names.
    - Record retained public names in `public_surface` with `name`, `kind`, `visibility`, and compatibility reasons.
+   - For visual fallback, record UI claims as behavior-spec observations with evidence refs; do not copy visible words unless preflight recorded them as public compatibility surface.
 8. Sanitize:
    - Apply `LEAKAGE-RULES.md`.
    - Start Agent 1.5 from fresh context without source access or Agent 1 source-reading chat history.
@@ -246,7 +253,7 @@ Clean polish reviewer:
    - Move only Agent 1.5-approved structured artifacts and `clean-run-context.json` to the clean workspace.
    - Include only allowed handoff artifact types: `clean-run-context`, `behavior-spec`, `coverage-ledger-summary`, `open-questions`, `test-plan`, and `abstract-delta-ticket`.
    - Use `coverage-ledger-summary` for neutral coverage status only; do not include raw contaminated ledgers.
-   - Do not include `task-manifest.json`, `preflight-goal.json`, `source-index.json`, source paths, import/export listings, or dependency graphs.
+   - Do not include `task-manifest.json`, `preflight-goal.json`, `source-index.json`, `visual-index.json`, raw screenshots, source or visual paths, image hashes, import/export listings, or dependency graphs.
    - Do not include clean-produced skeleton manifests, implementation plans, implementation reports, or QC reports in contaminated-to-clean handoff packages.
    - Preserve producer role and Agent 1.5 review status.
    - Create `handoff-package.json`.
@@ -286,8 +293,8 @@ Stop the workflow when any of these occur:
 - Authorization is missing or narrower than the requested analysis.
 - `preflight-goal.json` is missing, invalid, incomplete for unattended mode, or drifted from `task-manifest.json` refs.
 - Clean roles were exposed to source, contaminated chat history, raw diffs, or copied source expression.
-- Clean roles were given the full `task-manifest.json`, source roots, contaminated roots, source index refs, coverage ledgers, or evidence ledgers instead of `clean-run-context.json`.
-- Agent 1.5 was exposed to source roots, `source-index.json` contents, contaminated evidence ledgers, private identifier lists, raw diffs, source excerpts, or Agent 1 source-reading chat history.
+- Clean roles were given the full `task-manifest.json`, source roots, contaminated roots, source index refs, visual index refs, coverage ledgers, or evidence ledgers instead of `clean-run-context.json`.
+- Agent 1.5 was exposed to source roots, visual roots, `source-index.json` contents, `visual-index.json` contents, raw screenshots, contaminated evidence ledgers, private identifier lists, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 - Implementation roots overlap source, contaminated artifact roots, clean artifact roots, or schema roots.
 - Agent 2 is asked to write code.
 - Agent 3 needs shell access without `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, outside implementation roots, or for anything except the installed verification runner.
@@ -298,7 +305,7 @@ Stop the workflow when any of these occur:
 - No durable artifact changes after an inner-loop iteration.
 - The same unit is selected again after a no-progress iteration.
 - Patent, trade-secret, license, or contract analysis is needed from counsel.
-- The source scope is too large to keep bounded source index or coverage records.
+- The source or visual scope is too large to keep bounded index or coverage records.
 
 ## Final Package
 
@@ -309,6 +316,7 @@ Produce a final audit package containing:
 - `init-config.json`
 - `clean-run-context.json`
 - contaminated-side `source-index.json`
+- contaminated-side `visual-index.json` when visual fallback was used
 - contaminated-side `coverage-ledger.json`
 - contaminated-side `evidence-ledger.json`
 - `handoff-package.json`

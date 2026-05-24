@@ -14,6 +14,7 @@ const CLEAN_EXAMPLES = path.join(ROOT, 'skills', 'clean-room', 'examples', 'mini
 const CONTAMINATED_EXAMPLES = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side');
 const SCHEMA_DIR = path.join(ROOT, 'skills', 'clean-room', 'assets');
 const SOURCE_INDEX = path.join(ROOT, 'skills', 'clean-room', 'scripts', 'build_source_index.py');
+const VISUAL_INDEX = path.join(ROOT, 'skills', 'clean-room', 'scripts', 'build_visual_index.py');
 const TOOL_MANAGER = path.join(ROOT, 'skills', 'clean-room', 'scripts', 'clean_room_tool_manager.py');
 const AGENT3_RUNNER = path.join(HOOKS, 'agent3-verification-runner.py');
 const AGENT4_RUNNER = path.join(HOOKS, 'agent4-polish-runner.py');
@@ -205,6 +206,7 @@ module.exports = {
   SOURCE_INDEX,
   tempDir,
   TOOL_MANAGER,
+  VISUAL_INDEX,
   writeImplementationPlan,
   writeProbeTool,
 };

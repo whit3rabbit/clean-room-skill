@@ -83,6 +83,10 @@
       "type": "string",
       "minLength": 1
     },
+    "visual_index_ref": {
+      "type": "string",
+      "minLength": 1
+    },
     "preflight_goal_ref": {
       "type": "string",
       "minLength": 1
@@ -658,6 +662,13 @@
             ]
           },
           "source_index_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "visual_index_refs": {
             "type": "array",
             "items": {
               "type": "string",

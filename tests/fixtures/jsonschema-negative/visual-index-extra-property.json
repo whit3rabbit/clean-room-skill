@@ -1,0 +1,16 @@
+{
+  "schema_kind": "visual-index",
+  "base": "visual-index.json",
+  "description": "Visual index schema should reject unknown fields.",
+  "set": [
+    {
+      "path": [
+        "images",
+        0,
+        "ocr_text"
+      ],
+      "value": "Do not capture UI words here."
+    }
+  ],
+  "expected_error": "Additional properties are not allowed"
+}

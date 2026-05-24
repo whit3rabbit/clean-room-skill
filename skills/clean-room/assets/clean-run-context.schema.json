@@ -395,7 +395,7 @@
     "clean_path": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?!.*(?:source-index|coverage-ledger|evidence-ledger|task-manifest|preflight-goal)\\.json).+"
+      "pattern": "^(?!.*(?:source-index|visual-index|coverage-ledger|evidence-ledger|task-manifest|preflight-goal)\\.json).+"
     },
     "target_profile": {
       "enum": [

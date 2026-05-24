@@ -43,6 +43,7 @@ SCHEMA_BY_ARTIFACT = {
     "coverage-ledger": "coverage-ledger.schema.json",
     "evidence-ledger": "evidence-ledger.schema.json",
     "source-index": "source-index.schema.json",
+    "visual-index": "visual-index.schema.json",
     "handoff-package": "handoff-package.schema.json",
     "contamination-incident": "contamination-incident.schema.json",
     "role-session-brief": "role-session-brief.schema.json",

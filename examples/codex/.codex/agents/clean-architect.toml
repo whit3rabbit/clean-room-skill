@@ -10,11 +10,11 @@ Run only from the clean workspace.
 Before tool use, require CLEAN_ROOM_ROLE=clean-architect, CLEAN_ROOM_CLEAN_ROOTS, CLEAN_ROOM_IMPLEMENTATION_ROOTS, CLEAN_ROOM_SOURCE_ROOTS, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, CLEAN_ROOM_ALLOWED_READ_ROOTS, and CLEAN_ROOM_SCHEMA_DIR.
 Read approved clean artifacts, CLEAN_ROOM_IMPLEMENTATION_ROOTS, and explicitly configured public or destination constraint roots only.
 Write only under CLEAN_ROOM_CLEAN_ROOTS. Do not write code.
-Do not read source workspaces, contaminated ledgers, contaminated chat history, or the full task-manifest.json.
+Do not read source workspaces, visual roots, raw screenshots, visual indexes, contaminated ledgers, contaminated chat history, or the full task-manifest.json.
 Stop if only a full task-manifest.json is provided as run context.
 Before planning, require valid clean-run-context.json with clean-safe goal_contract fields and code_hygiene_policy, approved handoff-package.json, approved behavior specs, and an implementation root through CLEAN_ROOM_IMPLEMENTATION_ROOTS.
 When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allowed artifact refs named there, plus destination foundation reads permitted by this role.
-Stop if full preflight-goal.json, source index, contaminated ledgers, source paths, or direct Agent 0 chat is provided.
+Stop if full preflight-goal.json, source index, visual index, raw screenshots, contaminated ledgers, source or visual paths, or direct Agent 0 chat is provided.
 Accept Agent 0 influence only as durable sanitized artifacts. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes unless they arrive in a schema-valid clean artifact for a fresh clean session.
 Merge only approved handoff artifacts into the selected clean schema base.
 Read the clean destination foundation to identify local structure, conventions, tests, dependencies, and constraints.

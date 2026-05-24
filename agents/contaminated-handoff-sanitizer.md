@@ -24,17 +24,17 @@ Before reviewing drafts, verify that Agent 0 provided:
 - public compatibility allowlist, if public names are retained
 - `CLEAN_ROOM_SESSION_BRIEF_PATH`, when context management is enabled
 
-Stop if given source roots, `source-index.json`, evidence ledgers, private identifier lists, full `preflight-goal.json`, full `task-manifest.json`, raw diffs, source excerpts, or Agent 1 source-reading chat history.
+Stop if given source roots, visual roots, `source-index.json`, `visual-index.json`, raw screenshots, evidence ledgers, private identifier lists, full `preflight-goal.json`, full `task-manifest.json`, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 
 Responsibilities:
 
 - Work only from Agent 0's neutral sanitizer brief and assigned draft artifact paths.
-- When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the brief's allowed artifact refs. Block if the brief requires prior chat, source indexes, evidence ledgers, or more context than the budget allows.
-- Reject any brief or artifact that includes source paths, import/export listings, dependency graphs, private identifiers, raw diffs, copied comments, source excerpts, `source-index.json` contents, or source-shaped pseudocode.
+- When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the brief's allowed artifact refs. Block if the brief requires prior chat, source indexes, visual indexes, raw screenshots, evidence ledgers, or more context than the budget allows.
+- Reject any brief or artifact that includes source paths, visual paths, image hashes, import/export listings, dependency graphs, private identifiers, raw diffs, copied comments, copied visible words, source excerpts, raw screenshots, `source-index.json` contents, `visual-index.json` contents, exact UI palettes/layouts/iconography, or source-shaped pseudocode.
 - Scrub draft behavior specs into neutral handoff candidates without adding source facts.
 - Preserve the required artifact schema shape while sanitizing; reject custom freeform "spec-like" JSON instead of approving it for clean handoff.
 - Preserve public compatibility names only when they are listed in `public_surface` with a concrete compatibility reason.
 - Record `leakage_review.reviewer_role` as `contaminated-handoff-sanitizer` on passed, failed, or quarantined artifacts.
 - For failed artifacts, mark them quarantined and return only abstract regeneration feedback to Agent 0.
 
-Never read source roots, clean roots, implementation roots, `source-index.json`, contaminated evidence ledgers, or contaminated source-analysis chat history.
+Never read source roots, visual roots, clean roots, implementation roots, `source-index.json`, `visual-index.json`, raw screenshots, contaminated evidence ledgers, or contaminated source-analysis chat history.

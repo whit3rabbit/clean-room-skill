@@ -310,7 +310,7 @@ Strict context-management adapter example:
 }
 ```
 
-Relative `context.brief_path` values resolve relative to the `agent-commands.json` directory. Contaminated phases must point to briefs under the contaminated artifact root. Clean phases must point to briefs under the clean artifact root. A clean-stage brief may reference allowed clean artifacts, implementation artifacts, and approved public references, but not source indexes, contaminated ledgers, full manifests, controller status, or prior chat state.
+Relative `context.brief_path` values resolve relative to the `agent-commands.json` directory. Contaminated phases must point to briefs under the contaminated artifact root. Clean phases must point to briefs under the clean artifact root. A clean-stage brief may reference allowed clean artifacts, implementation artifacts, and approved public references, but not source indexes, visual indexes, raw screenshots, contaminated ledgers, full manifests, controller status, or prior chat state.
 
 The runner exports `CLEAN_ROOM_SESSION_BRIEF_PATH`, `CLEAN_ROOM_ROLE_SESSION_ID`, and `CLEAN_ROOM_FRESH_CONTEXT_REQUIRED=1` for strict stages. The adapter still owns the actual fresh-context behavior: it must open a new model session, profile, or thread for that stage. Setting `fresh_session` while reusing one long chat is not a clean-room boundary.
 
@@ -329,6 +329,7 @@ The runner exports `CLEAN_ROOM_SESSION_BRIEF_PATH`, `CLEAN_ROOM_ROLE_SESSION_ID`
 | `clean-room run` reports repeated unit selection | Same unit selected after a no-progress iteration | Resolve the blocker or update durable artifacts before retrying. |
 | Hook reports `could not read` or `could not stat` | Artifact disappeared, permissions changed, or path was replaced during validation | Restore readable artifact state and retry. |
 | `source-index.json` is missing files | Limits, unreadable directories, ignored directories, binary files, changed files, or outside-root symlinks | Inspect `skipped_entries` and adjust limits or permissions if omissions matter. |
+| `visual-index.json` is missing screenshots | Limits, unsupported formats, unreadable directories, changed files, invalid image headers, or outside-root symlinks | Inspect `skipped_entries`, keep visual roots in the contaminated/source domain, and rerun `build_visual_index.py` only as fallback evidence preflight. |
 
 ## Local Verification
 

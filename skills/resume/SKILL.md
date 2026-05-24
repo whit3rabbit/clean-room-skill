@@ -20,6 +20,7 @@ Load these artifacts from the paths recorded in `task-manifest.json` and the con
 - `init-config.json`, when present, only for drift comparison against `task-manifest.json` `initialization_snapshot`
 - `clean-run-context.json`, when present, only on the clean side
 - `source-index.json`, only when referenced by the task manifest and only on the contaminated side
+- `visual-index.json`, only when referenced by the task manifest and only on the contaminated side
 - `coverage-ledger.json`
 - `evidence-ledger.json`
 - `handoff-package.json` and behavior specs when present
@@ -47,13 +48,13 @@ Before choosing work:
 - Stop if new-run artifacts lack `preflight_goal_ref`, `preflight_goal_sha256`, or the required `handoff_sequence`. Treat this as legacy or incomplete preflight state and ask for a reviewed preflight goal before resuming.
 - Validate referenced `preflight-goal.json` before using goal, stack, dependency, license, exactness, output, or hygiene decisions.
 - Preserve `loop_context` when present. In unattended inner-loop mode, selected work must remain inside `loop_context.approved_scope_refs`.
-- Stop if clean roles appear to require source, contaminated ledgers, contaminated chat history, raw diffs, source excerpts, `source-index.json`, or the full `task-manifest.json`.
+- Stop if clean roles appear to require source, screenshots, contaminated ledgers, contaminated chat history, raw diffs, source excerpts, `source-index.json`, `visual-index.json`, or the full `task-manifest.json`.
 - Stop if Agent 3 appears to require writing code outside `CLEAN_ROOM_IMPLEMENTATION_ROOTS` or running shell outside the bounded Agent 3 shell policy.
 - Stop if Agent 4 appears to require reading source/contaminated material, writing outside `CLEAN_ROOM_IMPLEMENTATION_ROOTS` and `CLEAN_ROOM_CLEAN_ROOTS`, or running shell outside the bounded Agent 4 polish runner policy.
-- Stop if `clean-run-context.json` exposes source roots, contaminated roots, source index refs, coverage ledgers, or evidence ledgers.
+- Stop if `clean-run-context.json` exposes source roots, visual roots, contaminated roots, source index refs, visual index refs, coverage ledgers, or evidence ledgers.
 - Stop if Agent 0 appears to have steered Agent 2, Agent 3, or Agent 4 through direct chat, progress feedback, implementation hints, priority changes, or partial implementation reports instead of durable sanitized artifacts.
 - Treat non-terminal Agent 3 `implementation-report.json` states as internal clean-side state, not Agent 0 feedback.
-- Stop if Agent 1.5 appears to require source roots, `source-index.json` contents, contaminated evidence ledgers, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
+- Stop if Agent 1.5 appears to require source roots, visual roots, `source-index.json` contents, `visual-index.json` contents, raw screenshots, contaminated evidence ledgers, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 - If `context_management.mode` is `role-session-briefs`, verify the next role can be launched from a fresh context using `role-session-brief.json` and the recorded budgets. Do not use resume chat history as the brief.
 
 ## Selection Rules

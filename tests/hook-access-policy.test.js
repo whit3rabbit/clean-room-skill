@@ -162,9 +162,11 @@ describe('clean-room access hook policy', () => {
     const implementationFile = path.join(env.CLEAN_ROOM_IMPLEMENTATION_ROOTS, 'clean-foundation.js');
     const sourceFile = path.join(env.CLEAN_ROOM_SOURCE_ROOTS, 'secret.py');
     const contaminatedFile = path.join(env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, 'coverage-ledger.json');
+    const allowedVisualIndex = path.join(env.CLEAN_ROOM_ALLOWED_READ_ROOTS, 'visual-index.json');
     fs.writeFileSync(implementationFile, 'export const value = 1;\n');
     fs.writeFileSync(sourceFile, 'VALUE = 1\n');
     fs.writeFileSync(contaminatedFile, '{}\n');
+    fs.writeFileSync(allowedVisualIndex, '{}\n');
 
     let result = runHook('deny-clean-source-read.py', {
       tool_name: 'Read',
@@ -191,6 +193,13 @@ describe('clean-room access hook policy', () => {
     }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /outside allowed roots/);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: allowedVisualIndex },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /visual-index artifact/);
   });
 
   test('source-denied sanitizer can read only explicitly allowed staged artifacts and denied roots stay blocked', () => {
@@ -203,6 +212,7 @@ describe('clean-room access hook policy', () => {
     const evidenceLedger = path.join(contaminated, 'evidence-ledger.json');
     const preflightGoal = path.join(contaminated, 'preflight-goal.json');
     const sourceIndex = path.join(contaminated, 'source-index.json');
+    const visualIndex = path.join(contaminated, 'visual-index.json');
     const taskManifest = path.join(contaminated, 'task-manifest.json');
     const staged = path.join(contaminated, 'staged');
     const stagedCoverageLedger = path.join(staged, 'coverage-ledger.json');
@@ -218,6 +228,7 @@ describe('clean-room access hook policy', () => {
     fs.writeFileSync(evidenceLedger, '{}');
     fs.writeFileSync(preflightGoal, '{}');
     fs.writeFileSync(sourceIndex, '{}');
+    fs.writeFileSync(visualIndex, '{}');
     fs.writeFileSync(taskManifest, '{}');
     fs.writeFileSync(stagedCoverageLedger, '{}');
     fs.writeFileSync(path.join(source, 'secret.py'), 'VALUE = 1\n');
@@ -261,6 +272,7 @@ describe('clean-room access hook policy', () => {
       { file: stagedCoverageLedger, allowRoot: staged, message: /coverage-ledger artifact/ },
       { file: evidenceLedger, allowRoot: evidenceLedger, message: /evidence-ledger artifact/ },
       { file: sourceIndex, allowRoot: sourceIndex, message: /source-index artifact/ },
+      { file: visualIndex, allowRoot: visualIndex, message: /visual-index artifact/ },
       { file: preflightGoal, allowRoot: preflightGoal, message: /preflight-goal artifact/ },
     ]) {
       result = runHook('deny-clean-source-read.py', {
@@ -316,6 +328,13 @@ describe('clean-room access hook policy', () => {
     }, env);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /source-index artifact/);
+
+    result = runHook('deny-clean-source-read.py', {
+      tool_name: 'Read',
+      tool_input: { file_path: visualIndex },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /visual-index artifact/);
   });
 
   test('write policy resolves relative payload paths against tool cwd', () => {

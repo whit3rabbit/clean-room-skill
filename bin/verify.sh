@@ -49,6 +49,7 @@ echo "Compiling Python hooks and scripts..."
 
 echo "Smoke testing source index CLI..."
 "$python_cmd" skills/clean-room/scripts/build_source_index.py --help >/dev/null
+"$python_cmd" skills/clean-room/scripts/build_visual_index.py --help >/dev/null
 
 echo "Validating example schemas..."
 for dir in skills/clean-room/examples/minimal-spec-package skills/clean-room/examples/contaminated-side; do

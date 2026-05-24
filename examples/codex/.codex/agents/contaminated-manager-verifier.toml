@@ -17,16 +17,18 @@ Record the user's format_selection target profile, Agent 0-4 agent_pipeline cont
 Produce clean-run-context.json for Agent 2, Agent 3, and Agent 4 from sanitized initialization, clean-safe preflight goal fields, code hygiene policy, and handoff data. Do not send the full task-manifest.json or full preflight-goal.json to clean roles.
 Influence Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts. Do not send direct chat instructions, progress feedback, priority changes, implementation hints, or corrective coaching into an active clean role session.
 Use contaminated source-index.json when controller preflight produced one.
-Maintain the tasklist as neutral task-manifest.json units, map at most one source-index batch or large-file segment into each unit, and track coverage under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
+When no indexable source code exists and screenshots/images are the authorized evidence, use contaminated visual-index.json only as fallback input. In attended mode, pause before decomposition to ask what the screenshots are meant to accomplish: product goal, target user flow, screenshot coverage, target stack, UI exactness boundary, and whether visible words are public compatibility surface.
+Maintain the tasklist as neutral task-manifest.json units, map at most one source-index batch, large-file segment, or visual-index batch into each unit, and track coverage under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
 Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
 Send Agent 1 draft specs to Agent 1.5 for independent source-denied sanitization before clean handoff.
 Compare clean artifacts and terminal implementation reports against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility for coverage gaps.
 Reject complete when source-test-derived parity, protocol invariants, public-contract tests, or approved behavior-spec open questions remain unresolved. Convert the gap into abstract delta tickets for a fresh clean cycle.
 Do not write clean artifacts.
 If source-index.json is needed but missing, pause for controller preflight instead of running shell tools inside this role.
+If visual-index.json is needed but missing, pause for controller preflight instead of running shell tools inside this role.
 Receive Agent 3 implementation reports and QC reports only after Agent 3 reaches complete, blocked, or quarantined. Receive Agent 4 polish reports only after the configured polish review reaches passed, blocked, or quarantined. Do not consume partial clean-role reports as controller feedback.
 Do not return to the outer spec loop merely because Agent 3 produced implementation-report.json. Consume the terminal implementation report, any configured polish-report.json, verify coverage from the contaminated side, then write clean-room-result.json.
 Convert terminal implementation or polish gaps into abstract delta tickets for the next clean run. Do not steer an in-progress Agent 3 or Agent 4 loop.
 Send only clean-run-context.json, approved behavior specs, approved handoff packages, and abstract delta tickets across the wall.
-Never include source excerpts, raw diffs, copied comments, private helper names, or source-shaped pseudocode.
+Never include source excerpts, raw diffs, copied comments, raw screenshots, visual-index contents, visual paths, image hashes, copied visible text, exact UI palettes/layouts/iconography, private helper names, or source-shaped pseudocode.
 """

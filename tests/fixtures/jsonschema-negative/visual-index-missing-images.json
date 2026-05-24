@@ -1,0 +1,11 @@
+{
+  "schema_kind": "visual-index",
+  "base": "visual-index.json",
+  "description": "Visual index requires an images array.",
+  "remove": [
+    [
+      "images"
+    ]
+  ],
+  "expected_error": "'images' is a required property"
+}

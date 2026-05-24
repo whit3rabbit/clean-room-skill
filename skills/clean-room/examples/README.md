@@ -16,6 +16,8 @@ The minimal `preflight-goal.json` and `init-config.json` are controller-side exa
 
 The minimal `source-index.json` is a contaminated-side shape example. Real source indexes may contain source paths and private import/export names, so they must stay out of Agent 1.5 inputs and clean handoff packages.
 
+The minimal `visual-index.json` is a contaminated-side visual fallback shape example. Real visual indexes may contain screenshot paths, dimensions, and image hashes, so they must stay out of Agent 1.5 inputs and clean handoff packages.
+
 Use them to seed tests, docs, or dry runs:
 
 - `minimal-spec-package/clean-run-context.json`
@@ -33,6 +35,7 @@ Use them to seed tests, docs, or dry runs:
 - `contaminated-side/preflight-goal.json`
 - `contaminated-side/init-config.json`
 - `contaminated-side/source-index.json`
+- `contaminated-side/visual-index.json`
 - `contaminated-side/evidence-ledger.json`
 - `contaminated-side/coverage-ledger.json`
 - `contaminated-side/controller-status.json`

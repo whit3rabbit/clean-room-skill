@@ -19,6 +19,8 @@ from clean_room_paths import (
     read_artifact_text,
 )
 
+VISUAL_EVIDENCE_SUFFIXES = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
+
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -92,6 +94,10 @@ def validate_artifact(
         return ["handoff artifact path must be a non-empty string"]
     if Path(raw_path).name == "source-index.json" or item.get("artifact_type") == "source-index":
         errors.append("source-index.json must not be included in a clean handoff package")
+    if Path(raw_path).name == "visual-index.json" or item.get("artifact_type") == "visual-index":
+        errors.append("visual-index.json must not be included in a clean handoff package")
+    if Path(raw_path).suffix.lower() in VISUAL_EVIDENCE_SUFFIXES:
+        errors.append("raw screenshots/images must not be included in a clean handoff package")
     if Path(raw_path).name == "task-manifest.json" or item.get("artifact_type") == "task-manifest":
         errors.append("task-manifest.json must not be included in a clean handoff package; use clean-run-context.json")
     if Path(raw_path).name == "preflight-goal.json" or item.get("artifact_type") == "preflight-goal":
