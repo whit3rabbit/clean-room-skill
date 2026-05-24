@@ -551,7 +551,7 @@ describe('clean-room shell hook policy', () => {
     const args = fs.readFileSync(argvPath, 'utf8').trim().split('\n');
     const argAfter = (flag) => args[args.indexOf(flag) + 1];
     assert.deepEqual(args.slice(0, 2), ['run', '--rm']);
-    assert.equal(argAfter('--network'), 'off');
+    assert.equal(argAfter('--network'), 'none');
     assert.equal(argAfter('--cap-drop'), 'ALL');
     assert.equal(argAfter('--security-opt'), 'no-new-privileges');
     assert.equal(argAfter('--pids-limit'), '512');
