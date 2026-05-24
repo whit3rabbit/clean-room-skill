@@ -1570,4 +1570,20 @@ describe('clean-room run command', () => {
     assert.equal(ledger.iterations[0].phases[1].role, 'clean-polish-reviewer');
     assert.equal(ledger.iterations[0].phases[1].session_brief_ref, polishBrief);
   });
+
+  test('run rejects overlapping source and contaminated roots', () => {
+    const workspace = baseWorkspace('clean-room-run-overlap-source-contaminated');
+    const manifest = readJson(workspace.manifestPath);
+    manifest.artifact_paths.contaminated_artifacts = workspace.source;
+    manifest.artifact_paths.contaminated_artifact_roots = [workspace.source];
+    manifest.initialization_snapshot.effective_roots.contaminated_artifact_roots = [workspace.source];
+    writeJson(workspace.manifestPath, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /source roots and contaminated artifact roots must be separate/);
+    assert.equal(fs.existsSync(path.join(workspace.source, '.clean-room-run.lock')), false);
+    assert.equal(fs.existsSync(path.join(workspace.source, 'controller-run-ledger.json')), false);
+    assert.equal(fs.existsSync(path.join(workspace.source, 'clean-room-result.json')), false);
+  });
 });
