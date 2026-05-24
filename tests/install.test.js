@@ -1654,6 +1654,19 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(codexHome, 'skills', 'clean-room', 'SKILL.md')), false);
   });
 
+  test('install rejects symlinked install root', (t) => {
+    const root = tempDir('clean-room-root-symlink');
+    const realCodexHome = path.join(root, 'real-codex');
+    const linkedCodexHome = path.join(root, 'linked-codex');
+    fs.mkdirSync(realCodexHome, { recursive: true });
+    if (!symlinkDirOrSkip(t, realCodexHome, linkedCodexHome)) return;
+
+    const result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: linkedCodexHome });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /managed install root must not be a symlink/);
+    assert.equal(fs.existsSync(path.join(realCodexHome, 'skills', 'clean-room', 'SKILL.md')), false);
+  });
+
   test('uninstall removes only managed files and clean-room hooks', () => {
     const root = tempDir('clean-room-uninstall');
     const claudeHome = path.join(root, 'config');
