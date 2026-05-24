@@ -72,6 +72,124 @@ describe('clean-room leakage hook policy', () => {
     }
   });
 
+  test('leakage scanner catches source-derived hyphenated destination names without a denylist', () => {
+    const root = tempDir('clean-room-leakage-source-name');
+    const env = policyEnv(root, 'clean-architect');
+    const sourceRoot = path.join(root, 'claude-code-build2');
+    fs.mkdirSync(sourceRoot);
+    env.CLEAN_ROOM_SOURCE_ROOTS = sourceRoot;
+    const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'skeleton-manifest.json');
+    fs.writeFileSync(filePath, JSON.stringify({
+      description: 'Architecture map for the claude-code workspace.',
+      workspace_layout: {
+        members: [
+          { crate_name: 'claude-code-types' },
+        ],
+      },
+    }));
+
+    const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /source_derived_name/);
+  });
+
+  test('leakage scanner normalizes underscores and spaces in source codebase names', () => {
+    const cases = [
+      {
+        sourceName: 'zk_cli',
+        leakedName: 'zk_cli_types',
+      },
+      {
+        sourceName: 'zk cli',
+        leakedName: 'zk cli types',
+      },
+      {
+        sourceName: 'zk cli',
+        leakedName: 'zk_cli_types',
+      },
+    ];
+
+    for (const item of cases) {
+      const root = tempDir(`clean-room-leakage-${item.sourceName.replaceAll(/[\s_]+/g, '-')}`);
+      const env = policyEnv(root, 'clean-architect');
+      const sourceRoot = path.join(root, item.sourceName);
+      fs.mkdirSync(sourceRoot);
+      env.CLEAN_ROOM_SOURCE_ROOTS = sourceRoot;
+      const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'skeleton-manifest.json');
+      fs.writeFileSync(filePath, JSON.stringify({
+        description: `Architecture map for ${item.leakedName}.`,
+        workspace_layout: {
+          members: [
+            { crate_name: item.leakedName },
+          ],
+        },
+      }));
+
+      const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+      assert.notEqual(result.status, 0, item.sourceName);
+      assert.match(result.stderr, /source_derived_name/, item.sourceName);
+    }
+  });
+
+  test('leakage scanner allows source-named public compatibility values listed in public_surface', () => {
+    const root = tempDir('clean-room-leakage-public-surface');
+    const env = policyEnv(root, 'clean-architect');
+    const sourceRoot = path.join(root, 'claude-code-build2');
+    fs.mkdirSync(sourceRoot);
+    env.CLEAN_ROOM_SOURCE_ROOTS = sourceRoot;
+    const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'behavior-spec.json');
+    fs.writeFileSync(filePath, JSON.stringify({
+      categories: [
+        {
+          public_surface: [
+            {
+              name: 'CLAUDE_CONFIG_DIR',
+              kind: 'environment-variable',
+              visibility: 'public',
+              compatibility_reason: 'Documented config-directory override.',
+            },
+            {
+              name: 'claude-code-20250219',
+              kind: 'protocol-header',
+              visibility: 'protocol',
+              compatibility_reason: 'Protocol compatibility header value.',
+            },
+          ],
+          behavioral_requirements: [
+            {
+              description: 'Honor CLAUDE_CONFIG_DIR and send claude-code-20250219 exactly.',
+            },
+          ],
+        },
+      ],
+    }));
+
+    const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  test('leakage scanner checks implementation package manifests for source-derived names', () => {
+    const root = tempDir('clean-room-leakage-implementation-metadata');
+    const env = policyEnv(root, 'clean-qa-editor');
+    const sourceRoot = path.join(root, 'claude-code-build2');
+    fs.mkdirSync(sourceRoot);
+    env.CLEAN_ROOM_SOURCE_ROOTS = sourceRoot;
+    const filePath = path.join(env.CLEAN_ROOM_IMPLEMENTATION_ROOTS, 'Cargo.toml');
+    fs.writeFileSync(filePath, [
+      '[package]',
+      'name = "agent-cli-config"',
+      'description = "Configuration wrapper for claude-code"',
+      '',
+      '[dependencies]',
+      'claude-code-types = { path = "../types" }',
+      '',
+    ].join('\n'));
+
+    const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /source_derived_name/);
+  });
+
   test('leakage scanner keeps path fields denylist-only to avoid path-shaped false positives', () => {
     const root = tempDir('clean-room-leakage-negative');
     const env = policyEnv(root, 'clean-architect');

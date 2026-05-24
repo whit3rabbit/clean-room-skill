@@ -9,7 +9,18 @@ import re
 import sys
 from pathlib import Path
 
-from clean_room_paths import checked_write_paths, describe_path, load_payload, redact_text, read_artifact_bytes, stat_artifact
+from clean_room_paths import (
+    GENERIC_PATH_TOKENS,
+    checked_write_paths,
+    describe_path,
+    env_roots,
+    load_payload,
+    normalize_path_name,
+    private_name_tokens,
+    redact_text,
+    read_artifact_bytes,
+    stat_artifact,
+)
 
 
 MAX_SCAN_BYTES = 1_000_000
@@ -114,6 +125,12 @@ SCAN_LIGHT_JSON_STRING_KEYS = {
     "action",
     "formatting_rules",
 }
+IMPLEMENTATION_METADATA_MANIFESTS = {
+    "Cargo.toml",
+    "go.mod",
+    "package.json",
+    "pyproject.toml",
+}
 BLOCKED_PATTERNS = {
     "raw_diff": re.compile(r"(?m)^(diff --git|@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@)"),
     "source_fence": re.compile(
@@ -154,18 +171,22 @@ def path_under_any(path: Path, roots: list[Path]) -> bool:
     return any(path == root or root in path.parents for root in roots)
 
 
+def is_implementation_metadata_manifest(path: Path) -> bool:
+    return path.name in IMPLEMENTATION_METADATA_MANIFESTS
+
+
 def is_scannable_artifact(path: Path) -> bool:
-    if path.suffix.lower() not in {".json", ".md", ".yaml", ".yml", ".txt"}:
+    is_metadata_manifest = is_implementation_metadata_manifest(path)
+    if path.suffix.lower() not in {".json", ".md", ".yaml", ".yml", ".txt"} and not is_metadata_manifest:
         return False
-    clean_roots = [Path(p).expanduser().resolve() for p in os.environ.get("CLEAN_ROOM_CLEAN_ROOTS", "").split(os.pathsep) if p]
+    clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
     if clean_roots and path_under_any(path, clean_roots):
         return True
+    implementation_roots = env_roots("CLEAN_ROOM_IMPLEMENTATION_ROOTS")
+    if is_metadata_manifest and implementation_roots and path_under_any(path, implementation_roots):
+        return True
     if os.environ.get("CLEAN_ROOM_ROLE") == SANITIZER_ROLE:
-        contaminated_roots = [
-            Path(p).expanduser().resolve()
-            for p in os.environ.get("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS", "").split(os.pathsep)
-            if p
-        ]
+        contaminated_roots = env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
         return bool(contaminated_roots) and path_under_any(path, contaminated_roots)
     if clean_roots:
         return False
@@ -220,6 +241,30 @@ def compile_private_identifier_terms(private_terms: list[str]) -> list[tuple[str
     return [(term, private_identifier_pattern(term)) for term in private_terms]
 
 
+def source_name_pattern(term: str) -> re.Pattern[str]:
+    parts = [part for part in term.split("-") if part]
+    body = r"[\s_-]+".join(re.escape(part) for part in parts) if len(parts) > 1 else re.escape(term)
+    return re.compile(rf"(?<![A-Za-z0-9]){body}(?![A-Za-z0-9])", re.I)
+
+
+def exact_source_names(value: str) -> set[str]:
+    normalized = normalize_path_name(value)
+    if not normalized:
+        return set()
+    parts = [part for part in normalized.split("-") if part]
+    if len(parts) < 2 or all(part in GENERIC_PATH_TOKENS for part in parts):
+        return set()
+    return {normalized}
+
+
+def compile_source_name_terms() -> list[tuple[str, re.Pattern[str]]]:
+    terms: set[str] = set()
+    for source_root in env_roots("CLEAN_ROOM_SOURCE_ROOTS"):
+        terms.update(exact_source_names(source_root.name))
+        terms.update(private_name_tokens(source_root.name))
+    return [(term, source_name_pattern(term)) for term in sorted(terms)]
+
+
 def has_identifier_signal(value: str) -> bool:
     return any(char.isupper() or char.isdigit() for char in value) or "_" in value or "$" in value
 
@@ -271,9 +316,9 @@ def public_names(value: object, path: tuple[str | int, ...] = ()) -> set[str]:
     names: set[str] = set()
     if isinstance(value, dict):
         is_public_record = (
-            len(path) == 2
-            and path[0] in {"public_surface", "public_contracts"}
-            and isinstance(path[1], int)
+            len(path) >= 2
+            and path[-2] in {"public_surface", "public_contracts"}
+            and isinstance(path[-1], int)
             and PUBLIC_NAME_KEYS <= set(value)
             and value.get("visibility") in PUBLIC_NAME_VISIBILITIES
             and isinstance(value.get("name"), str)
@@ -342,6 +387,16 @@ def scan_private_identifier_denylist(texts: list[str], private_patterns: list[tu
     return sorted(findings)
 
 
+def scan_source_derived_names(texts: list[str], source_patterns: list[tuple[str, re.Pattern[str]]]) -> list[str]:
+    findings: set[str] = set()
+    for text in texts:
+        for _term, pattern in source_patterns:
+            if pattern.search(text):
+                findings.add("source_derived_name")
+                break
+    return sorted(findings)
+
+
 def scan_identifier_patterns(
     texts: list[str],
     private_patterns: list[tuple[str, re.Pattern[str]]],
@@ -389,6 +444,7 @@ def main() -> int:
             print(f"clean-room leakage scan failed: {redact_text(error)}", file=sys.stderr)
         return 1
     private_patterns = compile_private_identifier_terms(private_terms)
+    source_patterns = compile_source_name_terms()
     for path in paths:
         if not is_scannable_artifact(path):
             continue
@@ -419,6 +475,12 @@ def main() -> int:
             )
         )
         findings.extend(scan_private_identifier_denylist(denylist_scan_texts, private_patterns))
+        findings.extend(
+            scan_source_derived_names(
+                full_scan_texts + light_scan_texts + denylist_scan_texts,
+                source_patterns,
+            )
+        )
         if findings:
             print(
                 f"clean-room leakage scan failed for {describe_path(path)}: {', '.join(sorted(set(findings)))}",
