@@ -7,7 +7,7 @@
 - Executable inner-loop runner: `clean-room-skill run`.
 - Full local verifier: `bin/verify.sh`.
 - Node requirement: `>=22`.
-- CI runs Node 22 with Python 3.12 on macOS.
+- CI runs Node 24 with Python 3.12 on macOS.
 - This repo installs clean-room skills, role agents, hooks, schemas, and examples for multiple agent runtimes.
 - The workflow creates clean behavioral spec packages and clean implementation outputs. It does not generate replacement code directly from source.
 - Full docs: [README.md](README.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/REFERENCE.md](docs/REFERENCE.md).
