@@ -134,6 +134,7 @@ function baseWorkspace(name) {
 }
 
 function writeCoverage(contaminated, coverageState) {
+  const evidenceRefs = coverageState === 'covered' ? ['evidence-ledger:item-001'] : [];
   writeJson(path.join(contaminated, 'coverage-ledger.json'), {
     ledger_id: 'coverage-test',
     task_id: 'task-example',
@@ -142,7 +143,7 @@ function writeCoverage(contaminated, coverageState) {
       {
         unit_id: 'unit-example-flow',
         coverage_state: coverageState,
-        evidence_refs: [],
+        evidence_refs: evidenceRefs,
       },
     ],
     behavior_spec_refs: [],
@@ -153,6 +154,27 @@ function writeCoverage(contaminated, coverageState) {
         reviewer_role: 'contaminated-manager-verifier',
         status: 'test',
         notes: '',
+      },
+    ],
+  });
+  if (coverageState === 'covered') {
+    writeEvidenceLedger(contaminated);
+  }
+}
+
+function writeEvidenceLedger(contaminated, entries = null) {
+  writeJson(path.join(contaminated, 'evidence-ledger.json'), {
+    ledger_id: 'evidence-test',
+    task_id: 'task-example',
+    domain: 'contaminated',
+    entries: entries || [
+      {
+        evidence_id: 'item-001',
+        source_unit_ref: 'unit-example-flow',
+        evidence_type: 'source-observation',
+        description: 'Neutral test evidence that the unit was source-verified.',
+        evidence_location_ref: 'contaminated-only:unit-example-flow:item-001',
+        retained_in_contaminated_domain: true,
       },
     ],
   });
@@ -558,6 +580,19 @@ function writeCoveredCoverageScript(root) {
 const fs = require('node:fs');
 const path = require('node:path');
 const contaminated = process.env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.split(path.delimiter)[0];
+fs.writeFileSync(path.join(contaminated, 'evidence-ledger.json'), JSON.stringify({
+  ledger_id: 'evidence-test',
+  task_id: 'task-example',
+  domain: 'contaminated',
+  entries: [{
+    evidence_id: 'item-001',
+    source_unit_ref: 'unit-example-flow',
+    evidence_type: 'source-observation',
+    description: 'Neutral test evidence that the unit was source-verified.',
+    evidence_location_ref: 'contaminated-only:unit-example-flow:item-001',
+    retained_in_contaminated_domain: true
+  }]
+}, null, 2) + '\\n');
 fs.writeFileSync(path.join(contaminated, 'coverage-ledger.json'), JSON.stringify({
   ledger_id: 'coverage-test',
   task_id: 'task-example',
@@ -565,7 +600,7 @@ fs.writeFileSync(path.join(contaminated, 'coverage-ledger.json'), JSON.stringify
   source_units: [{
     unit_id: 'unit-example-flow',
     coverage_state: 'covered',
-    evidence_refs: []
+    evidence_refs: ['evidence-ledger:item-001']
   }],
   behavior_spec_refs: ['spec-example-flow'],
   coverage_status: 'complete',
@@ -696,6 +731,123 @@ describe('clean-room run command', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /clean-room artifacts must not be under implementation roots/);
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
+  test('rejects coverage ledger entries for missing manifest units', () => {
+    const workspace = baseWorkspace('clean-room-run-coverage-unknown-unit');
+    writeJson(path.join(workspace.contaminated, 'coverage-ledger.json'), {
+      ledger_id: 'coverage-test',
+      task_id: 'task-example',
+      updated_by_role: 'contaminated-manager-verifier',
+      source_units: [
+        {
+          unit_id: 'unit-missing',
+          coverage_state: 'gap',
+          evidence_refs: [],
+        },
+      ],
+      behavior_spec_refs: [],
+      coverage_status: 'partial',
+      abstract_delta_tickets: [],
+      review_history: [
+        {
+          reviewer_role: 'contaminated-manager-verifier',
+          status: 'test',
+          notes: '',
+        },
+      ],
+    });
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /coverage-ledger references unknown task-manifest unit/);
+  });
+
+  test('rejects covered coverage ledger entries with missing evidence items', () => {
+    const workspace = baseWorkspace('clean-room-run-coverage-missing-evidence');
+    writeJson(path.join(workspace.contaminated, 'coverage-ledger.json'), {
+      ledger_id: 'coverage-test',
+      task_id: 'task-example',
+      updated_by_role: 'contaminated-manager-verifier',
+      source_units: [
+        {
+          unit_id: 'unit-example-flow',
+          coverage_state: 'covered',
+          evidence_refs: ['evidence-ledger:item-missing'],
+        },
+      ],
+      behavior_spec_refs: ['spec-example-flow'],
+      coverage_status: 'complete',
+      abstract_delta_tickets: [],
+      review_history: [
+        {
+          reviewer_role: 'contaminated-manager-verifier',
+          status: 'test',
+          notes: '',
+        },
+      ],
+    });
+    writeEvidenceLedger(workspace.contaminated);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /coverage-ledger references missing evidence-ledger item/);
+  });
+
+  test('rejects covered coverage ledger entries with unresolved coverage gaps', () => {
+    const workspace = baseWorkspace('clean-room-run-covered-coverage-gap');
+    writeJson(path.join(workspace.contaminated, 'coverage-ledger.json'), {
+      ledger_id: 'coverage-test',
+      task_id: 'task-example',
+      updated_by_role: 'contaminated-manager-verifier',
+      source_units: [
+        {
+          unit_id: 'unit-example-flow',
+          coverage_state: 'covered',
+          evidence_refs: ['evidence-ledger:item-001'],
+        },
+      ],
+      behavior_spec_refs: ['spec-example-flow'],
+      coverage_status: 'complete',
+      abstract_delta_tickets: [
+        {
+          ticket_id: 'coverage-gap-001',
+          unit_id: 'unit-example-flow',
+          summary: 'TUI behavior remains unverified.',
+          status: 'open',
+        },
+      ],
+      review_history: [
+        {
+          reviewer_role: 'contaminated-manager-verifier',
+          status: 'test',
+          notes: '',
+        },
+      ],
+    });
+    writeEvidenceLedger(workspace.contaminated);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /covered coverage-ledger unit has unresolved coverage gaps/);
+  });
+
+  test('rejects completed slices without terminal clean artifacts', () => {
+    const workspace = baseWorkspace('clean-room-run-complete-missing-terminal-artifacts');
+    writeCoverage(workspace.contaminated, 'covered');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /completion requires terminal clean artifact/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'clean-room-result.json')), false);
   });
 
   test('rejects mismatched preflight goal hash', () => {
@@ -1563,7 +1715,7 @@ describe('clean-room run command', () => {
     ]);
   });
 
-  test('open questions in approved behavior specs force spec delta instead of completion', () => {
+  test('rejects covered behavior specs with unresolved open questions', () => {
     const workspace = baseWorkspace('clean-room-run-open-question-delta');
     writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec({
       open_questions: ['The approved behavior spec still has an unresolved compatibility question.'],
@@ -1579,20 +1731,9 @@ describe('clean-room run command', () => {
 
     const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
 
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /spec-delta-required/);
-    const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
-    assert.equal(runResult.result, 'spec-delta-required');
-    assert.equal(runResult.coverage_state, 'complete');
-    assert.deepEqual(runResult.abstract_delta_tickets, [
-      {
-        ticket_id: 'delta-open-questions',
-        kind: 'ambiguity',
-        summary: '1 approved behavior spec(s) still contain open questions.',
-        requested_clean_change: 'Resolve or remove approved behavior spec open questions before marking the spec slice complete.',
-        status: 'open',
-      },
-    ]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /covered behavior spec has unresolved open_questions/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'clean-room-result.json')), false);
   });
 
   test('polish report is required for completion when polish stage is configured', () => {

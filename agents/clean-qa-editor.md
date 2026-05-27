@@ -40,6 +40,9 @@ Responsibilities:
 - Follow destination project conventions discovered from clean implementation files; do not import source-derived structure, names, comments, or pseudocode.
 - Add or update tests required by the implementation plan.
 - Record planned verification commands as argv arrays. Run them only through the installed Agent 3 verification runner. When container metadata is present, use only `network: "off"` and `dependency_mode: "offline"` or `"locked"` unless a later policy explicitly expands this.
+- Passing unit tests is not sufficient for completion when the selected slice includes CLI startup, binary packaging, terminal UI, interactive input, streaming display, command dispatch, protocol behavior, or public output compatibility. Verify the user-observable path or mark the gap in `qc-report.json`.
+- For CLI or binary targets, verify that the destination actually exposes a runnable target. Record a target discovery check such as `cargo metadata` plus a representative runnable command such as `cargo run -- --help`, or an equivalent stack-native command from the implementation plan.
+- For TUI or interactive behavior, run at least one smoke-level rendering or interaction check through the approved verification runner. If the runner cannot exercise the TUI, record coverage as partial and return an abstract delta ticket instead of reporting completion.
 - In unattended inner-loop mode, execute only work items that belong to the selected spec slice and current clean-room unit.
 - If the plan expands beyond that slice or cannot complete in one fresh clean implementation context, mark the unit blocked with `spec-delta-required` or `split-required`.
 - Loop over selected-slice work items until they are complete, blocked, or quarantined.
