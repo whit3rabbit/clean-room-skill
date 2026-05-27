@@ -1909,6 +1909,40 @@ describe('clean-room-skill installer', () => {
     );
   });
 
+  test('source index rejects roots overlapping implementation roots from env', () => {
+    const root = tempDir('clean-room-source-index-implementation-overlap');
+    const sourceRoot = path.join(root, 'implementation');
+    const artifactRoot = path.join(root, 'artifacts');
+    const outputPath = path.join(artifactRoot, 'source-index.json');
+    fs.mkdirSync(sourceRoot, { recursive: true });
+    fs.mkdirSync(artifactRoot, { recursive: true });
+    fs.writeFileSync(path.join(sourceRoot, 'a.js'), 'export const a = 1;\n');
+
+    const result = spawnSync('python3', [
+      path.join(ROOT, 'skills', 'clean-room', 'scripts', 'build_source_index.py'),
+      '--source-root',
+      sourceRoot,
+      '--output',
+      outputPath,
+      '--contaminated-artifact-root',
+      artifactRoot,
+      '--task-id',
+      'task-overlap',
+      '--skip-tool-detection',
+    ], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CLEAN_ROOM_IMPLEMENTATION_ROOTS: sourceRoot,
+      },
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /source roots and CLEAN_ROOM_IMPLEMENTATION_ROOTS roots must be separate/);
+    assert.equal(fs.existsSync(outputPath), false);
+  });
+
   test('safe hook wrapper no-ops without env and strict/enforced mode fails closed', () => {
     let result = spawnSync('python3', [HOOK, '--mode', 'safe', '--check', 'require-clean-room-env.py'], {
       cwd: ROOT,

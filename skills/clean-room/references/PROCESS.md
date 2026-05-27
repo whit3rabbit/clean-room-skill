@@ -11,9 +11,9 @@ This process reduces engineering risk. It does not resolve patent, trade-secret,
 Use separate locations for each trust domain:
 
 - Contaminated source workspace: source-readable, read-only where practical, no clean implementation output. In visual fallback runs, authorized screenshot/image roots are source evidence roots.
-- Contaminated artifact workspace: preflight goals, init configs, source indexes, visual indexes, task manifests, draft behavior specs, coverage ledgers, and abstract delta tickets. Configure it with `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
-- Clean artifact workspace: sanitized clean run contexts, behavior specs that passed leakage review, skeleton manifests, implementation plans, implementation reports, QC reports, and test plans. Configure it with `CLEAN_ROOM_CLEAN_ROOTS`.
-- Clean implementation workspace: clean destination code and tests. Configure it with `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
+- Contaminated artifact workspace: `preflight-goal.json`, `init-config.json`, `task-manifest.json`, source indexes, visual indexes, draft behavior specs, coverage ledgers, and abstract delta tickets. Configure it with `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+- Clean artifact workspace: sanitized clean run contexts, behavior specs that passed leakage review, skeleton manifests, implementation plans, implementation reports, QC reports, polish reports, incidents, and test plans. Configure it with `CLEAN_ROOM_CLEAN_ROOTS`.
+- Clean implementation workspace: clean destination code, tests, fixtures, and real project files only. Configure it with `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 - Clean allowed reference workspace: public documentation or destination constraints explicitly configured for clean and source-denied role reads.
 
 ### Path Naming Guards
@@ -33,7 +33,7 @@ Use host-level policy where available:
 
 For clean roles, configure read hooks as deny-by-default. `CLEAN_ROOM_CLEAN_ROOTS` is the clean artifact allowlist, `CLEAN_ROOM_IMPLEMENTATION_ROOTS` is the clean destination foundation allowlist, and `CLEAN_ROOM_SCHEMA_DIR` is readable for bundled schemas. For Agent 1.5, configure reads as source-denied: assigned contaminated artifacts, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOWED_READ_ROOTS` are allowed; source roots, visual roots, clean roots, implementation roots, `source-index.json`, and `visual-index.json` are denied. `CLEAN_ROOM_ALLOWED_READ_ROOTS` is the extra clean/source-denied read allowlist for public documentation or destination constraints. `CLEAN_ROOM_SOURCE_ROOTS` remains denied for source-denied roles even if a source path is also listed elsewhere.
 
-For all roles, configure write hooks as deny-by-default. Agent 2 writes only under `CLEAN_ROOM_CLEAN_ROOTS`. Agent 3 writes clean reports under `CLEAN_ROOM_CLEAN_ROOTS` and code/tests only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Agent 4 writes polish reports under `CLEAN_ROOM_CLEAN_ROOTS` and final hygiene/commit state only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Contaminated roles may write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`. Source roots should remain read-only for contaminated roles.
+For all roles, configure write hooks as deny-by-default. Agent 2 writes only under `CLEAN_ROOM_CLEAN_ROOTS`. Agent 3 writes clean reports under `CLEAN_ROOM_CLEAN_ROOTS` and code/tests only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Agent 4 writes polish reports under `CLEAN_ROOM_CLEAN_ROOTS` and final hygiene/commit state only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Clean-room artifact JSON files do not belong under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Contaminated roles may write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`. Source roots should remain read-only for contaminated roles.
 
 Agent zero/controller is responsible for computing the role environment block and passing it into every new role session. Sessions must not rely on inherited values. The minimum block is:
 
@@ -166,7 +166,7 @@ Clean architect/implementation planner:
 - Define architecture areas with owned relative path prefixes, responsibilities, forbidden responsibilities, allowed area dependencies, and refactor triggers.
 - Assign every planned target and test path to one or more architecture areas.
 - Record split, move, merge, or extract work as planned refactors before implementation.
-- Produce `implementation-plan.json` as the primary code-development contract.
+- Produce `CLEAN_ROOM_CLEAN_ROOTS/implementation-plan.json` as the primary code-development contract.
 - Keep `skeleton-manifest.json` valid and current for code-development runs.
 - Do not write implementation code.
 
@@ -179,8 +179,8 @@ Clean implementer/verifier:
 - Refuse unowned target paths and unplanned cross-area refactors by recording an abstract delta.
 - Write code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 - Run bounded argv-array verification commands only through the installed Agent 3 verification runner.
-- Produce or update `implementation-report.json` with changed paths, verification results, blockers, and abstract delta tickets.
-- Maintain `qc-report.json` for schema, leakage, and clean artifact status when the run expects it.
+- Produce or update `CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json` with changed paths, verification results, blockers, and abstract delta tickets.
+- Maintain `CLEAN_ROOM_CLEAN_ROOTS/qc-report.json` for schema, leakage, and clean artifact status when the run expects it.
 - In unattended inner-loop mode, stop at the selected spec slice. If the plan expands beyond that slice or cannot fit one fresh clean implementation context, mark the unit blocked with `spec-delta-required` or `split-required`.
 
 Clean polish reviewer:
@@ -261,7 +261,7 @@ Clean polish reviewer:
    - Start from a fresh role session brief when context management is enabled.
    - Agent 2 starts from the clean artifact workspace and builds or merges the clean schema base from `clean-run-context.json`, approved handoff artifacts, the selected target profile, target constraints, and clean implementation foundation.
    - Update `skeleton-manifest.json` as the clean destination architecture map before writing work items.
-   - Produce `implementation-plan.json` with relative destination paths, architecture area refs, work items, tests, code hygiene policy, constraints, risks, planned refactors, and argv-array verification commands.
+   - Produce `CLEAN_ROOM_CLEAN_ROOTS/implementation-plan.json` with relative destination paths, architecture area refs, work items, tests, code hygiene policy, constraints, risks, planned refactors, and argv-array verification commands.
    - Keep `skeleton-manifest.json` valid and current for code-development runs.
    - Avoid implementation code, private algorithm choices, source-derived layout, and source-shaped pseudocode.
 11. Implement and verify:
@@ -269,13 +269,13 @@ Clean polish reviewer:
    - Agent 3 starts from the clean domain, reads `implementation-plan.json`, and writes code/tests only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
    - In unattended inner-loop mode, Agent 3 executes only work items for the selected spec slice and current unit.
    - Run bounded argv-array verification commands only through the installed Agent 3 verification runner.
-   - Record changed paths, verification status, blockers, and abstract delta tickets in `implementation-report.json`.
-   - Maintain `qc-report.json` for schema, leakage, architecture alignment, source-test parity, equal-output assertions, and spec-to-plan-to-test mismatches.
+   - Record changed paths, verification status, blockers, and abstract delta tickets in `CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json`.
+   - Maintain `CLEAN_ROOM_CLEAN_ROOTS/qc-report.json` for schema, leakage, architecture alignment, source-test parity, equal-output assertions, and spec-to-plan-to-test mismatches.
    - Treat missing invariant tests as a parity gap when protocol, serialization, streaming, queueing, error-budget, async, or typed-data behavior is in scope.
    - Do not send Agent 0 progress updates or partial findings while work remains in progress.
 12. Polish review:
    - Start from a fresh role session brief when context management is enabled.
-   - Agent 4 starts from the clean domain, reviews only clean implementation-root files and clean artifacts, and writes `polish-report.json`.
+   - Agent 4 starts from the clean domain, reviews only clean implementation-root files and clean artifacts, and writes `CLEAN_ROOM_CLEAN_ROOTS/polish-report.json`.
    - Create or update implementation-root `AGENTS.md` and `.gitignore` only when the clean implementation actually needs them.
    - Commit only through `agent4-polish-runner.py`, with no push, tag, reset, clean, branch deletion, or arbitrary git commands.
 13. Verify coverage:

@@ -380,12 +380,52 @@ describe('clean-room access hook policy', () => {
     }, agent3Env);
     assert.equal(result.status, 0, result.stderr);
 
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: implementation, file_path: 'implementation-report-unit-001.json' },
+    }, agent3Env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room artifact under CLEAN_ROOM_IMPLEMENTATION_ROOTS/);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: implementation, file_path: 'implementation-plan-unit-001.json' },
+    }, agent3Env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room artifact under CLEAN_ROOM_IMPLEMENTATION_ROOTS/);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: implementation, file_path: 'package.json' },
+    }, agent3Env);
+    assert.equal(result.status, 0, result.stderr);
+
     const agent4Env = { ...env, CLEAN_ROOM_ROLE: 'clean-polish-reviewer' };
     result = runHook('deny-contaminated-clean-write.py', {
       tool_name: 'Write',
       tool_input: { cwd: implementation, file_path: 'AGENTS.md' },
     }, agent4Env);
     assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: implementation, file_path: 'qc-report-unit-001.json' },
+    }, agent4Env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room artifact under CLEAN_ROOM_IMPLEMENTATION_ROOTS/);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: implementation, file_path: 'test/fixtures/input.json' },
+    }, agent4Env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: clean, file_path: 'task-manifest.json' },
+    }, agent4Env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /contaminated-only artifact outside CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/);
 
     const contaminatedEnv = { ...env, CLEAN_ROOM_ROLE: 'contaminated-source-analyst' };
     result = runHook('deny-contaminated-clean-write.py', {
@@ -407,6 +447,13 @@ describe('clean-room access hook policy', () => {
     }, contaminatedEnv);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /writing implementation-root\[0\]/);
+
+    result = runHook('deny-contaminated-clean-write.py', {
+      tool_name: 'Write',
+      tool_input: { cwd: contaminated, file_path: '../implementation/preflight-goal.json' },
+    }, contaminatedEnv);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /contaminated-only artifact outside CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/);
 
     result = runHook('deny-contaminated-clean-write.py', {
       tool_name: 'NotebookEdit',

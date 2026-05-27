@@ -95,8 +95,8 @@ flowchart LR
     architect["Agent 2: clean-architect<br/>Plan implementation from clean specs and foundation"]
     qa["Agent 3: clean-qa-editor<br/>Implement, record verification, terminal report"]
     polish["Agent 4: clean-polish-reviewer<br/>Final code polish, repo hygiene, local commit"]
-    outputs["Clean artifacts<br/>implementation-plan.json<br/>qc-report.json<br/>test plan notes"]
-    imploutputs["Implementation outputs<br/>code, tests, AGENTS.md, .gitignore<br/>implementation-report.json<br/>polish-report.json"]
+    outputs["Clean artifacts<br/>implementation-plan.json<br/>implementation-report.json<br/>qc-report.json<br/>polish-report.json<br/>test plan notes"]
+    imploutputs["Implementation outputs<br/>code, tests, fixtures, AGENTS.md, .gitignore"]
   end
 
   subgraph guardrails["Guardrails and audit"]
@@ -142,8 +142,8 @@ flowchart LR
   denyread -. clean roles may read implementation roots .-> implroots
   denyread -. Agent 1.5 cannot read source/visual roots, clean roots, implementation roots, source-index.json, visual-index.json, or preflight-goal.json .-> sanitizer
   denywrite -. contaminated writes only to contaminated artifact roots .-> ledgers
-  denywrite -. Agent 2 writes clean artifacts only; Agents 3 and 4 write implementation roots .-> cleanroots
-  denywrite -. Agents 3 and 4 write code, tests, docs, and repo hygiene only here .-> implroots
+  denywrite -. Agent 2 writes clean artifacts; Agents 3 and 4 write clean reports .-> cleanroots
+  denywrite -. Agents 3 and 4 write destination files only here; no clean-room artifact JSON .-> implroots
   denyshell -. no shell-style tools in role sessions .-> manager
   denyshell -. no shell for Agent 2; explicit Agent 3 and Agent 4 runners only .-> architect
   scan -. post-write checks .-> outputs
@@ -223,7 +223,7 @@ The architecture delegates work across six distinct custom role agents to enforc
     *   Records code hygiene violations as `code-hygiene` findings in `qc-report.json`.
     *   Writes code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
     *   Runs bounded verification only through the installed Agent 3 verification runner, with `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`, strict hooks, and cwd under implementation roots.
-    *   Writes `implementation-report.json` and maintains `qc-report.json`.
+    *   Writes `CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json` and maintains `CLEAN_ROOM_CLEAN_ROOTS/qc-report.json`.
     *   Does not report progress or ask Agent 0 for guidance during implementation.
     *   Emits one terminal report for Agent 0 only when the assigned spec slice is complete, blocked, or quarantined.
 
@@ -234,7 +234,7 @@ The architecture delegates work across six distinct custom role agents to enforc
     *   Reviews final clean implementation for security, docs/comments, exception handling, resource leaks, race conditions, missing tests, and repository hygiene.
     *   Creates or updates implementation-root `AGENTS.md` with gotchas and build/test/dev commands discovered from clean implementation files.
     *   Updates `.gitignore` only for real generated outputs, dependencies, caches, or build/test artifacts.
-    *   Writes `polish-report.json`.
+    *   Writes `CLEAN_ROOM_CLEAN_ROOTS/polish-report.json`.
     *   Uses `agent4-polish-runner.py` only with `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1`, cwd under implementation roots, and strict hooks.
     *   May initialize git and create one local commit containing only paths listed in `polish-report.json`; it must not push, tag, reset, clean, or delete branches.
 
@@ -258,7 +258,7 @@ Agent 3's terminal report is not enough to return. If configured, Agent 4 must p
 *   Records controller memory in contaminated-side `controller-run-ledger.json`.
 *   Writes `clean-room-result.json` before returning to the outer spec loop.
 
-Progress is durable-artifact based. `clean-room-skill run` compares semantic JSON artifact hashes that ignore volatile timestamp and artifact-hash fields, plus raw file hashes under implementation roots. Chat output, timestamp-only artifact churn, and `controller-status.json` updates alone do not count as progress.
+Progress is durable-artifact based. `clean-room-skill run` compares semantic JSON artifact hashes that ignore volatile timestamp and artifact-hash fields, plus raw file hashes under implementation roots while ignoring generated directories such as `target/`. Chat output, timestamp-only artifact churn, Cargo build metadata, and `controller-status.json` updates alone do not count as progress.
 
 ---
 
@@ -270,7 +270,7 @@ Every clean-room role session requires a populated environment block before any 
 *   `CLEAN_ROOM_SOURCE_ROOTS`: Source roots (only readable by source-reading contaminated roles, not Agent 1.5).
 *   `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`: Target write directory for contaminated roles.
 *   `CLEAN_ROOM_CLEAN_ROOTS`: Target write directory for clean artifacts and reports.
-*   `CLEAN_ROOM_IMPLEMENTATION_ROOTS`: Target write directory for Agent 3 clean implementation code and tests, plus Agent 4 implementation-root hygiene changes and local git metadata.
+*   `CLEAN_ROOM_IMPLEMENTATION_ROOTS`: Target write directory for Agent 3 clean implementation code, tests, fixtures, real destination project files, plus Agent 4 implementation-root hygiene changes and local git metadata. Clean-room artifact JSON files stay out of this root.
 *   `CLEAN_ROOM_ALLOWED_READ_ROOTS`: Approved reference docs or constraints readable by clean and source-denied roles.
 *   `CLEAN_ROOM_SCHEMA_DIR`: Path to the directory containing JSON schema assets.
 
@@ -294,7 +294,7 @@ Post-write hook failures are deny-by-default and redacted. If an artifact disapp
 *   [require-clean-room-env.py](../hooks/require-clean-room-env.py): Fails closed if the required role and root environment variables are missing, if trust-domain roots overlap, or if clean, implementation, or contaminated artifact root names appear source-derived.
 *   [deny-clean-room-shell.py](../hooks/deny-clean-room-shell.py): Denies shell-style tool execution inside clean-room role sessions except installed Agent 3 verification-runner invocations under implementation roots and installed Agent 4 polish-runner invocations under implementation roots.
 *   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles and Agent 1.5 cannot read source or visual roots or unapproved paths; clean roles may read implementation roots, and source-denied roles are denied direct `preflight-goal.json` reads. Agent 1.5 is also denied clean roots, implementation roots, and direct `source-index.json` or `visual-index.json` reads.
-*   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots. Agent 2 writes clean artifacts only, Agent 3 writes implementation files and clean reports, Agent 4 writes clean polish reports and implementation-root polish changes, and contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
+*   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots. Agent 2 writes clean artifacts only, Agent 3 writes implementation files and clean reports, Agent 4 writes clean polish reports and implementation-root polish changes, contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, and clean-room artifact JSON files are denied under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 *   [check-artifact-leakage.py](../hooks/check-artifact-leakage.py): Scans clean artifacts and Agent 1.5 staged contaminated artifacts for high-risk leakage markers, source-like identifiers, and private identifier denylist terms. The private identifier denylist (loaded via `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST`) is subject to hard limits to protect hook execution performance: a maximum of 1,000,000 bytes per file, 20,000 total terms, and 512 characters per individual term.
 *   [validate-json-schema.py](../hooks/validate-json-schema.py): Verifies JSON syntax and structural conformance against schemas under `CLEAN_ROOM_SCHEMA_DIR`, including controller-side `preflight-goal.schema.json` and `init-config.schema.json`. Under clean roots, any unrecognized JSON files that do not conform to canonical schemas will trigger a failure unless they are explicitly registered in the path-separated `CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST` environment variable.
 *   [validate-handoff-package.py](../hooks/validate-handoff-package.py): Verifies that handoff packages stay within clean roots, do not reference contaminated paths, `task-manifest.json`, `preflight-goal.json`, `source-index.json`, or `visual-index.json`, and match declared `sha256` checksums.

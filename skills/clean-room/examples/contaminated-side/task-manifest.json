@@ -18,7 +18,7 @@
   "license_contract_notes": "No legal conclusion recorded.",
   "preflight_goal_ref": "preflight-goal.json",
   "preflight_goal_sha256": "7c06e4696a4f116c7f62823facad18c9ccc666f9efbfd48cf561eed5f3a1330d",
-  "source_index_ref": "contaminated-artifacts/source-index.json",
+  "source_index_ref": "source-index.json",
   "run_state": {
     "generation": 1,
     "started_at": "2024-01-01T00:00:00Z",
@@ -214,7 +214,7 @@
       "producer": "controller",
       "required_inputs": [],
       "required_outputs": [
-        "preflight-goal.json"
+        "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/preflight-goal.json"
       ],
       "next": "source-destination-discovery"
     },
@@ -225,8 +225,8 @@
         "preflight-goal.json"
       ],
       "required_outputs": [
-        "init-config.json",
-        "source-index.json"
+        "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/init-config.json",
+        "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/source-index.json"
       ],
       "next": "agent-0-decomposition"
     },
@@ -238,8 +238,8 @@
         "source-index.json"
       ],
       "required_outputs": [
-        "task-manifest.json",
-        "neutral-sanitizer-brief.json"
+        "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/task-manifest.json",
+        "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/neutral-sanitizer-brief.json"
       ],
       "next": "agent-1-analysis"
     },
@@ -290,7 +290,7 @@
         "approved-behavior-spec.json"
       ],
       "required_outputs": [
-        "implementation-plan.json"
+        "CLEAN_ROOM_CLEAN_ROOTS/implementation-plan.json"
       ],
       "next": "clean-implementation-qc"
     },
@@ -302,8 +302,8 @@
         "implementation-plan.json"
       ],
       "required_outputs": [
-        "implementation-report.json",
-        "qc-report.json"
+        "CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json",
+        "CLEAN_ROOM_CLEAN_ROOTS/qc-report.json"
       ],
       "next": "clean-polish-review"
     },
@@ -317,7 +317,7 @@
         "qc-report.json"
       ],
       "required_outputs": [
-        "polish-report.json"
+        "CLEAN_ROOM_CLEAN_ROOTS/polish-report.json"
       ],
       "next": "agent-0-coverage-verification"
     },
@@ -331,7 +331,7 @@
         "coverage-ledger.json"
       ],
       "required_outputs": [
-        "clean-room-result.json"
+        "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/clean-room-result.json"
       ],
       "next": null
     }
@@ -415,9 +415,9 @@
     "Use source-denied reads for the contaminated handoff sanitizer.",
     "Use write tools only in contaminated artifact roots for contaminated roles.",
     "Agent 2 writes only clean artifacts and reads the clean implementation foundation.",
-    "Agent 3 writes implementation code only under CLEAN_ROOM_IMPLEMENTATION_ROOTS and writes reports under clean artifacts.",
+    "Agent 3 writes implementation code only under CLEAN_ROOM_IMPLEMENTATION_ROOTS and writes reports under CLEAN_ROOM_CLEAN_ROOTS.",
     "Agent 3 may run verification shell commands only with CLEAN_ROOM_ALLOW_AGENT3_SHELL=1 and cwd under CLEAN_ROOM_IMPLEMENTATION_ROOTS.",
-    "Agent 4 writes only clean polish artifacts and implementation-root hygiene changes, and may commit only through agent4-polish-runner.py with CLEAN_ROOM_ALLOW_AGENT4_SHELL=1."
+    "Agent 4 writes only CLEAN_ROOM_CLEAN_ROOTS polish artifacts and implementation-root hygiene changes, and may commit only through agent4-polish-runner.py with CLEAN_ROOM_ALLOW_AGENT4_SHELL=1."
   ],
   "model_policy": [
     "Use the initialization snapshot default model plus clean and contaminated overrides.",
@@ -493,17 +493,17 @@
     }
   ],
   "expected_artifacts": [
-    "init-config.json",
-    "preflight-goal.json",
-    "clean-run-context.json",
-    "source-index.json",
-    "behavior-spec.json",
-    "skeleton-manifest.json",
-    "implementation-plan.json",
-    "implementation-report.json",
-    "polish-report.json",
-    "qc-report.json",
-    "clean-room-result.json"
+    "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/init-config.json",
+    "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/preflight-goal.json",
+    "CLEAN_ROOM_CLEAN_ROOTS/clean-run-context.json",
+    "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/source-index.json",
+    "CLEAN_ROOM_CLEAN_ROOTS/behavior-spec.json",
+    "CLEAN_ROOM_CLEAN_ROOTS/skeleton-manifest.json",
+    "CLEAN_ROOM_CLEAN_ROOTS/implementation-plan.json",
+    "CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json",
+    "CLEAN_ROOM_CLEAN_ROOTS/polish-report.json",
+    "CLEAN_ROOM_CLEAN_ROOTS/qc-report.json",
+    "CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/clean-room-result.json"
   ],
   "audit_log_refs": [
     "audit-log:example"

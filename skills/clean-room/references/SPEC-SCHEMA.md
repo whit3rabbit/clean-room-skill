@@ -193,8 +193,8 @@ Every real task must record the user's actual target profile. Do not default sil
 - Agent 1: `contaminated-source-analyst`; source reader and neutral draft task/spec generator.
 - Agent 1.5: `contaminated-handoff-sanitizer`; source-denied contaminated reviewer that sanitizes draft specs before clean handoff.
 - Agent 2: `clean-architect`; clean-domain implementation planner using approved handoff artifacts and clean implementation roots.
-- Agent 3: `clean-qa-editor`; clean implementer/verifier that writes code only under implementation roots and emits one terminal report for Agent 0.
-- Agent 4: `clean-polish-reviewer`; clean final reviewer that writes `polish-report.json`, implementation-root repo hygiene changes, and one constrained local commit when configured.
+- Agent 3: `clean-qa-editor`; clean implementer/verifier that writes code only under implementation roots and emits one terminal report under `CLEAN_ROOM_CLEAN_ROOTS` for Agent 0.
+- Agent 4: `clean-polish-reviewer`; clean final reviewer that writes `CLEAN_ROOM_CLEAN_ROOTS/polish-report.json`, implementation-root repo hygiene changes, and one constrained local commit when configured.
 
 Agent 1.5 may read only Agent 0's neutral sanitizer brief, assigned draft artifacts, schema assets, and explicit public or destination reference roots. Do not give it source roots, visual roots, `source-index.json`, `visual-index.json`, raw screenshots, evidence ledger contents, private identifier denylist contents, raw diffs, source excerpts, or Agent 1 source-reading chat history.
 Agent 2, Agent 3, and Agent 4 must start in the clean domain and read `clean-run-context.json`, approved clean artifacts, schemas, approved public references, and clean implementation roots only. They must not read source roots, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`. Agent 0 may influence them only through schema-valid durable sanitized artifacts. Agents 3 and 4 report back to Agent 0 only after their assigned clean work is complete, blocked, or quarantined, with abstract findings or delta tickets only.
@@ -226,7 +226,7 @@ Capture behavior rather than source structure:
 - API, protocol, config, and data/schema compatibility requirements
 - leakage review status
 
-Do not include source-shaped code blocks, raw screenshots, copied visible words, exact palettes, exact iconography, exact layout measurements, or visual-index contents in behavior specs. Use declarative requirements. Clean implementation code belongs only in `CLEAN_ROOM_IMPLEMENTATION_ROOTS` after Agent 2 has produced `implementation-plan.json`.
+Do not include source-shaped code blocks, raw screenshots, copied visible words, exact palettes, exact iconography, exact layout measurements, or visual-index contents in behavior specs. Use declarative requirements. Clean implementation code belongs only in `CLEAN_ROOM_IMPLEMENTATION_ROOTS` after Agent 2 has produced `CLEAN_ROOM_CLEAN_ROOTS/implementation-plan.json`.
 
 Use `evidence_refs` values such as `evidence-ledger:item-001`. They must point to contaminated-side evidence ledger entries and must not carry source text into the clean artifact.
 
@@ -289,7 +289,7 @@ Map API, protocol, config, and data/schema compatibility into `public_contracts`
 
 ## Implementation Plan Content
 
-`implementation-plan.json` is Agent 2's primary output for code-development runs. Capture:
+`implementation-plan.json` is Agent 2's primary output under `CLEAN_ROOM_CLEAN_ROOTS` for code-development runs. Capture:
 
 - clean implementation root refs such as `CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]`
 - clean source artifacts used for planning
@@ -311,7 +311,7 @@ Container metadata is declarative policy, not a shell escape hatch. Clean verifi
 
 ## Implementation Report Content
 
-`implementation-report.json` is Agent 3's implementation status artifact. Capture:
+`implementation-report.json` is Agent 3's implementation status artifact under `CLEAN_ROOM_CLEAN_ROOTS`. Capture:
 
 - implementation status
 - completed and blocked work items
@@ -325,7 +325,7 @@ Do not include raw source excerpts, contaminated evidence, or source stack trace
 
 ## Polish Report Content
 
-`polish-report.json` is Agent 4's final clean review artifact. Capture:
+`polish-report.json` is Agent 4's final clean review artifact under `CLEAN_ROOM_CLEAN_ROOTS`. Capture:
 
 - reviewed artifacts
 - security, docs/comments, exception handling, resource leak, race/concurrency, repo hygiene, verification, leakage, and correctness findings

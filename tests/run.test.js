@@ -605,6 +605,18 @@ fs.writeFileSync(path.join(implementation, 'generated.txt'), 'implemented\\n');
   return script;
 }
 
+function writeImplementationTargetJsonScript(root) {
+  const script = path.join(root, 'write-implementation-target-json.js');
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+const path = require('node:path');
+const implementation = process.env.CLEAN_ROOM_IMPLEMENTATION_ROOTS.split(path.delimiter)[0];
+fs.mkdirSync(path.join(implementation, 'target'), { recursive: true });
+fs.writeFileSync(path.join(implementation, 'target', 'build-metadata.json'), '{"fresh":true}\\n');
+`);
+  return script;
+}
+
 function writeControllerStatusScript(root) {
   const script = path.join(root, 'write-controller-status.js');
   fs.writeFileSync(script, `
@@ -658,6 +670,31 @@ describe('clean-room run command', () => {
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /preflight goal not found/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
+  test('requires task manifest under contaminated artifact root', () => {
+    const workspace = baseWorkspace('clean-room-run-manifest-placement');
+    const outsideManifest = path.join(workspace.root, 'task-manifest.json');
+    fs.copyFileSync(workspace.manifestPath, outsideManifest);
+
+    const result = runCli(['run', '--task-manifest', outsideManifest, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task manifest must be under contaminated artifact root/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
+  test('rejects clean-room report JSON under implementation roots', () => {
+    const workspace = baseWorkspace('clean-room-run-implementation-artifact-placement');
+    writeJson(path.join(workspace.implementation, 'implementation-report-unit-001.json'), {
+      report_id: 'misplaced-report',
+    });
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room artifacts must not be under implementation roots/);
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
   });
 
@@ -912,6 +949,22 @@ describe('clean-room run command', () => {
     assert.equal(fs.readFileSync(path.join(workspace.implementation, 'generated.txt'), 'utf8'), 'implemented\n');
     const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
     assert.equal(runResult.result, 'iteration-limit-reached');
+  });
+
+  test('implementation target JSON does not count as semantic progress', () => {
+    const workspace = baseWorkspace('clean-room-run-target-json-ignored');
+    const script = writeImplementationTargetJsonScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      coverageStage(workspace.root, script),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations[0].progress_detected, false);
+    assert.equal(ledger.iterations[0].stop_reason, 'no-progress-detected');
+    assert.equal(fs.existsSync(path.join(workspace.implementation, 'target', 'build-metadata.json')), true);
   });
 
   test('between stages validates only changed artifacts', () => {

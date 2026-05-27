@@ -44,7 +44,7 @@ Responsibilities:
 
 Use this file map when a CLI bootstrap is present:
 
-- Contaminated artifact root: write `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `source-index.json`, `visual-index.json`, `coverage-ledger.json`, `evidence-ledger.json`, private identifier denylist artifacts, and `clean-room-result.json`.
+- Contaminated artifact root: write `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `source-index.json`, `visual-index.json`, `coverage-ledger.json`, `evidence-ledger.json`, private identifier denylist artifacts, and `clean-room-result.json` only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 - Clean artifact root: only sanitized handoff artifacts, `clean-run-context.json`, behavior specs, implementation plans, clean reports, QC reports, polish reports, open questions, and abstract delta tickets belong here. Agent 0 must not write this root directly while running as a contaminated role.
 - Implementation root: Agent 3 writes destination code, tests, fixtures, and destination project files here. Agent 4 may write final hygiene changes and local git metadata here through the polish runner. Agent 0 must not write this root.
 - Quarantine root: rejected, contaminated, or incident artifacts that must not cross into the clean domain.

@@ -18,7 +18,7 @@ Produce clean-run-context.json for Agent 2, Agent 3, and Agent 4 from sanitized 
 Influence Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts. Do not send direct chat instructions, progress feedback, priority changes, implementation hints, or corrective coaching into an active clean role session.
 Use contaminated source-index.json when controller preflight produced one.
 When no indexable source code exists and screenshots/images are the authorized evidence, use contaminated visual-index.json only as fallback input. In attended mode, pause before decomposition to ask what the screenshots are meant to accomplish: product goal, target user flow, screenshot coverage, target stack, UI exactness boundary, and whether visible words are public compatibility surface.
-Maintain the tasklist as neutral task-manifest.json units, map at most one source-index batch, large-file segment, or visual-index batch into each unit, and track coverage under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
+Maintain the tasklist as neutral CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/task-manifest.json units, map at most one source-index batch, large-file segment, or visual-index batch into each unit, and track coverage under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
 Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
 Send Agent 1 draft specs to Agent 1.5 for independent source-denied sanitization before clean handoff.
 Compare clean artifacts and terminal implementation reports against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility for coverage gaps.

@@ -67,9 +67,9 @@ For visual fallback runs, Agent 1.5 also cannot receive `visual-index.json`, raw
 
 Agent 2 cannot start until Agent 1.5 writes a passed handoff package, approved behavior specs, leakage review status, and `clean-run-context.json`.
 
-Agent 3 cannot start until Agent 2 writes `implementation-plan.json` with relative paths, argv-array verification commands, target stack, and code hygiene policy from preflight.
+Agent 3 cannot start until Agent 2 writes `CLEAN_ROOM_CLEAN_ROOTS/implementation-plan.json` with relative paths, argv-array verification commands, target stack, and code hygiene policy from preflight.
 
-Agent 4 cannot start until Agent 3 writes terminal `implementation-report.json` and `qc-report.json`. Agent 4 receives only clean artifacts, implementation roots, schema roots, approved public references, and role-session briefs.
+Agent 4 cannot start until Agent 3 writes terminal `CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json` and `CLEAN_ROOM_CLEAN_ROOTS/qc-report.json`. Agent 4 receives only clean artifacts, implementation roots, schema roots, approved public references, and role-session briefs.
 
 When `context_management.enforcement` is `strict`, no role can start until Agent 0 writes a valid `role-session-brief.json` for that role, phase, unit, and spec slice. The brief must fit the recorded budgets and must not contain prior chat, copied artifact bodies, source paths, or contaminated ledgers.
 

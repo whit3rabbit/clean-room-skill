@@ -24,10 +24,52 @@ CONTAMINATED_ROLES = {
     "contaminated-handoff-sanitizer",
 }
 CLEAN_ROLES = {"clean-architect", "clean-qa-editor", "clean-polish-reviewer"}
+CONTAMINATED_ONLY_ARTIFACT_NAMES = {
+    "clean-room-result.json",
+    "init-config.json",
+    "preflight-goal.json",
+    "task-manifest.json",
+}
+CLEAN_ROOM_ARTIFACT_PREFIXES = (
+    "behavior-spec",
+    "clean-room-result",
+    "clean-run-context",
+    "contamination-incident",
+    "controller-status",
+    "coverage-ledger",
+    "evidence-ledger",
+    "handoff-package",
+    "implementation-plan",
+    "implementation-report",
+    "init-config",
+    "polish-report",
+    "preflight-goal",
+    "qc-report",
+    "role-session-brief",
+    "skeleton-manifest",
+    "source-index",
+    "task-manifest",
+    "visual-index",
+)
 
 
 def is_under(path: Path, root: Path) -> bool:
     return path_is_under(path, root)
+
+
+def is_clean_room_artifact_name(path: Path) -> bool:
+    if path.suffix.lower() != ".json":
+        return False
+    stem = path.name[:-5]
+    return any(stem == prefix or stem.startswith(f"{prefix}-") for prefix in CLEAN_ROOM_ARTIFACT_PREFIXES)
+
+
+def is_contaminated_only_artifact_name(path: Path) -> bool:
+    return path.name in CONTAMINATED_ONLY_ARTIFACT_NAMES
+
+
+def deny_contaminated_only_outside_root(path: Path, contaminated_artifact_roots: list[Path]) -> bool:
+    return is_contaminated_only_artifact_name(path) and not any(is_under(path, root) for root in contaminated_artifact_roots)
 
 
 def main() -> int:
@@ -63,6 +105,13 @@ def main() -> int:
     if role in CLEAN_ROLES:
         allowed_read_roots = env_roots("CLEAN_ROOM_ALLOWED_READ_ROOTS")
         for path in paths:
+            if deny_contaminated_only_outside_root(path, contaminated_artifact_roots):
+                print(
+                    f"clean-room policy denied role {role} writing contaminated-only artifact outside "
+                    f"CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: {describe_path(path)}",
+                    file=sys.stderr,
+                )
+                return 1
             if any(is_under(path, root) for root in source_roots):
                 print(
                     f"clean-room policy denied clean role {role} writing {describe_path(path)}",
@@ -92,6 +141,13 @@ def main() -> int:
             if role in {"clean-qa-editor", "clean-polish-reviewer"} and any(
                 is_under(path, root) for root in implementation_roots
             ):
+                if is_clean_room_artifact_name(path):
+                    print(
+                        f"clean-room policy denied clean role {role} writing clean-room artifact under "
+                        f"CLEAN_ROOM_IMPLEMENTATION_ROOTS: {describe_path(path)}",
+                        file=sys.stderr,
+                    )
+                    return 1
                 continue
             if not any(is_under(path, root) for root in clean_roots):
                 print(
@@ -102,6 +158,13 @@ def main() -> int:
         return 0
 
     for path in paths:
+        if deny_contaminated_only_outside_root(path, contaminated_artifact_roots):
+            print(
+                f"clean-room policy denied contaminated role {role} writing contaminated-only artifact outside "
+                f"CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS: {describe_path(path)}",
+                file=sys.stderr,
+            )
+            return 1
         if any(is_under(path, root) for root in clean_roots):
             print(
                 f"clean-room policy denied contaminated role {role} writing {describe_path(path)}",

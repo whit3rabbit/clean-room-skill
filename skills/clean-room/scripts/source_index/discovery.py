@@ -74,6 +74,27 @@ def contaminated_artifact_roots(args: argparse.Namespace) -> list[Path]:
     return roots
 
 
+def env_path_roots(name: str) -> list[Path]:
+    roots: list[Path] = []
+    seen: set[Path] = set()
+    for value in os.environ.get(name, "").split(os.pathsep):
+        if not value:
+            continue
+        root = Path(value).expanduser().resolve()
+        if root in seen:
+            continue
+        seen.add(root)
+        roots.append(root)
+    return roots
+
+
+def clean_or_implementation_roots() -> list[tuple[str, Path]]:
+    roots: list[tuple[str, Path]] = []
+    for name in ("CLEAN_ROOM_CLEAN_ROOTS", "CLEAN_ROOM_IMPLEMENTATION_ROOTS"):
+        roots.extend((name, root) for root in env_path_roots(name))
+    return roots
+
+
 def checked_output_path(args: argparse.Namespace, source_root_records: list[dict[str, str]]) -> Path:
     output = Path(args.output).expanduser().resolve()
     source_root_paths = [Path(root["path"]) for root in source_root_records]
@@ -90,6 +111,12 @@ def checked_output_path(args: argparse.Namespace, source_root_records: list[dict
                 raise SystemExit(
                     f"source roots and contaminated artifact roots must be separate: "
                     f"{source_root} overlaps {contaminated_root}"
+                )
+        for env_name, clean_root in clean_or_implementation_roots():
+            if paths_overlap(source_root, clean_root):
+                raise SystemExit(
+                    f"source roots and {env_name} roots must be separate: "
+                    f"{source_root} overlaps {clean_root}"
                 )
     if not any(path_is_under(output, root) for root in roots):
         allowed = ", ".join(root.as_posix() for root in roots)
