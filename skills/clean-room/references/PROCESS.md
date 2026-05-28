@@ -128,6 +128,7 @@ Contaminated manager/verifier:
 - Track contaminated evidence references in `evidence-ledger.json`.
 - Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
 - Compare clean artifacts and terminal implementation, QC, and polish reports against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility.
+- For exact-public-contract or behavior-compatible units, split broad public surfaces into smaller units or maintain `public_surface_coverage` entries for every required `public_surface:<spec_id>:<kind>:<name>` obligation before marking coverage complete.
 - Return only abstract delta tickets into a fresh clean artifact cycle, such as "retry behavior after transient network failure is missing."
 
 Contaminated source analyst/spec writer:
@@ -271,6 +272,7 @@ Clean polish reviewer:
    - Run bounded argv-array verification commands only through the installed Agent 3 verification runner.
    - Record changed paths, verification status, blockers, and abstract delta tickets in `CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json`.
    - Maintain `CLEAN_ROOM_CLEAN_ROOTS/qc-report.json` for schema, leakage, architecture alignment, source-test parity, equal-output assertions, and spec-to-plan-to-test mismatches.
+   - Verify public-surface inventory parity item by item; each required public command, API, config, protocol, or user-visible behavior must map from behavior spec test coverage to implementation-plan `public_contract_refs`, terminal report completion, and coverage-ledger `public_surface_coverage`.
    - Treat missing invariant tests as a parity gap when protocol, serialization, streaming, queueing, error-budget, async, or typed-data behavior is in scope.
    - Do not send Agent 0 progress updates or partial findings while work remains in progress.
 12. Polish review:
@@ -280,6 +282,7 @@ Clean polish reviewer:
    - Commit only through `agent4-polish-runner.py`, with no push, tag, reset, clean, branch deletion, or arbitrary git commands.
 13. Verify coverage:
    - Contaminated manager checks gaps against source behavior, discovered source tests, equal-output requirements, public contract compatibility, terminal implementation reports, and terminal polish reports when configured.
+   - Reject completion when any required public-surface obligation is missing from behavior spec test coverage, implementation-plan `public_contract_refs`, terminal implementation completion, or coverage-ledger `public_surface_coverage`.
    - Do not mark exact-public-contract or behavior-compatible work complete while approved behavior specs have open questions or untested compatibility-critical invariants.
    - Return only abstract deltas through updated durable artifacts for a fresh clean cycle.
    - In unattended mode, reload durable artifacts and process at most one pending or gap unit per iteration inside the approved spec slice.

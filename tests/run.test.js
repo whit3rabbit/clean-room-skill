@@ -338,6 +338,124 @@ function validBehaviorSpec(overrides = {}) {
   };
 }
 
+function publicSurfaceRef(name, kind = 'command', specId = 'spec-example-flow') {
+  return `public_surface:${specId}:${kind}:${name}`;
+}
+
+function publicCommandItem(name) {
+  return {
+    name,
+    kind: 'command',
+    visibility: 'user-required',
+    compatibility_reason: `${name} is part of the required user-visible command surface.`,
+  };
+}
+
+function publicSurfaceCoverage(ref, status = 'covered') {
+  return {
+    ref,
+    status,
+    evidence_refs: status === 'covered' ? ['evidence-ledger:item-001'] : [],
+    work_item_refs: ['wi-test'],
+    verification_refs: ['verification:npm-test'],
+  };
+}
+
+function writeCoveredCoverageWithPublicSurface(workspace, publicSurfaceCoverageEntries) {
+  writeJson(path.join(workspace.contaminated, 'coverage-ledger.json'), {
+    ledger_id: 'coverage-test',
+    task_id: 'task-example',
+    updated_by_role: 'contaminated-manager-verifier',
+    source_units: [
+      {
+        unit_id: 'unit-example-flow',
+        coverage_state: 'covered',
+        evidence_refs: ['evidence-ledger:item-001'],
+        public_surface_coverage: publicSurfaceCoverageEntries,
+      },
+    ],
+    behavior_spec_refs: ['spec-example-flow'],
+    coverage_status: 'complete',
+    abstract_delta_tickets: [],
+    review_history: [
+      {
+        reviewer_role: 'contaminated-manager-verifier',
+        status: 'test',
+        notes: '',
+      },
+    ],
+  });
+  writeEvidenceLedger(workspace.contaminated);
+}
+
+function writePublicCommandCompletionArtifacts(workspace, options = {}) {
+  const commandNames = options.commandNames || ['/alpha'];
+  const publicRefs = commandNames.map((name) => publicSurfaceRef(name));
+  const scenarioCoverage = options.scenarioCoverage || publicRefs;
+  writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec({
+    public_surface: commandNames.map((name) => publicCommandItem(name)),
+    test_scenarios: [
+      {
+        scenario_id: 'test-public-command-surface',
+        scenario: 'Invoke required public slash commands.',
+        expected_result: 'Each command produces its documented user-visible behavior.',
+        coverage: scenarioCoverage,
+      },
+    ],
+  }));
+  writeCleanRunContext(workspace);
+  writeArchitectureArtifacts(workspace, {
+    work_items: [
+      {
+        work_item_id: 'wi-test',
+        status: 'planned',
+        summary: 'Implement required public command surface.',
+        spec_ids: ['spec-example-flow'],
+        architecture_area_refs: ['area-example-flow'],
+        public_contract_refs: options.planRefs || publicRefs,
+        implementation_root_ref: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+        target_paths: ['src/example-flow.js'],
+        test_paths: ['test/example-flow.test.js'],
+        acceptance_criteria: ['Required public commands are implemented and tested.'],
+      },
+    ],
+  }, {
+    public_contracts: commandNames.map((name) => ({
+      contract_id: publicSurfaceRef(name),
+      source_spec_id: 'spec-example-flow',
+      name,
+      kind: 'command',
+      visibility: 'user-required',
+      compatibility_reason: `${name} is part of the required user-visible command surface.`,
+    })),
+    areas: [
+      {
+        area_id: 'area-example-flow',
+        purpose: 'Own the example public command flow and tests.',
+        owned_path_prefixes: ['src/', 'test/'],
+        responsibilities: ['Implement and test required public commands.'],
+        forbidden_responsibilities: ['Do not own unrelated destination behavior.'],
+        allowed_area_dependencies: [],
+        spec_ids: ['spec-example-flow'],
+        public_contract_refs: publicRefs,
+        target_constraints: [],
+        dependency_constraints: [],
+        test_obligations: ['test-public-command-surface'],
+        open_decisions: [],
+      },
+    ],
+  });
+  writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+  writeCompleteCleanReports(workspace);
+  if (options.completedWorkItems) {
+    const reportPath = path.join(workspace.clean, 'implementation-report.json');
+    const report = readJson(reportPath);
+    report.completed_work_items = options.completedWorkItems;
+    writeJson(reportPath, report);
+  }
+  return publicRefs;
+}
+
 function writeSkeletonManifest(workspace, overrides = {}) {
   writeJson(path.join(workspace.clean, 'skeleton-manifest.json'), {
     manifest_id: 'skeleton-test',
@@ -833,6 +951,89 @@ describe('clean-room run command', () => {
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /covered coverage-ledger unit has unresolved coverage gaps/);
+  });
+
+  test('rejects covered public surface missing behavior spec test coverage', () => {
+    const workspace = baseWorkspace('clean-room-run-public-surface-missing-test-coverage');
+    const refs = writePublicCommandCompletionArtifacts(workspace, {
+      commandNames: ['/alpha'],
+      scenarioCoverage: [],
+    });
+    writeCoveredCoverageWithPublicSurface(workspace, refs.map((ref) => publicSurfaceCoverage(ref)));
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public_surface obligation missing from behavior spec test coverage/);
+  });
+
+  test('rejects covered public surface missing implementation plan mapping', () => {
+    const workspace = baseWorkspace('clean-room-run-public-surface-missing-plan-ref');
+    const refs = writePublicCommandCompletionArtifacts(workspace, {
+      commandNames: ['/alpha'],
+      planRefs: [],
+    });
+    writeCoveredCoverageWithPublicSurface(workspace, refs.map((ref) => publicSurfaceCoverage(ref)));
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public_surface obligation missing from implementation plan/);
+  });
+
+  test('rejects covered public surface with incomplete mapped work item', () => {
+    const workspace = baseWorkspace('clean-room-run-public-surface-incomplete-work-item');
+    const refs = writePublicCommandCompletionArtifacts(workspace, {
+      commandNames: ['/alpha'],
+      completedWorkItems: [],
+    });
+    writeCoveredCoverageWithPublicSurface(workspace, refs.map((ref) => publicSurfaceCoverage(ref)));
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public_surface obligation work item is not complete/);
+  });
+
+  test('rejects covered unit with uncovered public surface coverage entry', () => {
+    const workspace = baseWorkspace('clean-room-run-public-surface-gap-coverage');
+    const refs = writePublicCommandCompletionArtifacts(workspace, {
+      commandNames: ['/alpha'],
+    });
+    writeCoveredCoverageWithPublicSurface(workspace, [publicSurfaceCoverage(refs[0], 'gap')]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /coverage-ledger public_surface_coverage is not covered/);
+  });
+
+  test('completes covered public surface when spec, plan, report, and ledger all map obligations', () => {
+    const workspace = baseWorkspace('clean-room-run-public-surface-complete');
+    const refs = writePublicCommandCompletionArtifacts(workspace, {
+      commandNames: ['/alpha', '/beta'],
+    });
+    writeCoveredCoverageWithPublicSurface(workspace, refs.map((ref) => publicSurfaceCoverage(ref)));
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-slice-complete/);
+  });
+
+  test('rejects noncanonical manual task manifests before completion claims', () => {
+    const root = tempDir('clean-room-run-noncanonical-manual-manifest');
+    const manifestPath = path.join(root, 'task-manifest.json');
+    writeJson(manifestPath, {
+      manifest_id: 'manual-result',
+      status: 'complete',
+      units_completed: ['unit-example-flow'],
+    });
+
+    const result = runCli(['run', '--task-manifest', manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /missing required field 'task_id'/);
   });
 
   test('rejects completed slices without terminal clean artifacts', () => {
@@ -1486,6 +1687,20 @@ describe('clean-room run command', () => {
         ticket_id: 'delta-001',
         summary: 'The spec does not define timeout behavior.',
         requested_clean_change: 'Define timeout behavior.',
+        status: 'open',
+      },
+      {
+        ticket_id: 'delta-qc-coverage',
+        kind: 'implementation-gap',
+        summary: 'QC coverage_status is partial, not complete.',
+        requested_clean_change: 'Resolve QC coverage gaps before marking the spec slice complete.',
+        status: 'open',
+      },
+      {
+        ticket_id: 'delta-qc-final-status',
+        kind: 'implementation-gap',
+        summary: 'QC final_status is passed-with-gaps, not passed.',
+        requested_clean_change: 'Resolve QC findings before marking the spec slice complete.',
         status: 'open',
       },
     ]);

@@ -22,6 +22,7 @@ Maintain the tasklist as neutral CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS/task-man
 Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
 Send Agent 1 draft specs to Agent 1.5 for independent source-denied sanitization before clean handoff.
 Compare clean artifacts and terminal implementation reports against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility for coverage gaps.
+For exact-public-contract or behavior-compatible units, split broad public surfaces into smaller units or maintain coverage-ledger.json public_surface_coverage entries for every required public_surface:<spec_id>:<kind>:<name> obligation. A covered unit requires each obligation to be covered, mapped to clean work, and verified.
 Reject complete when source-test-derived parity, protocol invariants, public-contract tests, or approved behavior-spec open questions remain unresolved. Convert the gap into abstract delta tickets for a fresh clean cycle.
 Do not write clean artifacts.
 If source-index.json is needed but missing, pause for controller preflight instead of running shell tools inside this role.

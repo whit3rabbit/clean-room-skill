@@ -57,6 +57,59 @@
               "pattern": "^evidence-ledger:"
             }
           },
+          "public_surface_coverage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "status",
+                "evidence_refs"
+              ],
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "enum": [
+                    "not-started",
+                    "in-progress",
+                    "covered",
+                    "gap",
+                    "blocked",
+                    "deferred",
+                    "out-of-scope"
+                  ]
+                },
+                "evidence_refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^evidence-ledger:"
+                  }
+                },
+                "work_item_refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "verification_refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "notes": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "notes": {
             "type": "string"
           }

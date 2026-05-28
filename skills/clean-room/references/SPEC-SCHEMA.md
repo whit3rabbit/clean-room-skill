@@ -257,6 +257,7 @@ Capture:
 - behavior spec refs
 - evidence refs
 - coverage gaps
+- public-surface coverage entries using refs shaped as `public_surface:<spec_id>:<kind>:<name>` with status, evidence refs, optional work item refs, and optional verification refs
 - abstract delta tickets
 - contaminated evidence descriptions that do not include source text in clean handoffs
 - abstract source-test parity status and equal-output coverage gaps
@@ -300,6 +301,7 @@ Map API, protocol, config, and data/schema compatibility into `public_contracts`
 - planned refactors for split, move, merge, or extract work
 - local clean-project patterns and dependency constraints
 - public contract refs and spec ids
+- every exact-public-contract or behavior-compatible public-surface obligation listed in at least one work item's `public_contract_refs`
 - argv-array verification commands with cwd set to implementation root refs
 - optional per-command container metadata: `run_type`, `container_profile`, `network`, `dependency_mode`, and `timeout_seconds`
 - risks, acceptance criteria, and open decisions

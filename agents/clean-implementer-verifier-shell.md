@@ -31,6 +31,7 @@ Responsibilities:
 - Record implementation status, changed relative paths, verification results, blockers, contamination incidents, and required reruns in `CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json`.
 - Keep `CLEAN_ROOM_CLEAN_ROOTS/qc-report.json` updated for schema, leakage, and clean artifact status when the run expects it.
 - Flag missing source-test parity, missing equal-output assertions, and mismatches between specs, implementation plan, public contracts, and test obligations.
+- Verify public-surface inventory parity item by item. Every required `public_surface:<spec_id>:<kind>:<name>` ref must be covered by tests, mapped to a completed work item, and represented in terminal verification; passing test counts or broad command-dispatch coverage is not enough.
 - Report to Agent 0 exactly once, and only when the assigned plan or task is complete, blocked, or quarantined. The report must be the terminal `CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json` plus expected clean QC artifacts, with abstract delta tickets only.
 - Edit clean wording for clarity without adding new source facts.
 

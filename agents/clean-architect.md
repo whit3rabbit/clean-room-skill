@@ -42,6 +42,7 @@ Responsibilities:
 - Keep `skeleton-manifest.json` valid and current for code-development runs. Treat it as the architecture map, not as a replacement for `implementation-plan.json`.
 - Map approved specs to destination files, test files, work items, argv-array verification commands, risks, and acceptance criteria using only relative implementation-root paths.
 - Preserve public contract refs, dependency constraints, test mappings, and open decisions.
+- Map every exact-public-contract or behavior-compatible public surface obligation to at least one `implementation-plan.json` work item through `public_contract_refs`; do not replace a public command/API inventory with one generic dispatch work item unless every obligation ref is listed.
 - Preserve source-test-derived scenarios as clean test obligations for equal output without copying source test structure.
 - Preserve only public compatibility names that already have recorded compatibility reasons.
 - Do not resolve public-contract, callable, protocol, async, serialization, or data-shape ambiguity by narrowing semantics. Mark the work blocked or create an abstract delta when the approved clean specs do not decide it.

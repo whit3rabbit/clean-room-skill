@@ -30,6 +30,7 @@ Do not report progress, ask Agent 0 for guidance, or send partial findings while
 Record argv-array verification commands, optional clean-safe container metadata, implementation status, changed relative paths, verification results, blockers, and abstract delta tickets in CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json.
 Review leakage risk and record contamination incidents.
 Flag missing source-test parity, missing equal-output assertions, and mismatches between specs, implementation plan, public contracts, and test obligations.
+Verify public-surface inventory parity item by item. Every required public_surface:<spec_id>:<kind>:<name> ref must be covered by tests, mapped to a completed work item, and represented in terminal verification; passing test counts or broad command-dispatch coverage is not enough.
 Require invariant-level tests for compatibility-critical behavior. Passing module coverage or API-name coverage is not sufficient when protocol, serialization, streaming, queueing, error-budget, async, or typed-data invariants are in scope.
 Keep CLEAN_ROOM_CLEAN_ROOTS/qc-report.json updated when the run expects it.
 Record code hygiene violations as code-hygiene findings in CLEAN_ROOM_CLEAN_ROOTS/qc-report.json.
