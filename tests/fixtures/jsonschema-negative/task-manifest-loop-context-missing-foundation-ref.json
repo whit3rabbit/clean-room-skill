@@ -1,0 +1,12 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Nested loop context must name the foundation unit.",
+  "remove": [
+    [
+      "loop_context",
+      "foundation_unit_ref"
+    ]
+  ],
+  "expected_error": "'foundation_unit_ref' is a required property"
+}

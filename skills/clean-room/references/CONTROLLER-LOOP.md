@@ -11,6 +11,7 @@ The outer loop evolves specs. The inner clean-room loop completes one approved s
 The outer loop owns product intent and spec state:
 
 - Define or refine source scope.
+- Create and approve the foundation unit first for code-development runs. Do not approve behavior units until the foundation unit is covered.
 - Draft and review behavior specs.
 - Select one approved spec slice.
 - Invoke the inner clean-room loop.
@@ -64,6 +65,8 @@ Inner loop states:
 
 The inner loop must not expand scope. If it finds missing behavior, ambiguity, parity gaps, test gaps, or a plan that exceeds the selected slice, it emits abstract delta tickets and returns to the outer loop.
 
+Unresolved high-priority `coverage-ledger.json` `discovery_leads` are treated as incomplete contaminated discovery, not clean implementation work. The inner loop may not mark the affected unit covered or send it to handoff until the lead is resolved by an authorized follow-up unit or the outer loop changes scope.
+
 ## Return Contract
 
 The inner loop returns only after Agent 0 has consumed the terminal Agent 3 report, any configured Agent 4 `polish-report.json`, and verified coverage from the contaminated side. An Agent 3 terminal `implementation-report.json` alone is not a clean-room return.
@@ -99,6 +102,8 @@ Expected durable artifacts include:
 The runner records controller state in contaminated-side `controller-run-ledger.json`. That ledger is controller memory, not clean input.
 
 `controller-status.json` is compact Agent 0 resume state, not workflow progress by itself. Status-only updates must not keep an unattended loop alive. `role-session-brief.json` is the launch packet for one fresh role context; it should contain refs and hashes, not copied artifact contents.
+
+`coverage-ledger.json` `discovery_leads` are contaminated-only coverage metadata. They may name neutral source or visual refs for Agent 0 tracking, but clean roles receive only abstract deltas or sanitized behavior specs.
 
 ## Unit Sizing
 

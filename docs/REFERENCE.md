@@ -210,7 +210,11 @@ Options:
 | `--schema-dir <path>` | Override bundled schema directory. |
 | `--python <path>` | Python executable for validation hooks; default is `python3`. |
 
-The task manifest must already include preflight references, the required handoff sequence, unattended controller policy, finite iteration bounds, and `loop_context.approved_scope_refs`.
+The task manifest must already include preflight references, the required handoff sequence, unattended controller policy, finite iteration bounds, `loop_context.foundation_unit_ref`, and `loop_context.approved_scope_refs`.
+
+Unattended code-development manifests must include exactly one `unit_kind: "foundation"` unit. The runner rejects non-foundation approved slices until that unit is covered.
+
+`coverage-ledger.json` may record contaminated-only `source_units[].discovery_leads` for authorized related surfaces that were detected but not analyzed in the assigned unit. The runner rejects a `covered` unit while any high-priority discovery lead remains open or deferred. It does not add follow-up units or expand `loop_context.approved_scope_refs`; Agent 0 must return an abstract delta, mark coverage partial or blocked, or pause for attended approval.
 
 Minimal agent command adapter shape for advisory or disabled context management:
 
@@ -323,7 +327,8 @@ The runner exports `CLEAN_ROOM_SESSION_BRIEF_PATH`, `CLEAN_ROOM_ROLE_SESSION_ID`
 | `install lock is held` | Another install or uninstall is mutating the same target root | Wait for the other process to finish; stale locks are handled conservatively. |
 | Hook config write failed after files copied | Partial installer state | Fix the filesystem error, then re-run the same installer command. |
 | Install manifest remains `installing` | The previous install did not complete | Re-run the same installer command for that runtime and target root. |
-| `clean-room run` rejects the manifest | Invalid or incomplete unattended loop metadata | Fix `controller_policy`, `loop_context`, and `approved_scope_refs`, then retry `--dry-run`. |
+| `clean-room run` rejects the manifest | Invalid or incomplete unattended loop metadata | Fix `controller_policy`, `loop_context.foundation_unit_ref`, and `approved_scope_refs`, then retry `--dry-run`. |
+| `clean-room run` rejects a covered unit with `discovery_leads` | A high-priority contaminated discovery lead is still unresolved | Analyze the lead in an authorized follow-up unit, mark it resolved, or keep coverage partial/blocked and return an abstract delta. |
 | `clean-room run` rejects an agent command stage in strict context mode | The stage is missing `context.fresh_session: true`, missing `context.brief_path`, or points the brief outside the allowed artifact root | Fix the stage context and regenerate the role-session brief for the selected unit. |
 | `clean-room run` reports no progress | Configured stages exited without durable artifact changes | Check role command cwd/argv, selected unit, and artifact write roots. |
 | `clean-room run` reports repeated unit selection | Same unit selected after a no-progress iteration | Resolve the blocker or update durable artifacts before retrying. |

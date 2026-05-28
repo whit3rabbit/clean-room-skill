@@ -1,0 +1,16 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Task manifests must have exactly one foundation unit.",
+  "set": [
+    {
+      "path": [
+        "units",
+        1,
+        "unit_kind"
+      ],
+      "value": "foundation"
+    }
+  ],
+  "expected_error": "Too many items match the given schema"
+}

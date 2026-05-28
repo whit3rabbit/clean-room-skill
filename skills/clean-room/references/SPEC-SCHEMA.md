@@ -64,12 +64,15 @@ Capture:
 - handoff policy
 - tool and model policy
 - source units with neutral ids
+- per-unit `unit_kind`, with exactly one `foundation` unit and remaining implementation slices as `behavior` units
 - optional per-unit `source_index_refs` such as `source-index:batch-0001` or `source-index:segment-file-000001-0001`
 - optional per-unit `visual_index_refs` such as `visual-index:batch-0001` or `visual-index:image-000001`
 - expected artifacts
 - audit log refs
 
-Use neutral ids such as `unit-auth-flow` or `unit-config-loading`. Avoid source path mirroring unless the path is already a public API or package name.
+Use neutral ids such as `unit-foundation`, `unit-auth-flow`, or `unit-config-loading`. Avoid source path mirroring unless the path is already a public API or package name.
+
+The foundation unit is first in code-development runs. It captures target stack, package or module boundaries, public manifest surfaces, test entrypoints, dependency policy, and destination constraints before behavior implementation starts. Public/package compatibility facts may appear in a normal behavior spec; destination/build constraints belong in `clean-run-context.json`, `skeleton-manifest.json`, and `implementation-plan.json`. Do not copy source dependency lists or package manifests into clean artifacts merely because they exist.
 
 When a role needs more than one runtime profile, keep the role name stable and set `profile_purpose` to distinguish the sessions. For example, Agent 3 may use `report-review` for clean artifact work and `implementation` for the clean implementation workspace.
 
@@ -158,6 +161,7 @@ Do not send `visual-index.json`, raw screenshots, visual paths, image hashes, co
 - `child_loop_kind: "clean-room"`
 - `parent_loop_ref`
 - `spec_slice_ref`
+- `foundation_unit_ref`
 - `approved_scope_refs`
 - `acceptance_refs`
 - `public_surface_refs`
@@ -166,7 +170,7 @@ Do not send `visual-index.json`, raw screenshots, visual paths, image hashes, co
 - `inner_iteration`
 - `max_inner_iterations`
 
-The inner loop may select only units named by `approved_scope_refs`. If a needed unit is outside that slice, return `spec-delta-required` instead of expanding scope.
+The inner loop may select only units named by `approved_scope_refs`. `foundation_unit_ref` must resolve to the one `unit_kind: "foundation"` unit. A non-foundation slice must not run or complete until the foundation unit is covered. If a needed unit is outside that slice, return `spec-delta-required` instead of expanding scope.
 
 `run_state` is optional for compatibility with older manifests. When present, it records `generation`, `started_at`, optional `previous_generation_ref`, and `restart_reason`. Valid restart reasons are `user-requested`, `contamination`, `scope-change`, and `invalid-state`.
 
@@ -226,6 +230,8 @@ Capture behavior rather than source structure:
 - API, protocol, config, and data/schema compatibility requirements
 - leakage review status
 
+For foundation specs, capture public package names, public module names, manifest fields, config keys, and test entrypoints only when they are public compatibility surface or destination constraints. Record dependency allow/block and install behavior through the existing dependency-policy and implementation-plan fields; do not mirror private source manifests.
+
 Do not include source-shaped code blocks, raw screenshots, copied visible words, exact palettes, exact iconography, exact layout measurements, or visual-index contents in behavior specs. Use declarative requirements. Clean implementation code belongs only in `CLEAN_ROOM_IMPLEMENTATION_ROOTS` after Agent 2 has produced `CLEAN_ROOM_CLEAN_ROOTS/implementation-plan.json`.
 
 Use `evidence_refs` values such as `evidence-ledger:item-001`. They must point to contaminated-side evidence ledger entries and must not carry source text into the clean artifact.
@@ -258,6 +264,7 @@ Capture:
 - evidence refs
 - coverage gaps
 - public-surface coverage entries using refs shaped as `public_surface:<spec_id>:<kind>:<name>` with status, evidence refs, optional work item refs, and optional verification refs
+- contaminated-only discovery leads for authorized related surfaces that were detected but not analyzed, with priority and resolution status
 - abstract delta tickets
 - contaminated evidence descriptions that do not include source text in clean handoffs
 - abstract source-test parity status and equal-output coverage gaps

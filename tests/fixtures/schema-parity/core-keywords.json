@@ -40,6 +40,19 @@
         "type": "array",
         "minItems": 1,
         "maxItems": 2,
+        "contains": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "const": "one"
+            }
+          }
+        },
+        "minContains": 1,
+        "maxContains": 1,
         "items": {
           "$ref": "#/$defs/item"
         }
@@ -223,6 +236,23 @@
         "items": [
           {
             "name": ""
+          }
+        ],
+        "choice": "s:value"
+      }
+    },
+    {
+      "name": "contains",
+      "valid": false,
+      "instance": {
+        "kind": "parity",
+        "mode": "fast",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "count": 2,
+        "tag": "alpha",
+        "items": [
+          {
+            "name": "two"
           }
         ],
         "choice": "s:value"

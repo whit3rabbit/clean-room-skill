@@ -110,6 +110,48 @@
               }
             }
           },
+          "discovery_leads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lead_id",
+                "source_ref",
+                "description",
+                "priority",
+                "status"
+              ],
+              "properties": {
+                "lead_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "priority": {
+                  "enum": [
+                    "high",
+                    "medium",
+                    "low"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "open",
+                    "resolved",
+                    "deferred"
+                  ]
+                }
+              }
+            }
+          },
           "notes": {
             "type": "string"
           }

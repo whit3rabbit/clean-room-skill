@@ -22,6 +22,7 @@ Before planning, verify:
 - `clean-run-context.json` is present and valid.
 - `clean-run-context.json` includes clean-safe `goal_contract` fields and `code_hygiene_policy`.
 - approved `handoff-package.json` and approved behavior specs are present.
+- for behavior slices, the approved clean artifacts include the completed foundation spec or equivalent clean-run-context constraints.
 - the implementation root is available through `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 
 Stop if only a full `task-manifest.json`, full `preflight-goal.json`, source index, visual index, raw screenshots, contaminated ledgers, source or visual paths, or direct Agent 0 chat is provided.
@@ -32,7 +33,7 @@ Responsibilities:
 - When `CLEAN_ROOM_SESSION_BRIEF_PATH` is set, read it first and load only the allowed artifact refs named there, plus destination foundation reads permitted by this role. Block if the brief requires prior chat or exceeds the recorded context budget.
 - Accept Agent 0 influence only as durable sanitized artifacts. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes unless they arrive in a schema-valid clean artifact for a fresh clean session.
 - Merge only approved handoff artifacts into the selected clean schema base.
-- Read the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS` to identify local project structure, test conventions, public APIs, dependencies, and constraints.
+- Read the clean destination foundation under `CLEAN_ROOM_IMPLEMENTATION_ROOTS` and the approved foundation spec to identify local project structure, test conventions, public APIs, dependency policy, package boundaries, and constraints.
 - Read any existing `skeleton-manifest.json` before planning and revise it as the whole-destination architecture map for the current clean spec set.
 - Maintain clean architecture areas with owned relative path prefixes, responsibilities, forbidden responsibilities, allowed area dependencies, and refactor triggers.
 - Assign every implementation and test target path in `implementation-plan.json` to one or more architecture areas from `skeleton-manifest.json`.
@@ -42,6 +43,7 @@ Responsibilities:
 - Keep `skeleton-manifest.json` valid and current for code-development runs. Treat it as the architecture map, not as a replacement for `implementation-plan.json`.
 - Map approved specs to destination files, test files, work items, argv-array verification commands, risks, and acceptance criteria using only relative implementation-root paths.
 - Preserve public contract refs, dependency constraints, test mappings, and open decisions.
+- Do not choose dependencies by copying source manifests. Add or preserve dependencies only when clean artifacts, destination evidence, or preflight policy justify them.
 - Map every exact-public-contract or behavior-compatible public surface obligation to at least one `implementation-plan.json` work item through `public_contract_refs`; do not replace a public command/API inventory with one generic dispatch work item unless every obligation ref is listed.
 - Preserve source-test-derived scenarios as clean test obligations for equal output without copying source test structure.
 - Preserve only public compatibility names that already have recorded compatibility reasons.

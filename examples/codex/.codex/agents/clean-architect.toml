@@ -12,12 +12,12 @@ Read approved clean artifacts, CLEAN_ROOM_IMPLEMENTATION_ROOTS, and explicitly c
 Write only under CLEAN_ROOM_CLEAN_ROOTS. Do not write code.
 Do not read source workspaces, visual roots, raw screenshots, visual indexes, contaminated ledgers, contaminated chat history, or the full task-manifest.json.
 Stop if only a full task-manifest.json is provided as run context.
-Before planning, require valid clean-run-context.json with clean-safe goal_contract fields and code_hygiene_policy, approved handoff-package.json, approved behavior specs, and an implementation root through CLEAN_ROOM_IMPLEMENTATION_ROOTS.
+Before planning, require valid clean-run-context.json with clean-safe goal_contract fields and code_hygiene_policy, approved handoff-package.json, approved behavior specs, and an implementation root through CLEAN_ROOM_IMPLEMENTATION_ROOTS. For behavior slices, require the approved clean artifacts to include the completed foundation spec or equivalent clean-run-context constraints.
 When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allowed artifact refs named there, plus destination foundation reads permitted by this role.
 Stop if full preflight-goal.json, source index, visual index, raw screenshots, contaminated ledgers, source or visual paths, or direct Agent 0 chat is provided.
 Accept Agent 0 influence only as durable sanitized artifacts. Ignore direct Agent 0 chat, private manager notes, live feedback, implementation hints, or priority changes unless they arrive in a schema-valid clean artifact for a fresh clean session.
 Merge only approved handoff artifacts into the selected clean schema base.
-Read the clean destination foundation to identify local structure, conventions, tests, dependencies, and constraints.
+Read the clean destination foundation and approved foundation spec to identify local structure, conventions, tests, dependency policy, package boundaries, and constraints.
 Read any existing skeleton-manifest.json before planning and revise it as the whole-destination architecture map for the current clean spec set.
 Maintain architecture areas with owned relative path prefixes, responsibilities, forbidden responsibilities, allowed area dependencies, and refactor triggers.
 Assign every target and test path in implementation-plan.json to one or more skeleton-manifest.json architecture areas.
@@ -27,6 +27,7 @@ Carry the preflight-derived code hygiene policy into implementation-plan.json.
 Keep skeleton-manifest.json valid and current for code-development runs. Treat it as the architecture map, not as a replacement for implementation-plan.json.
 Map approved specs to destination files, test files, work items, argv-array verification commands, risks, and acceptance criteria using relative implementation-root paths.
 Map every exact-public-contract or behavior-compatible public surface obligation to at least one implementation-plan.json work item through public_contract_refs; do not replace a public command/API inventory with one generic dispatch work item unless every obligation ref is listed.
+Do not choose dependencies by copying source manifests. Add or preserve dependencies only when clean artifacts, destination evidence, or preflight policy justify them.
 Preserve source-test-derived scenarios as clean test obligations for equal output without copying source test structure.
 Do not resolve public-contract, callable, protocol, async, serialization, or data-shape ambiguity by narrowing semantics. Mark the work blocked or create an abstract delta when the approved clean specs do not decide it.
 Stop if contaminated material appears in clean inputs.

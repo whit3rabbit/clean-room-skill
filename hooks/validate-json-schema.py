@@ -468,6 +468,20 @@ def validate_value(value: Any, schema: dict, root_schema: dict, path: tuple[str 
                 seen.add(marker)
             if error_limit_reached(errors):
                 return errors
+        contains_schema = schema.get("contains")
+        if isinstance(contains_schema, dict):
+            match_count = 0
+            for index, item in enumerate(value):
+                if not validate_value(item, contains_schema, root_schema, path + (index,)):
+                    match_count += 1
+            min_contains = schema.get("minContains", 1)
+            max_contains = schema.get("maxContains")
+            if isinstance(min_contains, int) and match_count < min_contains:
+                add_error(errors, f"{path_label(path)}: fewer than minContains {min_contains} matching contains schema")
+            if isinstance(max_contains, int) and match_count > max_contains:
+                add_error(errors, f"{path_label(path)}: more than maxContains {max_contains} matching contains schema")
+            if error_limit_reached(errors):
+                return errors
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):

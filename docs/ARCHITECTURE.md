@@ -52,6 +52,7 @@ To assist in logical unit decomposition, the workflow supports an optional sourc
 *   **Execution Boundary**: This tooling runs exclusively in the contaminated domain before clean-room role sessions are initialized.
 *   **Traversal Bounds**: Source indexing enforces file count, per-file byte, total byte, batch token, and segment caps. It validates file size again after reading, skips files that change during read, records directory walk errors, and prunes traversal after global limits are exhausted with an aggregate skipped entry.
 *   **Agent 0 Use**: Agent 0 consumes `source-index.json` only to create neutral `task-manifest.json` units and per-unit `source_index_refs`. In visual fallback runs, Agent 0 consumes `visual-index.json` only to create neutral units and per-unit `visual_index_refs`. Both indexes stay contaminated-only and do not cross to Agent 1.5, Agent 2, Agent 3, Agent 4, or clean handoff packages.
+*   **Discovery Leads**: When Agent 1 detects an authorized related surface that cannot be analyzed inside the assigned unit, Agent 0 tracks it in contaminated `coverage-ledger.json` `discovery_leads`. High-priority leads must be resolved before the unit can be marked covered; the runner does not expand approved scope automatically.
 *   **Tool Trust Policy**: By default, tool discovery operates in `stat-only` mode and does not execute third-party binaries. It queries version strings only when explicitly invoked with `--probe-tools`. Tools discovered under `/opt/homebrew` or `/usr/local` remain stat-only unless `--allow-user-toolchain-probes` is also supplied. Project-local directories (such as `.bin` or `node_modules/.bin`) are ignored unless the environment variable `RE_SKILLS_TRUST_PROJECT_TOOLS=1` or the flag `--allow-working-project-tools` is supplied.
 *   **Local Tool Install Safety**: Explicit npm-backed helper installs are strict-version pinned and serialized with a cache-local lock before mutating `~/.cache/re-skills/clean-room-tools/npm`. Prefix creation failures, subprocess timeouts, and subprocess launch errors are returned as structured JSON facts instead of raw tracebacks.
 
@@ -177,6 +178,7 @@ The architecture delegates work across six distinct custom role agents to enforc
     *   Produces `clean-run-context.json` for Agent 2, Agent 3, and Agent 4 instead of handing over the full `task-manifest.json` or full `preflight-goal.json`.
     *   Influences Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts, never direct chat, progress feedback, implementation hints, or priority changes.
     *   Performs final verification of clean specification and implementation coverage against the source scope.
+    *   Blocks handoff or coverage completion when high-priority contaminated discovery leads remain unresolved.
     *   Writes the inner-loop `clean-room-result.json` only after contaminated-side coverage verification.
     *   Consumes Agent 3 reports only after Agent 3 reaches a terminal state, and consumes Agent 4 reports only after the configured polish review reaches a terminal state, then sends only abstract delta tickets into a fresh clean artifact cycle.
 
@@ -187,6 +189,8 @@ The architecture delegates work across six distinct custom role agents to enforc
     *   Analyzes the authorized source code within assigned units or batches.
     *   Uses target stack and compatibility policy from preflight instead of inferring product goals from source.
     *   Writes neutral draft behavioral specifications based on observed behavior, public contracts, invariants, state transitions, and errors.
+    *   Inventories the assigned unit's observable CLI, env, TUI, UI, protocol, config, command, and public behavior surfaces when relevant.
+    *   Records authorized related surfaces that cannot be analyzed in the assigned context as contaminated `discovery_leads`, not clean spec fields.
     *   Generates evidence references pointing to contaminated ledgers instead of copying raw source code or comments.
     *   Flags suspected leakage but does not approve its own work for clean handoff.
 
@@ -251,10 +255,12 @@ Agent 3's terminal report is not enough to return. If configured, Agent 4 must p
 *   Locks the contaminated artifact root with `.clean-room-run.lock`.
 *   Reloads durable artifacts before each iteration.
 *   Selects at most one pending or gap unit inside `loop_context.approved_scope_refs`.
+*   Requires exactly one `unit_kind: "foundation"` unit, named by `loop_context.foundation_unit_ref`; behavior units cannot run or complete until that foundation unit is covered.
 *   Spawns configured role commands with `shell: false`, bounded output, and bounded timeout.
 *   In strict context-management mode, requires each configured stage to provide `context.fresh_session: true` and `context.brief_path`, then validates the session brief before spawn.
 *   Supports the optional `clean-polish-review` phase between `clean-implement-qc` and `contaminated-coverage-verify`.
 *   Validates schema, leakage, and handoff integrity before advancing state.
+*   Rejects `covered` coverage-ledger units that still have unresolved high-priority `discovery_leads`.
 *   Records controller memory in contaminated-side `controller-run-ledger.json`.
 *   Writes `clean-room-result.json` before returning to the outer spec loop.
 

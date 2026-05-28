@@ -1,0 +1,13 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Task manifest units must declare whether they are foundation or behavior units.",
+  "remove": [
+    [
+      "units",
+      0,
+      "unit_kind"
+    ]
+  ],
+  "expected_error": "'unit_kind' is a required property"
+}

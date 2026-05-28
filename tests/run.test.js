@@ -14,6 +14,11 @@ const TASK_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contam
 const PREFLIGHT_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json');
 const BEHAVIOR_SPEC_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'behavior-spec.json');
 const CLEAN_CONTEXT_FIXTURE = path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'clean-run-context.json');
+const FOUNDATION_UNIT_ID = 'unit-foundation';
+const FOUNDATION_SPEC_ID = 'spec-foundation';
+const FOUNDATION_SPEC_FILE = 'foundation-behavior-spec.json';
+const BEHAVIOR_UNIT_ID = 'unit-example-flow';
+const BEHAVIOR_SPEC_ID = 'spec-example-flow';
 const TEST_TIMEOUT_MS = 30_000;
 const TMP_DIRS = [];
 
@@ -103,6 +108,7 @@ function baseWorkspace(name) {
     child_loop_kind: 'clean-room',
     parent_loop_ref: 'spec-dev-loop:test',
     spec_slice_ref: 'behavior-spec:unit-example-flow',
+    foundation_unit_ref: FOUNDATION_UNIT_ID,
     approved_scope_refs: ['unit-example-flow'],
     acceptance_refs: ['AC-test'],
     public_surface_refs: ['public-contract:test'],
@@ -130,24 +136,52 @@ function baseWorkspace(name) {
   fs.copyFileSync(PREFLIGHT_FIXTURE, path.join(dirs.contaminated, 'preflight-goal.json'));
   writeJson(manifestPath, manifest);
   writeCoverage(dirs.contaminated, 'gap');
+  writeFoundationCleanArtifacts({ clean: dirs.clean });
   return { ...dirs, manifestPath };
 }
 
-function writeCoverage(contaminated, coverageState) {
+function discoveryLead(overrides = {}) {
+  return {
+    lead_id: 'lead-cli-flags',
+    source_ref: 'source-index:batch-cli-flags',
+    description: 'Related CLI flag surface was detected but not yet analyzed.',
+    priority: 'high',
+    status: 'open',
+    ...overrides,
+  };
+}
+
+function coverageEvidenceRefs(unitId, coverageState) {
+  if (coverageState !== 'covered') {
+    return [];
+  }
+  return unitId === FOUNDATION_UNIT_ID ? ['evidence-ledger:item-foundation'] : ['evidence-ledger:item-001'];
+}
+
+function writeCoverage(contaminated, coverageState, sourceUnitOverrides = {}, options = {}) {
+  const foundationCoverageState = options.foundationCoverageState || 'covered';
   const evidenceRefs = coverageState === 'covered' ? ['evidence-ledger:item-001'] : [];
+  const sourceUnits = [];
+  if (options.includeFoundation !== false) {
+    sourceUnits.push({
+      unit_id: FOUNDATION_UNIT_ID,
+      coverage_state: foundationCoverageState,
+      evidence_refs: coverageEvidenceRefs(FOUNDATION_UNIT_ID, foundationCoverageState),
+    });
+  }
+  sourceUnits.push({
+    unit_id: BEHAVIOR_UNIT_ID,
+    coverage_state: coverageState,
+    evidence_refs: evidenceRefs,
+    ...sourceUnitOverrides,
+  });
   writeJson(path.join(contaminated, 'coverage-ledger.json'), {
     ledger_id: 'coverage-test',
     task_id: 'task-example',
     updated_by_role: 'contaminated-manager-verifier',
-    source_units: [
-      {
-        unit_id: 'unit-example-flow',
-        coverage_state: coverageState,
-        evidence_refs: evidenceRefs,
-      },
-    ],
+    source_units: sourceUnits,
     behavior_spec_refs: [],
-    coverage_status: coverageState === 'covered' ? 'complete' : 'partial',
+    coverage_status: coverageState === 'covered' && foundationCoverageState === 'covered' ? 'complete' : 'partial',
     abstract_delta_tickets: [],
     review_history: [
       {
@@ -157,7 +191,7 @@ function writeCoverage(contaminated, coverageState) {
       },
     ],
   });
-  if (coverageState === 'covered') {
+  if (coverageState === 'covered' || foundationCoverageState === 'covered') {
     writeEvidenceLedger(contaminated);
   }
 }
@@ -169,8 +203,16 @@ function writeEvidenceLedger(contaminated, entries = null) {
     domain: 'contaminated',
     entries: entries || [
       {
+        evidence_id: 'item-foundation',
+        source_unit_ref: FOUNDATION_UNIT_ID,
+        evidence_type: 'source-observation',
+        description: 'Neutral test evidence that the foundation unit was source-verified.',
+        evidence_location_ref: 'contaminated-only:unit-foundation:item-foundation',
+        retained_in_contaminated_domain: true,
+      },
+      {
         evidence_id: 'item-001',
-        source_unit_ref: 'unit-example-flow',
+        source_unit_ref: BEHAVIOR_UNIT_ID,
         evidence_type: 'source-observation',
         description: 'Neutral test evidence that the unit was source-verified.',
         evidence_location_ref: 'contaminated-only:unit-example-flow:item-001',
@@ -216,9 +258,11 @@ function writeHookCaptureShim(root, capturePath) {
   fs.writeFileSync(script, `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
+const input = fs.readFileSync(0, 'utf8');
 fs.appendFileSync(${JSON.stringify(capturePath)}, JSON.stringify({
   script: path.basename(process.argv[2] || ''),
-  env: process.env
+  env: process.env,
+  input
 }) + '\\n');
 `);
   fs.chmodSync(script, 0o755);
@@ -338,6 +382,75 @@ function validBehaviorSpec(overrides = {}) {
   };
 }
 
+function validFoundationBehaviorSpec(overrides = {}) {
+  return validBehaviorSpec({
+    spec_id: FOUNDATION_SPEC_ID,
+    unit_id: FOUNDATION_UNIT_ID,
+    source_unit_refs: [FOUNDATION_UNIT_ID],
+    evidence_refs: ['evidence-ledger:item-foundation'],
+    summary: 'Foundation unit captures target stack, package boundaries, and dependency constraints.',
+    observable_surface: [
+      {
+        claim_id: 'foundation-surface',
+        claim: 'The destination foundation is identified before behavior implementation starts.',
+        evidence_refs: ['evidence-ledger:item-foundation'],
+        evidence_status: 'observed',
+        confidence: 'high',
+      },
+    ],
+    observable_behaviors: [
+      {
+        claim_id: 'foundation-behavior',
+        claim: 'Foundation facts are represented as public compatibility and destination constraints, not copied dependency lists.',
+        evidence_refs: ['evidence-ledger:item-foundation'],
+        evidence_status: 'observed',
+        confidence: 'high',
+      },
+    ],
+    test_scenarios: [
+      {
+        scenario_id: 'test-foundation-captured',
+        scenario: 'Review the sanitized foundation spec before behavior planning.',
+        expected_result: 'The clean planner has target stack, package boundary, test entrypoint, and dependency-policy constraints.',
+        coverage: [],
+      },
+    ],
+    ...overrides,
+  });
+}
+
+function writeFoundationCleanArtifacts(workspace) {
+  writeJson(path.join(workspace.clean, FOUNDATION_SPEC_FILE), validFoundationBehaviorSpec());
+  writeSkeletonManifest(workspace, {
+    areas: [
+      {
+        area_id: 'area-foundation',
+        purpose: 'Own destination foundation constraints and build/test boundaries.',
+        owned_path_prefixes: ['src/', 'test/', 'package.json'],
+        responsibilities: ['Record foundation constraints before behavior implementation.'],
+        forbidden_responsibilities: ['Do not mirror source dependencies without public compatibility or policy basis.'],
+        allowed_area_dependencies: [],
+        spec_ids: [FOUNDATION_SPEC_ID],
+        public_contract_refs: [],
+        target_constraints: ['Foundation must be established before behavior slices run.'],
+        dependency_constraints: ['Dependencies follow preflight policy and destination evidence.'],
+        test_obligations: ['test-foundation-captured'],
+        open_decisions: [],
+      },
+    ],
+    test_mapping: [
+      {
+        test_id: 'test-foundation-captured',
+        spec_ids: [FOUNDATION_SPEC_ID],
+        scenario_refs: ['test-foundation-captured'],
+      },
+    ],
+    test_obligations: ['test-foundation-captured'],
+  });
+  writeCleanRunContext(workspace, [FOUNDATION_SPEC_FILE]);
+  writeHandoffPackage(workspace, ['clean-run-context.json', FOUNDATION_SPEC_FILE]);
+}
+
 function publicSurfaceRef(name, kind = 'command', specId = 'spec-example-flow') {
   return `public_surface:${specId}:${kind}:${name}`;
 }
@@ -368,13 +481,18 @@ function writeCoveredCoverageWithPublicSurface(workspace, publicSurfaceCoverageE
     updated_by_role: 'contaminated-manager-verifier',
     source_units: [
       {
-        unit_id: 'unit-example-flow',
+        unit_id: FOUNDATION_UNIT_ID,
+        coverage_state: 'covered',
+        evidence_refs: ['evidence-ledger:item-foundation'],
+      },
+      {
+        unit_id: BEHAVIOR_UNIT_ID,
         coverage_state: 'covered',
         evidence_refs: ['evidence-ledger:item-001'],
         public_surface_coverage: publicSurfaceCoverageEntries,
       },
     ],
-    behavior_spec_refs: ['spec-example-flow'],
+    behavior_spec_refs: [FOUNDATION_SPEC_ID, BEHAVIOR_SPEC_ID],
     coverage_status: 'complete',
     abstract_delta_tickets: [],
     review_history: [
@@ -564,13 +682,21 @@ function writeArchitectureArtifacts(workspace, planOverrides = {}, skeletonOverr
   writeImplementationPlan(workspace, planOverrides);
 }
 
+function withFoundationSpec(workspace, behaviorSpecs) {
+  const specs = [...behaviorSpecs];
+  if (fs.existsSync(path.join(workspace.clean, FOUNDATION_SPEC_FILE)) && !specs.includes(FOUNDATION_SPEC_FILE)) {
+    specs.unshift(FOUNDATION_SPEC_FILE);
+  }
+  return specs;
+}
+
 function writeCleanRunContext(workspace, behaviorSpecs = ['behavior-spec.json']) {
   const context = readJson(CLEAN_CONTEXT_FIXTURE);
   context.clean_artifacts = {
     ...context.clean_artifacts,
     clean_root: './',
     handoff_package: 'handoff-package.json',
-    behavior_specs: behaviorSpecs,
+    behavior_specs: withFoundationSpec(workspace, behaviorSpecs),
     skeleton_manifest: 'skeleton-manifest.json',
     implementation_plan: 'implementation-plan.json',
     implementation_report: 'implementation-report.json',
@@ -580,13 +706,21 @@ function writeCleanRunContext(workspace, behaviorSpecs = ['behavior-spec.json'])
 }
 
 function writeHandoffPackage(workspace, artifactPaths) {
+  const paths = [...artifactPaths];
+  if (
+    paths.includes('clean-run-context.json') &&
+    fs.existsSync(path.join(workspace.clean, FOUNDATION_SPEC_FILE)) &&
+    !paths.includes(FOUNDATION_SPEC_FILE)
+  ) {
+    paths.splice(paths.indexOf('clean-run-context.json') + 1, 0, FOUNDATION_SPEC_FILE);
+  }
   writeJson(path.join(workspace.clean, 'handoff-package.json'), {
     package_id: 'handoff-test',
     task_id: 'task-example',
     from_domain: 'contaminated',
     to_domain: 'clean',
     created_by_role: 'contaminated-handoff-sanitizer',
-    artifacts: artifactPaths.map((artifactPath, index) => ({
+    artifacts: paths.map((artifactPath, index) => ({
       artifact_id: `artifact-${index + 1}`,
       artifact_type: path.basename(artifactPath) === 'clean-run-context.json' ? 'clean-run-context' : 'behavior-spec',
       path: artifactPath,
@@ -703,6 +837,13 @@ fs.writeFileSync(path.join(contaminated, 'evidence-ledger.json'), JSON.stringify
   task_id: 'task-example',
   domain: 'contaminated',
   entries: [{
+    evidence_id: 'item-foundation',
+    source_unit_ref: 'unit-foundation',
+    evidence_type: 'source-observation',
+    description: 'Neutral test evidence that the foundation unit was source-verified.',
+    evidence_location_ref: 'contaminated-only:unit-foundation:item-foundation',
+    retained_in_contaminated_domain: true
+  }, {
     evidence_id: 'item-001',
     source_unit_ref: 'unit-example-flow',
     evidence_type: 'source-observation',
@@ -716,11 +857,15 @@ fs.writeFileSync(path.join(contaminated, 'coverage-ledger.json'), JSON.stringify
   task_id: 'task-example',
   updated_by_role: 'contaminated-manager-verifier',
   source_units: [{
+    unit_id: 'unit-foundation',
+    coverage_state: 'covered',
+    evidence_refs: ['evidence-ledger:item-foundation']
+  }, {
     unit_id: 'unit-example-flow',
     coverage_state: 'covered',
     evidence_refs: ['evidence-ledger:item-001']
   }],
-  behavior_spec_refs: ['spec-example-flow'],
+  behavior_spec_refs: ['spec-foundation', 'spec-example-flow'],
   coverage_status: 'complete',
   abstract_delta_tickets: [],
   review_history: [{
@@ -805,6 +950,20 @@ function writeLock(lockPath, pid, createdAt) {
 }
 
 describe('clean-room run command', () => {
+  test('dry-run selects the foundation unit when it is approved and not covered', () => {
+    const workspace = baseWorkspace('clean-room-run-foundation-first');
+    const manifest = readJson(workspace.manifestPath);
+    manifest.loop_context.spec_slice_ref = 'behavior-spec:unit-foundation';
+    manifest.loop_context.approved_scope_refs = [FOUNDATION_UNIT_ID];
+    writeJson(workspace.manifestPath, manifest);
+    writeCoverage(workspace.contaminated, 'gap', {}, { foundationCoverageState: 'gap' });
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /selected unit-foundation/);
+  });
+
   test('dry-run validates nested loop context and selects one unit without writes', () => {
     const workspace = baseWorkspace('clean-room-run-dry');
     const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
@@ -813,6 +972,55 @@ describe('clean-room run command', () => {
     assert.match(result.stdout, /selected unit-example-flow/);
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'clean-room-result.json')), false);
+  });
+
+  test('rejects behavior slices before foundation coverage is complete', () => {
+    const workspace = baseWorkspace('clean-room-run-behavior-before-foundation');
+    writeCoverage(workspace.contaminated, 'gap', {}, { foundationCoverageState: 'gap' });
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /foundation unit must be covered before approving non-foundation unit/);
+  });
+
+  test('rejects behavior completion before foundation coverage is complete', () => {
+    const workspace = baseWorkspace('clean-room-run-complete-before-foundation');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    writeCoverage(workspace.contaminated, 'covered', {}, { foundationCoverageState: 'gap' });
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /foundation unit must be covered before approving non-foundation unit/);
+  });
+
+  test('rejects unknown foundation unit refs', () => {
+    const workspace = baseWorkspace('clean-room-run-unknown-foundation-ref');
+    const manifest = readJson(workspace.manifestPath);
+    manifest.loop_context.foundation_unit_ref = 'unit-missing';
+    writeJson(workspace.manifestPath, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /foundation_unit_ref does not match any task-manifest unit/);
+  });
+
+  test('rejects foundation refs that point at behavior units', () => {
+    const workspace = baseWorkspace('clean-room-run-mismatched-foundation-ref');
+    const manifest = readJson(workspace.manifestPath);
+    manifest.loop_context.foundation_unit_ref = BEHAVIOR_UNIT_ID;
+    writeJson(workspace.manifestPath, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /foundation_unit_ref must reference the foundation unit/);
   });
 
   test('rejects missing preflight goal before run work', () => {
@@ -951,6 +1159,58 @@ describe('clean-room run command', () => {
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /covered coverage-ledger unit has unresolved coverage gaps/);
+  });
+
+  test('rejects covered coverage ledger entries with unresolved high-priority discovery leads', () => {
+    const workspace = baseWorkspace('clean-room-run-covered-discovery-lead');
+    writeCoverage(workspace.contaminated, 'covered', {
+      discovery_leads: [discoveryLead()],
+    });
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /covered coverage-ledger unit has unresolved high-priority discovery_leads/);
+  });
+
+  test('allows covered coverage ledger entries with resolved high-priority discovery leads', () => {
+    const workspace = baseWorkspace('clean-room-run-resolved-discovery-lead');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    writeCoverage(workspace.contaminated, 'covered', {
+      discovery_leads: [discoveryLead({ status: 'resolved' })],
+    });
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-slice-complete/);
+  });
+
+  test('does not reject noncovered units solely for unresolved high-priority discovery leads', () => {
+    let workspace = baseWorkspace('clean-room-run-gap-discovery-lead');
+    writeCoverage(workspace.contaminated, 'gap', {
+      discovery_leads: [discoveryLead()],
+    });
+
+    let result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /selected unit-example-flow/);
+
+    workspace = baseWorkspace('clean-room-run-blocked-discovery-lead');
+    writeCoverage(workspace.contaminated, 'blocked', {
+      discovery_leads: [discoveryLead()],
+    });
+
+    result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /coverage_state blocked/);
+    assert.doesNotMatch(result.stderr, /discovery_leads/);
   });
 
   test('rejects covered public surface missing behavior spec test coverage', () => {
@@ -1341,7 +1601,10 @@ describe('clean-room run command', () => {
 
     assert.equal(result.status, 0, result.stderr);
     const captures = readJsonLines(capturePath);
-    assert.ok(captures.length < 27);
+    const coverageSchemaChecks = captures.filter((item) => {
+      return item.script === 'validate-json-schema.py' && item.input.includes('coverage-ledger.json');
+    });
+    assert.equal(coverageSchemaChecks.length, 2);
   });
 
   test('passes only allowlisted parent and hook-only env to validation hooks', () => {
@@ -1371,7 +1634,7 @@ describe('clean-room run command', () => {
       assert.equal(item.env.SECRET_TOKEN, undefined);
       assert.equal(item.env.CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST, path.join(workspace.clean, 'auxiliary.json'));
       assert.equal(item.env.CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST, denylistPath);
-      assert.equal(item.env.CLEAN_ROOM_ROLE, 'contaminated-manager-verifier');
+      assert.ok(['contaminated-manager-verifier', 'clean-architect'].includes(item.env.CLEAN_ROOM_ROLE));
       assert.equal(item.env.CLEAN_ROOM_CLEAN_ROOTS, workspace.clean);
     }
   });
@@ -1710,6 +1973,7 @@ describe('clean-room run command', () => {
   test('rejects clean-run-context behavior spec references that do not exist', () => {
     const workspace = baseWorkspace('clean-room-run-missing-context-spec');
     writeCleanRunContext(workspace, ['missing-behavior-spec.json']);
+    writeHandoffPackage(workspace, ['clean-run-context.json', FOUNDATION_SPEC_FILE]);
 
     const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
 
@@ -1737,6 +2001,7 @@ describe('clean-room run command', () => {
     writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
     writeCleanRunContext(workspace);
     writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    fs.rmSync(path.join(workspace.clean, 'skeleton-manifest.json'));
 
     const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
 

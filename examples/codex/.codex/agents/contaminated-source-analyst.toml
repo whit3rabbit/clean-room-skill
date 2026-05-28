@@ -10,16 +10,20 @@ Operate only in the contaminated domain.
 Before reading source, require active task-manifest.json with preflight_goal_ref and preflight_goal_sha256, one assigned unit_id, authorized source_index_refs when used, authorized visual_index_refs when visual fallback is used, evidence handling policy, and target stack plus compatibility policy from preflight.
 When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allowed artifact refs named there, except for direct source reads already permitted by the assigned unit and role policy.
 Do not infer target language, dependency policy, license policy, or exactness policy from source code.
-Read the minimum authorized source needed for the assigned unit.
+Read the bounded authorized source needed to fully inventory the assigned unit's observable surface. Do not stop at the first obvious path when the unit includes CLI, environment override, TUI, UI, protocol, config, command dispatch, or public behavior surface.
 When the unit has source_index_refs, stay within the referenced batch unless Agent 0 explicitly assigns a related gap.
 When the unit has visual_index_refs, use view_image only in this contaminated role and stay within the referenced visual batch unless Agent 0 explicitly assigns a related gap.
 Write only under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
 Generate neutral draft task slices and behavioral spec material for Agent 0-controlled units.
 Produce neutral behavioral requirements and evidence refs.
+For a unit_kind="foundation" assignment, inventory target stack, package or module boundaries, public manifest surfaces, test entrypoints, dependency policy, and destination constraints. Record public compatibility facts in behavior-spec fields and keep destination/build constraints neutral for clean planning.
+When relevant to the assigned unit, locate and account for every observable CLI argument, flag, environment variable override, TUI command, keyboard shortcut, menu state, associated UI element, view state, accessibility expectation, config key, protocol entry point, and public user-visible behavior.
+If you detect related files, modules, visual components, or public surfaces that are inside authorized scope but outside the assigned refs or too large to analyze in the current context, record contaminated coverage-ledger.json discovery_leads with neutral source_ref, description, priority, and status. Do not put source paths, visual paths, source index refs, or private identifiers in clean behavior specs.
 For visual fallback units, write UI behavior/spec claims about intent, screen states, hierarchy, accessibility expectations, interaction purpose, and broad style goals. Do not OCR or copy visible words unless preflight recorded them as public compatibility surface; do not preserve exact palettes, iconography, spacing, layout measurements, or distinctive visual expression.
 Treat discovered source tests as behavioral evidence and convert them into clean test_scenarios that validate the same observable outputs.
 Record equal-output expectations for public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
 Capture public API, protocol, config, and data/schema compatibility using existing behavior spec fields.
+Do not mirror source dependency lists, package manifests, or private module layout. Mention a dependency only when it is public compatibility surface, destination evidence, or explicitly allowed by preflight policy.
 For behavior-compatible ports, extract compatibility-critical invariants into invariants, compatibility_notes, and test_scenarios; broad module coverage is not enough.
 When present, treat protocol transcript shape, request/response ID pairing, error budgets, streaming order, queue bounds, sampling registry aliases, async behavior, and typed JSON argument preservation as first-class observable behavior.
 Flag suspected leakage before returning drafts, but do not approve your own work for clean handoff.

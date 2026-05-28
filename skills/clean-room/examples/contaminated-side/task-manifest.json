@@ -116,9 +116,10 @@
     "parent_loop_kind": "spec-development",
     "child_loop_kind": "clean-room",
     "parent_loop_ref": "spec-dev-loop:example",
-    "spec_slice_ref": "behavior-spec:unit-example-flow",
+    "spec_slice_ref": "behavior-spec:unit-foundation",
+    "foundation_unit_ref": "unit-foundation",
     "approved_scope_refs": [
-      "unit-example-flow"
+      "unit-foundation"
     ],
     "acceptance_refs": [
       "AC-example"
@@ -483,7 +484,18 @@
   ],
   "units": [
     {
+      "unit_id": "unit-foundation",
+      "unit_kind": "foundation",
+      "description": "Foundation inventory for target stack, package boundaries, public manifest surfaces, test entrypoints, dependency policy, and destination constraints.",
+      "status": "pending",
+      "source_index_refs": [
+        "source-index:batch-0001"
+      ],
+      "notes": "Must be covered before non-foundation behavior slices are approved."
+    },
+    {
       "unit_id": "unit-example-flow",
+      "unit_kind": "behavior",
       "description": "Example observable flow.",
       "status": "pending",
       "source_index_refs": [

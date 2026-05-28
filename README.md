@@ -124,13 +124,13 @@ In strict context-management mode, every `agent-commands.json` stage must set `c
    Use `/clean-room` or `/clean-room:attended` for human review gates. Use `/clean-room:unattended` only after preflight allows bounded unattended work with finite iteration limits and no open questions.
 
 4. Analyze and sanitize.
-   Source-reading roles produce neutral draft behavior specs. A source-denied sanitizer reviews handoff candidates before anything enters the clean domain.
+   Source-reading roles produce neutral draft behavior specs and record contaminated-only `discovery_leads` when authorized related surfaces are detected but not analyzed in the assigned unit. A source-denied sanitizer reviews handoff candidates before anything enters the clean domain.
 
 5. Plan, implement, and polish.
-   Clean roles read only approved clean artifacts and the clean destination foundation. Agent 2 writes `implementation-plan.json`; Agent 3 writes code/tests under the implementation root and reports under clean artifacts. Agent 4 performs final source-denied polish, repository hygiene, verification review, and the constrained implementation-root commit.
+   Clean roles read only approved clean artifacts and the clean destination foundation. The first approved code-development slice is the foundation unit; behavior slices wait until that unit is covered. Agent 2 writes `implementation-plan.json`; Agent 3 writes code/tests under the implementation root and reports under clean artifacts. Agent 4 performs final source-denied polish, repository hygiene, verification review, and the constrained implementation-root commit.
 
 6. Verify and return.
-   Agent 0 performs contaminated-side coverage verification after Agent 3 reaches a terminal state and any configured Agent 4 polish review passes, then writes `clean-room-result.json`.
+   Agent 0 performs contaminated-side coverage verification after Agent 3 reaches a terminal state and any configured Agent 4 polish review passes, rejects covered units with unresolved high-priority discovery leads, then writes `clean-room-result.json`.
 
 Use recovery skills instead of chat history:
 

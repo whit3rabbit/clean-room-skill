@@ -128,6 +128,7 @@ Ask before changing:
 - The process separates contaminated source analysis from clean behavioral specification.
 - The outer loop evolves specs. The inner clean-room loop completes one approved spec slice, then returns `clean-room-result.json`.
 - `clean-room-skill run` executes only the inner clean-room loop. It requires schema-valid `loop_context`, selects at most one pending/gap unit inside `approved_scope_refs`, supports optional `clean-polish-review`, and uses a user-supplied `agent-commands` adapter with `shell: false`.
+- `coverage-ledger.json` may record contaminated-only `discovery_leads` for authorized related surfaces that Agent 1 detected but could not analyze in the assigned unit. High-priority leads must be resolved before a unit can be marked `covered`.
 - Prompt rules are not a boundary. Use path separation, role-specific sessions, hooks, schema validation, and artifact quarantine.
 - Recovery entry points must reload durable artifacts, not prior chat history.
 - Never expose `source-index.json`, contaminated ledgers, source paths, private identifiers, or contaminated chat history to clean roles.
@@ -146,7 +147,7 @@ Ask before changing:
 ## Role Summary
 
 - [Agent 0: Contaminated Manager Verifier](agents/contaminated-manager-verifier.md): validates authorization, decomposes scope, tracks coverage, verifies Agent 3 terminal reports from the contaminated side, and writes `clean-room-result.json`.
-- [Agent 1: Contaminated Source Analyst](agents/contaminated-source-analyst.md): reads authorized source and writes neutral behavior specs with ledger references.
+- [Agent 1: Contaminated Source Analyst](agents/contaminated-source-analyst.md): reads authorized source, inventories the assigned unit's observable surface, records unresolved authorized follow-up surfaces as contaminated `discovery_leads`, and writes neutral behavior specs with ledger references.
 - [Agent 1.5: Contaminated Handoff Sanitizer](agents/contaminated-handoff-sanitizer.md): reviews Agent 1 drafts from a source-denied contaminated context, scrubs identifying material, and approves or quarantines clean handoff candidates.
 - [Agent 2: Clean Architect](agents/clean-architect.md): reads clean inputs, maintains `skeleton-manifest.json` as the clean architecture map, and builds `implementation-plan.json`.
 - [Agent 3: Clean Implementer Verifier](agents/clean-qa-editor.md): implements only selected-slice work under implementation roots, records verification status, maintains QC, and emits one terminal report.
