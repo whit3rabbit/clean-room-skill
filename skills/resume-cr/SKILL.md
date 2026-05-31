@@ -1,5 +1,5 @@
 ---
-name: resume
+name: resume-cr
 description: Continues an existing Clean Room run from durable artifacts without relying on prior chat history.
 argument-hint: [existing task-manifest.json or artifact roots]
 disable-model-invocation: true

@@ -99,7 +99,7 @@ In Claude Code, invoke skills with the plugin namespace:
 /clean-room
 /clean-room:attended
 /clean-room:unattended
-/clean-room:resume
+/clean-room:resume-cr
 /clean-room:start-over
 /clean-room:refocus
 ```
@@ -114,7 +114,7 @@ In Pi, invoke package skills with `/skill:<name>`:
 /skill:clean-room
 /skill:attended
 /skill:unattended
-/skill:resume
+/skill:resume-cr
 /skill:start-over
 /skill:refocus
 ```
@@ -156,7 +156,7 @@ In strict context-management mode, every `agent-commands.json` stage must set `c
 
 Use recovery skills instead of chat history:
 
-- `/clean-room:resume`: continue from durable artifacts.
+- `/clean-room:resume-cr`: continue from durable artifacts.
 - `/clean-room:start-over`: archive or quarantine current artifacts without deletion, then restart with a fresh neutral task id.
 - `/clean-room:refocus`: audit current artifacts against declared scope without expanding scope.
 
@@ -190,7 +190,7 @@ Use recovery skills instead of chat history:
 
 | Skill | Use it for |
 | --- | --- |
-| `/clean-room:resume` | Continue an existing run from durable artifacts. |
+| `/clean-room:resume-cr` | Continue an existing run from durable artifacts. |
 | `/clean-room:start-over` | Non-destructively archive or quarantine current artifacts and restart. |
 | `/clean-room:refocus` | Audit a run and route it back to missed gates without adding scope. |
 

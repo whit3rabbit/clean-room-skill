@@ -75,6 +75,6 @@ When `context_management.enforcement` is `strict`, no role can start until Agent
 
 ## Recovery
 
-`resume` and `refocus` must stop when new-run artifacts lack `preflight_goal_ref`, `preflight_goal_sha256`, or a complete `handoff_sequence`. Report this as legacy or incomplete preflight state; do not infer intent from prior chat or source.
+`resume-cr` and `refocus` must stop when new-run artifacts lack `preflight_goal_ref`, `preflight_goal_sha256`, or a complete `handoff_sequence`. Report this as legacy or incomplete preflight state; do not infer intent from prior chat or source.
 
 `start-over` must create a new preflight goal or explicitly reuse a reviewed goal contract before recreating active artifacts.

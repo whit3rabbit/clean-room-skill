@@ -140,7 +140,7 @@ Ask before changing:
 - `init`: record durable run preferences, separated roots, schema profile, model policy, and clean-safe/contaminated-only rules.
 - `attended`: start with `controller_policy.mode` fixed to `attended`.
 - `unattended`: start with bounded unattended defaults and `loop_context` for one approved spec slice.
-- `resume`: continue from existing durable artifacts.
+- `resume-cr`: continue from existing durable artifacts.
 - `start-over`: archive or quarantine current artifacts without deletion, then restart with a fresh `task_id`.
 - `refocus`: audit current artifacts against declared scope without expanding scope.
 

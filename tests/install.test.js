@@ -1388,7 +1388,8 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-init.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-attended.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-refocus.md')));
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-resume.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-resume-cr.md')));
+    assert.equal(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-resume.md')), false);
     assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-start-over.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-unattended.md')));
     assertOpenCodePlugin(opencodeHome);

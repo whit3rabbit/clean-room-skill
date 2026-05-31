@@ -62,7 +62,7 @@ Post-write hook failures are policy failures, not implementation guidance. If a 
 
 Use the recovery skills when a run already has durable artifacts:
 
-- `resume`: reload `task-manifest.json`, its `initialization_snapshot`, ledgers, `implementation-plan.json`, `implementation-report.json`, `qc-report.json`, and abstract delta tickets, then continue from the earliest incomplete gate using the recorded `controller_policy`. If `init-config.json` differs from the snapshot, report drift and wait for explicit confirmation.
+- `resume-cr`: reload `task-manifest.json`, its `initialization_snapshot`, ledgers, `implementation-plan.json`, `implementation-report.json`, `qc-report.json`, and abstract delta tickets, then continue from the earliest incomplete gate using the recorded `controller_policy`. If `init-config.json` differs from the snapshot, report drift and wait for explicit confirmation.
 - `start-over`: after explicit confirmation, non-destructively archive or quarantine existing artifacts and restart from the scope gate with a fresh `task_id`.
 - `refocus`: audit declared scope against current artifacts and steer the workflow back to missed gates without expanding scope.
 
@@ -84,7 +84,7 @@ If more than one candidate run is found without an explicit user path, list the 
 
 Classify the selected candidate before starting the wizard:
 
-- Valid `task-manifest.json`: route to `resume` and continue from the earliest incomplete gate.
+- Valid `task-manifest.json`: route to `resume-cr` and continue from the earliest incomplete gate.
 - Valid canonical `preflight-goal.json` without `task-manifest.json`: continue at source/destination discovery and manifest creation. Do not ask the preflight wizard again.
 - `clean-room-bootstrap.json` only: run preflight using the bootstrap roots.
 - Invalid `preflight-goal.json`: stop, report canonical schema or required-field errors, and do not create a replacement preflight.
