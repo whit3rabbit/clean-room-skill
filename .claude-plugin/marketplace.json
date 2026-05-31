@@ -9,7 +9,7 @@
       "name": "clean-room",
       "source": "./",
       "description": "Spec-first clean-room workflow for authorized source analysis without replacement code.",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "author": {
         "name": "whit3rabbit"
       },
