@@ -27,13 +27,19 @@
     "!**/*.pyo",
     "!**/.DS_Store"
   ],
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
   "keywords": [
     "clean-room",
     "specification",
     "reverse-engineering",
     "compliance",
     "codex",
-    "claude"
+    "claude",
+    "pi-package"
   ],
   "author": {
     "name": "whit3rabbit"

@@ -91,7 +91,7 @@ pi install npm:clean-room-skill@latest
 pi install https://github.com/whit3rabbit/clean-room-skill
 ```
 
-Pi invokes skills as `/skill:<name>`, for example `/skill:clean-room`. Pi support is package compatibility only: it does not add a `--pi` installer target, does not participate in `--all`, and does not register clean-room hooks. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
+Pi invokes skills as `/skill:<name>`. Use `/skill:init` for the setup pass, `/skill:clean-room` for the startup wizard, `/skill:attended` for attended controller mode, and `/skill:unattended` for bounded unattended mode. Pi support is package compatibility only: it does not add a `--pi` installer target, does not participate in `--all`, and does not register clean-room hooks. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
 
 Global install roots:
 

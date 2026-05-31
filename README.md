@@ -106,6 +106,19 @@ In Claude Code, invoke skills with the plugin namespace:
 
 In Codex, invoke the `clean-room` plugin or bundled skills through `@` or the skills UI. Do not rely on Claude-style slash namespacing in Codex.
 
+In Pi, invoke package skills with `/skill:<name>`:
+
+```text
+/skill:init
+/skill:preflight
+/skill:clean-room
+/skill:attended
+/skill:unattended
+/skill:resume
+/skill:start-over
+/skill:refocus
+```
+
 For unattended inner-loop execution from durable artifacts:
 
 ```bash
@@ -124,13 +137,13 @@ In strict context-management mode, every `agent-commands.json` stage must set `c
 ![Clean Room Architecture](assets/clean-room-arch.svg)
 
 1. Initialize or bootstrap the run.
-   Use `npx clean-room-skill@latest init` to create neutral external run folders and a clean-safe repository stub, or use `/clean-room:init` for skill-driven run preferences. The active `init-config.json` stays out of the clean implementation repository.
+   Use `npx clean-room-skill@latest init` to create neutral external run folders and a clean-safe repository stub, or use `/clean-room:init` in Claude Code or `/skill:init` in Pi for skill-driven run preferences. The active `init-config.json` stays out of the clean implementation repository.
 
 2. Record the goal contract.
    Use `npx clean-room-skill@latest preflight` or `/clean-room:preflight` before source discovery, attended mode, or unattended mode. This creates or validates `preflight-goal.json` on the contaminated/controller side.
 
 3. Start the controller.
-   Use `/clean-room` or `/clean-room:attended` for human review gates. Use `/clean-room:unattended` only after preflight allows bounded unattended work with finite iteration limits and no open questions.
+   Use `/clean-room` or `/clean-room:attended` in Claude Code, or `/skill:clean-room` or `/skill:attended` in Pi, for human review gates. Use unattended entry points only after preflight allows bounded unattended work with finite iteration limits and no open questions.
 
 4. Analyze and sanitize.
    Source-reading roles produce neutral draft behavior specs and record contaminated-only `discovery_leads` when authorized related surfaces are detected but not analyzed in the assigned unit. A source-denied sanitizer reviews handoff candidates before anything enters the clean domain.
@@ -153,11 +166,16 @@ Use recovery skills instead of chat history:
 | --- | --- | --- | --- |
 | 1 | `npx clean-room-skill@latest init` | CLI command | Create neutral external run folders and a clean-safe `.clean-room/README.md` stub. |
 | 1 | `/clean-room:init` | Skill | Record run preferences, separated roots, schema profile, and model policy. |
+| 1 | `/skill:init` | Pi skill | Record run preferences, separated roots, schema profile, and model policy. |
 | 2 | `npx clean-room-skill@latest preflight` | CLI command | Create or validate the Stage 0 goal contract. |
 | 2 | `/clean-room:preflight` | Skill | Record the required goal, policy, output, and controller-mode contract. |
+| 2 | `/skill:preflight` | Pi skill | Record the required goal, policy, output, and controller-mode contract. |
 | 3 | `/clean-room` | Skill | Start the setup wizard for authorized clean-room work. |
 | 3 | `/clean-room:attended` | Skill | Start the wizard in attended mode with human review gates. |
 | 3 | `/clean-room:unattended` | Skill | Start the wizard in bounded unattended mode with finite loop limits. |
+| 3 | `/skill:clean-room` | Pi skill | Start the setup wizard for authorized clean-room work. |
+| 3 | `/skill:attended` | Pi skill | Start the wizard in attended mode with human review gates. |
+| 3 | `/skill:unattended` | Pi skill | Start the wizard in bounded unattended mode with finite loop limits. |
 | 4 | `npx clean-room-skill@latest run` | CLI command | Execute the bounded inner clean-room runner for one approved spec slice. |
 
 ### Maintenance CLI Commands

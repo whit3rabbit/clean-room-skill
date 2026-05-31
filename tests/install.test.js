@@ -415,6 +415,10 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /npx clean-room-skill@latest --claude --global --hooks=safe --yes/);
     assert.match(result.stdout, /start in Claude Code: \/clean-room:init, then \/clean-room or \/clean-room:attended/);
     assert.match(result.stdout, /npx clean-room-skill@latest --claude --global --uninstall --yes/);
+    assert.match(result.stdout, /Pi:/);
+    assert.match(result.stdout, /pi install npm:clean-room-skill@latest/);
+    assert.match(result.stdout, /start in Pi: \/skill:init, then \/skill:clean-room or \/skill:attended/);
+    assert.match(result.stdout, /Pi package install does not register clean-room hooks/);
     const codexStartLine = result.stdout.split('\n').find((line) => line.includes('start in Codex:'));
     assert.ok(codexStartLine);
     assert.doesNotMatch(codexStartLine, /\/clean-room/);

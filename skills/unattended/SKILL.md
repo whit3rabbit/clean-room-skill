@@ -9,6 +9,8 @@ disable-model-invocation: true
 
 Start the clean-room startup wizard with `controller_policy.mode` fixed to `unattended`.
 
+In Pi, this entry point is invoked as `/skill:unattended`.
+
 Use the canonical `clean-room` skill workflow and references in this plugin. Read `skills/clean-room/references/CONTROLLER-LOOP.md` before defining unattended loop behavior. Preserve the same clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
 Before asking setup or preflight questions, use the canonical `clean-room` "Run State Discovery Before Wizard" rules. Resolve explicit artifact paths first, then configured clean-room roots, then bounded `~/Documents/CleanRoom/task-*` candidates. If a valid `task-manifest.json` exists, route to `resume`. If a valid canonical `preflight-goal.json` exists without a manifest, continue at source/destination discovery and manifest creation. If a preflight artifact exists but is invalid, stop with schema errors instead of restarting preflight. If multiple candidates are found without an explicit path, list them and stop for selection.

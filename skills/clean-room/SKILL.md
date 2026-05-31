@@ -68,7 +68,7 @@ Use the recovery skills when a run already has durable artifacts:
 
 ## Startup Wizard
 
-Use the startup wizard when the user invokes this skill directly, such as `/clean-room` or `/clean-room:clean-room`, and does not provide an existing `task-manifest.json` or specific artifact review task.
+Use the startup wizard when the user invokes this skill directly, such as `/clean-room`, `/clean-room:clean-room`, or Pi's `/skill:clean-room`, and does not provide an existing `task-manifest.json` or specific artifact review task.
 
 ### Run State Discovery Before Wizard
 
