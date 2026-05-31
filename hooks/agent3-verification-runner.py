@@ -472,6 +472,8 @@ def run_command(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=effective_timeout,
         shell=False,
         check=False,

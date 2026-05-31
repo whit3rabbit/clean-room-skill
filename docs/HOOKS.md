@@ -68,6 +68,7 @@ Role sessions must provide the full clean-room environment block so the hooks ca
 | `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST` | Optional path-separated denylist files for leakage scanning. |
 | `CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST` | Optional path-separated allowlist for unrecognized auxiliary JSON files under clean roots. |
 | `CLEAN_ROOM_ALLOW_AGENT3_SHELL` | Must be `1` before Agent 3 can invoke the verification runner through a shell-style tool. |
+| `CLEAN_ROOM_ALLOW_AGENT4_SHELL` | Must be `1` before Agent 4 can invoke the polish runner through a shell-style tool. |
 | `CLEAN_ROOM_HOOK_ENFORCE` | Forces enforcement in `safe` mode when truthy. |
 | `CLEAN_ROOM_HOOK_CHECK_TIMEOUT_SECONDS` | Optional per-check wrapper timeout. Defaults to 10 seconds. |
 

@@ -138,6 +138,8 @@ def run_command(argv: list[str], cwd: Path, timeout: int, blocked_roots: list[Pa
         cwd=cwd,
         env=safe_env(blocked_roots),
         text=True,
+        encoding="utf-8",
+        errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=False,

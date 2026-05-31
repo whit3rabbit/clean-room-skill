@@ -68,3 +68,7 @@ plugins/*/skills/*/tools/
 .syntext/
 repomix-output.xml
 .synrepo/
+.codex-plugin/
+.claude-plugin/
+.agents/
+.codex/

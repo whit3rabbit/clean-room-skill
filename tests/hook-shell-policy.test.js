@@ -28,6 +28,9 @@ const {
 } = require('./helpers/hook-policy.cjs');
 
 const TEST_TIMEOUT_MS = 30_000;
+const NON_UTF8_TEST_SCRIPT =
+  'node -e "process.stdout.write(Buffer.from([0xff,0xfe,0x0a]));' +
+  'process.stderr.write(Buffer.from([0xff,0x0a]))"';
 
 function spawnSync(command, args, options) {
   if (!Array.isArray(args)) {
@@ -296,6 +299,19 @@ describe('clean-room shell hook policy', () => {
     });
     assert.equal(result.status, 0, result.stderr);
 
+    fs.writeFileSync(path.join(implementation, 'package.json'), JSON.stringify({
+      scripts: {
+        test: NON_UTF8_TEST_SCRIPT,
+      },
+    }));
+    plan = writeImplementationPlan(clean, ['npm', 'test']);
+    result = spawnSync('python3', [AGENT3_RUNNER, '--plan', plan, '--command-index', '0'], {
+      cwd: ROOT,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+
     const sourceFile = path.join(source, 'secret.txt');
     fs.writeFileSync(sourceFile, 'secret\n');
     const deniedCommands = [
@@ -499,6 +515,39 @@ describe('clean-room shell hook policy', () => {
     });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /blocked root|outside implementation root/);
+  });
+
+  test('Agent 4 polish runner tolerates non-UTF-8 verification output', () => {
+    const root = tempDir('clean-room-agent4-runner-output');
+    const env = {
+      ...policyEnv(root, 'clean-polish-reviewer'),
+      CLEAN_ROOM_ALLOW_AGENT4_SHELL: '1',
+    };
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const implementation = env.CLEAN_ROOM_IMPLEMENTATION_ROOTS;
+    fs.writeFileSync(path.join(implementation, 'package.json'), JSON.stringify({
+      scripts: {
+        test: NON_UTF8_TEST_SCRIPT,
+      },
+    }));
+    const report = writePolishReport(clean, {
+      verification_results: [
+        {
+          command: ['npm', 'test'],
+          cwd: 'CLEAN_ROOM_IMPLEMENTATION_ROOTS[0]',
+          status: 'not-run',
+          output_summary: '',
+        },
+      ],
+    });
+
+    const result = spawnSync('python3', [AGENT4_RUNNER, '--report', report, '--verify-index', '0'], {
+      cwd: implementation,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).verification[0].status, 'passed');
   });
 
   test('Agent 3 verification runner builds hardened container argv without blocked mounts', () => {

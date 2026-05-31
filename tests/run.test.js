@@ -20,7 +20,12 @@ const FOUNDATION_SPEC_FILE = 'foundation-behavior-spec.json';
 const BEHAVIOR_UNIT_ID = 'unit-example-flow';
 const BEHAVIOR_SPEC_ID = 'spec-example-flow';
 const TEST_TIMEOUT_MS = 30_000;
+const RUN_TEST_DEBUG = process.env.CLEAN_ROOM_RUN_TEST_DEBUG === '1';
+const RUN_CLI_EXPECTED_COUNT = 70;
 const TMP_DIRS = [];
+let runCliCounter = 0;
+let runCliCompleted = 0;
+let runCliDurationMs = 0;
 
 function spawnSync(command, args, options) {
   if (!Array.isArray(args)) {
@@ -60,12 +65,70 @@ function fileSha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
+function debugRunCli(message) {
+  if (RUN_TEST_DEBUG) {
+    process._rawDebug(`[run.test] ${new Date().toISOString()} ${message}`);
+  }
+}
+
+function formatDebugDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return 'unknown';
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m${String(seconds % 60).padStart(2, '0')}s`;
+}
+
+function runCliEta() {
+  if (runCliCompleted === 0) return `full_progress=0/${RUN_CLI_EXPECTED_COUNT} full_eta=unknown`;
+  const averageMs = runCliDurationMs / runCliCompleted;
+  const remaining = Math.max(RUN_CLI_EXPECTED_COUNT - runCliCompleted, 0);
+  return [
+    `full_progress=${runCliCompleted}/${RUN_CLI_EXPECTED_COUNT}`,
+    `avg=${formatDebugDuration(averageMs)}`,
+    `full_eta=${formatDebugDuration(averageMs * remaining)}`,
+  ].join(' ');
+}
+
+function truncateDebugOutput(value) {
+  const text = String(value || '').trim();
+  if (text.length <= 2000) return text;
+  return `${text.slice(0, 2000)}...`;
+}
+
+function appendSpawnErrorDiagnostics(result, command, args, durationMs) {
+  if (!result.error) return result;
+  const details = [
+    `spawn error: ${result.error.message}`,
+    `duration_ms: ${durationMs}`,
+    `command: ${[command, ...args].join(' ')}`,
+    result.stdout ? `stdout: ${truncateDebugOutput(result.stdout)}` : '',
+    result.stderr ? `stderr: ${truncateDebugOutput(result.stderr)}` : '',
+  ].filter(Boolean).join('\n');
+  result.stderr = result.stderr ? `${result.stderr}\n${details}` : details;
+  return result;
+}
+
 function runCli(args, cwd = ROOT, env = {}) {
-  return spawnSync(process.execPath, [INSTALL, ...args], {
+  const index = runCliCounter + 1;
+  runCliCounter = index;
+  const commandArgs = [INSTALL, ...args];
+  const label = `runCli#${index} ${commandArgs.join(' ')}`;
+  const startedAt = Date.now();
+  debugRunCli(`start ${label} full_progress=${index}/${RUN_CLI_EXPECTED_COUNT}`);
+  const result = spawnSync(process.execPath, commandArgs, {
     cwd,
     env: { ...process.env, ...env },
     encoding: 'utf8',
   });
+  const durationMs = Date.now() - startedAt;
+  runCliCompleted += 1;
+  runCliDurationMs += durationMs;
+  debugRunCli(
+    `done ${label} status=${result.status} signal=${result.signal || ''} ` +
+    `error=${result.error?.code || ''} duration=${formatDebugDuration(durationMs)} ${runCliEta()}`
+  );
+  return appendSpawnErrorDiagnostics(result, process.execPath, commandArgs, durationMs);
 }
 
 function baseWorkspace(name) {
