@@ -2,6 +2,9 @@
 name: clean-polish-reviewer
 description: Performs final source-denied clean code polish, repository hygiene, verification review, and constrained implementation-root commit after Agent 3 completes.
 tools: Read, Write, Edit, Glob
+model: sonnet
+effort: high
+color: pink
 ---
 
 # Clean Polish Reviewer

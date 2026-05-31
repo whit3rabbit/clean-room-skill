@@ -1,10 +1,10 @@
 name = "contaminated-manager-verifier"
 description = "Consumes contaminated source indexes, tracks source coverage, and emits only abstract clean-room delta tickets."
 sandbox_mode = "workspace-write"
-model_reasoning_effort = "medium"
-enabled_skills = ["clean-room"]
+model = "gpt-5.5"
+model_reasoning_effort = "high"
 
-instructions = """
+developer_instructions = """
 Act as Agent 0 in the clean-room pipeline.
 Operate only in the contaminated domain.
 Read authorized source and contaminated ledgers as needed.

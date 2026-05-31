@@ -9,14 +9,16 @@ const { spawnSync } = require('node:child_process');
 const { runInit } = require('../lib/bootstrap.cjs');
 const { withDirectoryLock } = require('../lib/dir-lock.cjs');
 const { runDoctor } = require('../lib/doctor.cjs');
-const { assertManagedPath, fileHash } = require('../lib/fs-utils.cjs');
+const { assertManagedPath, fileHash, removeEmptyParents } = require('../lib/fs-utils.cjs');
 const { parsePreflightArgs, runPreflight } = require('../lib/preflight.cjs');
 const { parseRunArgs, runCleanRoom } = require('../lib/run.cjs');
 const {
   buildHookEntries,
   configPathForRuntime,
   hasManagedHookEntries,
+  hasManagedOpenCodePlugin,
   mergeHookEntries,
+  pluginPathForRuntime,
   removeHookEntries,
 } = require('../lib/hooks.cjs');
 const {
@@ -148,7 +150,7 @@ Commands:
   status              Report installed runtime version, drift, and hook state
   update              Update installed runtime files without onboarding
   preflight           Create or validate a preflight goal contract
-  doctor              Smoke test generated Codex or Claude hook registration
+  doctor              Smoke test generated Codex, Claude, or OpenCode hook registration
   run                 Execute the bounded inner clean-room controller loop
 
 Runtime:
@@ -362,7 +364,7 @@ function InstallerTui({ React, ink, h, initialOptions, onComplete, onAbort }) {
       items: [
         { label: 'Safe', value: 'safe', detail: 'enforces during clean-room role sessions' },
         { label: 'Copy-only', value: 'copy-only', detail: 'copy scripts without host hook registration' },
-        { label: 'Strict', value: 'strict', detail: 'fail closed in dedicated Codex or Claude homes' },
+        { label: 'Strict', value: 'strict', detail: 'fail closed in dedicated Codex, Claude, or OpenCode homes' },
       ],
       onSubmit: (item) => advance({ ...draft, hookMode: item.value, hookModeSpecified: true }),
     })
@@ -412,23 +414,19 @@ function runtimeInstallStatus(runtime, scope, configDir) {
   if (!layout.supportsHookRegistration) {
     return status;
   }
-  const configPath = configPathForRuntime(runtime, layout.targetRoot);
-  if (!configPath) {
-    return status;
+  const hookState = detectHookRegistration(layout, configPathForRuntime(runtime, layout.targetRoot));
+  if (hookState === 'present') {
+    return {
+      ...status,
+      state: 'hooks-only',
+      detail: 'managed hooks without install manifest',
+    };
   }
-  try {
-    if (hasManagedHookEntries(configPath)) {
-      return {
-        ...status,
-        state: 'hooks-only',
-        detail: 'managed hooks without install manifest',
-      };
-    }
-  } catch (err) {
+  if (hookState.startsWith('error: ')) {
     return {
       ...status,
       state: 'error',
-      detail: err.message,
+      detail: hookState.slice('error: '.length),
     };
   }
   return status;
@@ -1189,7 +1187,14 @@ function detectHookRegistration(layout, configPath) {
   if (!layout.supportsHookRegistration) {
     return 'unsupported';
   }
-  if (!configPath) {
+  if (layout.hookRegistration === 'local-plugin') {
+    try {
+      return hasManagedOpenCodePlugin(pluginPathForRuntime(layout.runtime, layout.targetRoot)) ? 'present' : 'missing';
+    } catch (err) {
+      return `error: ${err.message}`;
+    }
+  }
+  if (layout.hookRegistration !== 'json-config' || !configPath) {
     return 'unsupported';
   }
   try {
@@ -1312,7 +1317,7 @@ function validateRuntimeOptions(options) {
   for (const runtime of options.runtimes) {
     const layout = resolveRuntimeLayout(runtime, options.scope, { configDir: options.configDir });
     if (options.hookMode === 'strict' && !layout.supportsHookRegistration) {
-      throw new Error(`--hooks=strict is not supported for ${runtime}; hook registration is verified only for codex and claude`);
+      throw new Error(`--hooks=strict is not supported for ${runtime}; hook registration is verified only for codex, claude, and opencode`);
     }
   }
 }
@@ -1324,15 +1329,27 @@ function prepareHookRegistration(layout, hookMode, options = {}) {
   if (!layout.supportsHookRegistration) {
     return { status: 'unsupported' };
   }
+  if (layout.hookRegistration === 'local-plugin') {
+    const pluginPath = pluginPathForRuntime(layout.runtime, layout.targetRoot);
+    if (!pluginPath) return { status: 'unsupported' };
+    return {
+      status: options.dryRun ? 'planned' : 'local-plugin',
+      kind: 'local-plugin',
+      pluginPath,
+    };
+  }
+  if (layout.hookRegistration !== 'json-config') {
+    return { status: 'unsupported' };
+  }
   const configPath = configPathForRuntime(layout.runtime, layout.targetRoot);
   if (!configPath) return { status: 'unsupported' };
   if (options.dryRun) {
-    return { status: 'planned', configPath };
+    return { status: 'planned', kind: 'json-config', configPath };
   }
   const pythonPath = resolvePython3();
   const wrapperPath = path.join(layout.targetRoot, 'hooks', 'clean-room', 'clean-room-hook.py');
   const entries = buildHookEntries({ pythonPath, wrapperPath, mode: hookMode });
-  return { status: 'registered', configPath, entries };
+  return { status: 'registered', kind: 'json-config', configPath, entries };
 }
 
 function hookRegistrationFailureState(hookResult, err) {
@@ -1424,14 +1441,14 @@ async function installRuntime(runtime, options) {
               result.manifest,
               runtime,
               options.scope,
-                options.hookMode,
-                false,
-                {
-                  phase: 'installing',
-                  ...installState,
-                  ...hookRegistrationFailureState(hookResult, err),
-                }
-              );
+              options.hookMode,
+              false,
+              {
+                phase: 'installing',
+                ...installState,
+                ...hookRegistrationFailureState(hookResult, err),
+              }
+            );
             manifestStatus = 'install manifest records the failed hook registration';
           } catch {
             manifestStatus = 'install manifest could not record the failed hook registration';
@@ -1448,9 +1465,15 @@ async function installRuntime(runtime, options) {
     if (hookResult.status === 'unsupported' && options.hookMode === 'safe') {
       console.log('  hook registration unsupported for this runtime; copied hooks only');
     }
-    if (hookResult.status === 'planned') {
+    if (hookResult.status === 'planned' && hookResult.kind === 'json-config') {
       console.log(`  hook registration: would update ${hookResult.configPath}`);
       console.log('  hook registration: python3 required when applying the install');
+    }
+    if (hookResult.status === 'planned' && hookResult.kind === 'local-plugin') {
+      console.log(`  hook registration: would install local plugin ${hookResult.pluginPath}`);
+    }
+    if (hookResult.status === 'local-plugin') {
+      hookConfigWritten = true;
     }
     if (options.hookMode === 'safe') {
       console.log('  WARNING: safe hooks are installed; clean-room init/onboarding must set role environment variables before enforcement starts');
@@ -1500,6 +1523,15 @@ async function updateRuntime(runtime, options) {
 
 function removeHookRegistrations(layout, dryRun) {
   if (!layout.supportsHookRegistration) return null;
+  if (layout.hookRegistration === 'local-plugin') {
+    const pluginPath = pluginPathForRuntime(layout.runtime, layout.targetRoot);
+    if (!hasManagedOpenCodePlugin(pluginPath)) return null;
+    if (!dryRun) {
+      fs.rmSync(assertManagedPath(layout.targetRoot, path.relative(layout.targetRoot, pluginPath)), { force: true });
+      removeEmptyParents(path.dirname(pluginPath), layout.targetRoot);
+    }
+    return { removed: pluginPath };
+  }
   const configPath = configPathForRuntime(layout.runtime, layout.targetRoot);
   if (!configPath) return null;
   return removeHookEntries(configPath, { dryRun });

@@ -2,6 +2,9 @@
 name: contaminated-handoff-sanitizer
 description: Reviews Agent 1 draft specs from a fresh source-denied contaminated context, removes identifying material, and approves only scrubbed artifacts for clean handoff.
 tools: Read, Write, Edit, Glob
+model: sonnet
+effort: high
+color: yellow
 ---
 
 # Contaminated Handoff Sanitizer

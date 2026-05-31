@@ -52,10 +52,10 @@ Claude global installs use Claude's plugin system for skills and agents, so entr
 Hook modes:
 
 - `--hooks=safe`: default. Hooks are installed but enforce only during clean-room role sessions with the required environment.
-- `--hooks=strict`: fail-closed hook mode for dedicated Codex or Claude clean-room homes.
+- `--hooks=strict`: fail-closed hook mode for dedicated Codex, Claude, or OpenCode clean-room homes.
 - `--hooks=copy-only` or `--no-hooks`: copy hook files without registering runtime hook config.
 
-Verified runtimes are Codex and Claude Code. Other runtime layouts are installed on a best-effort basis. See [docs/REFERENCE.md](docs/REFERENCE.md#runtime-support) for the full support table and install roots.
+Verified runtimes are Codex, Claude Code, and OpenCode. OpenCode support uses native skills, commands, and a generated local plugin bridge for hook enforcement. Other runtime layouts are installed on a best-effort basis. See [docs/REFERENCE.md](docs/REFERENCE.md#runtime-support) for the full support table and install roots.
 
 Marketplace install is also supported.
 
@@ -71,6 +71,15 @@ Claude Code:
 /plugin marketplace add https://github.com/whit3rabbit/clean-room-skill.git
 /plugin install clean-room@clean-room-skill
 ```
+
+Pi:
+
+```bash
+pi install npm:clean-room-skill@latest
+pi install https://github.com/whit3rabbit/clean-room-skill
+```
+
+Pi loads bundled skills as `/skill:<name>`, for example `/skill:clean-room`. Pi package install is skill compatibility only; it does not register clean-room hooks. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
 
 ## How To Run
 
@@ -155,7 +164,7 @@ Use recovery skills instead of chat history:
 
 | Command | Use it for |
 | --- | --- |
-| `npx clean-room-skill@latest doctor` | Smoke test generated Codex or Claude hook registration. |
+| `npx clean-room-skill@latest doctor` | Smoke test generated Codex, Claude, or OpenCode hook registration. |
 | `npx clean-room-skill@latest status` | Report installed runtime version, drift, and hook state. |
 | `npx clean-room-skill@latest update` | Refresh installed runtime files without onboarding. |
 

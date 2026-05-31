@@ -6,7 +6,7 @@ The hooks are engineering guardrails. They reduce accidental cross-domain reads 
 
 ## Install Locations
 
-The installer copies the Python hook files for every supported runtime layout. Runtime hook registration is verified only for Codex and Claude Code.
+The installer copies the Python hook files for every supported runtime layout. Runtime hook registration is verified for Codex, Claude Code, and OpenCode.
 
 | Runtime | Hook files copied to | Active hook config |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ The installer copies the Python hook files for every supported runtime layout. R
 | Claude Code | `<targetRoot>/hooks/clean-room/*.py` | `<targetRoot>/settings.json` |
 | Antigravity | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
 | Gemini CLI | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
-| OpenCode | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
+| OpenCode | `<targetRoot>/hooks/clean-room/*.py` | `<targetRoot>/plugins/clean-room.ts` |
 | Kilo | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
 | Cursor | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
 | GitHub Copilot | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
@@ -31,8 +31,8 @@ Codex uses `CODEX_HOME` or `~/.codex` for global installs. Claude Code uses `CLA
 
 | Mode | Behavior |
 | --- | --- |
-| `safe` | Default. Registers hooks for Codex or Claude, but `clean-room-hook.py` no-ops until a clean-room role environment is present or `CLEAN_ROOM_HOOK_ENFORCE` is truthy. |
-| `strict` | Registers hooks for Codex or Claude and fails closed even without clean-room role environment. Use only in dedicated clean-room runtime homes. |
+| `safe` | Default. Registers hooks for Codex, Claude, or OpenCode, but `clean-room-hook.py` no-ops until a clean-room role environment is present or `CLEAN_ROOM_HOOK_ENFORCE` is truthy. |
+| `strict` | Registers hooks for Codex, Claude, or OpenCode and fails closed even without clean-room role environment. Use only in dedicated clean-room runtime homes. |
 | `copy-only` | Copies hook files without modifying runtime hook config. This is also the effective behavior for runtimes without verified hook registration support. |
 
 `--no-hooks` is an alias for `--hooks=copy-only`.
@@ -40,6 +40,8 @@ Codex uses `CODEX_HOME` or `~/.codex` for global installs. Claude Code uses `CLA
 ## Generated Runtime Hooks
 
 When hook mode is `safe` or `strict`, the installer registers four managed hook entries for Codex and Claude. Each entry invokes the installed `clean-room-hook.py` wrapper with an absolute Python path, an absolute wrapper path, the requested hook mode, and one or more `--check` scripts.
+
+For OpenCode, the installer writes a generated local plugin at `<targetRoot>/plugins/clean-room.ts`. OpenCode auto-loads that plugin from its config directory. The plugin subscribes to `tool.execute.before` and `tool.execute.after`, translates OpenCode tool payloads into the existing clean-room hook payload shape, and invokes the installed Python wrapper with `shell: false`. `copy-only` omits this plugin.
 
 | Event | Matcher | Checks |
 | --- | --- | --- |
@@ -205,26 +207,28 @@ The hook policy is deny-by-default during active clean-room role sessions.
 
 ## Verification
 
-Use `doctor` after installing Codex or Claude hooks:
+Use `doctor` after installing Codex, Claude, or OpenCode hooks:
 
 ```bash
 clean-room-skill doctor --runtime codex --hooks=safe
 clean-room-skill doctor --runtime codex --hooks=strict
 clean-room-skill doctor --runtime codex --hooks=strict --coverage
 clean-room-skill doctor --runtime claude --hooks=strict --coverage
+clean-room-skill doctor --runtime opencode --hooks=strict --coverage
 ```
 
 Add `--config-dir <path>` when checking a non-default runtime config root.
 
 `doctor` verifies that:
 
-- The hook config exists.
-- Exactly four managed clean-room hook entries are present.
-- Managed commands use absolute Python and wrapper paths.
+- The hook config or OpenCode local plugin exists.
+- Exactly four managed clean-room hook entries are present for Codex and Claude.
+- Managed Codex and Claude commands use absolute Python and wrapper paths.
+- The OpenCode plugin declares `tool.execute.before`, `tool.execute.after`, an absolute wrapper path, and `shell: false`.
 - The requested safe or strict mode is configured.
 - Safe mode no-ops without clean-room environment.
 - Strict mode and enforced safe mode fail without required environment.
 - Smoke payloads fail for source reads, source writes, shell bypasses, and malformed post-write JSON.
-- `--coverage` prints matcher and check coverage for the generated entries.
+- `--coverage` prints matcher and check coverage for generated hook config entries or OpenCode plugin coverage.
 
-`doctor` is a smoke test. It does not prove host event coverage, legal sufficiency, or full runtime isolation.
+`doctor` is a smoke test. It does not prove host event coverage, legal sufficiency, or full runtime isolation. For OpenCode, it verifies the generated plugin bridge and Python guardrail checks, not every OpenCode tool surface.

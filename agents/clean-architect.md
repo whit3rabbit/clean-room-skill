@@ -2,6 +2,9 @@
 name: clean-architect
 description: Plans clean implementation from approved clean behavioral specs and the clean destination foundation without reading contaminated source or chat history.
 tools: Read, Write, Edit, Glob
+model: opus
+effort: high
+color: blue
 ---
 
 # Clean Architect

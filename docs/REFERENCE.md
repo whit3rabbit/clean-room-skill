@@ -64,12 +64,12 @@ Verified:
 
 - Codex
 - Claude Code
+- OpenCode
 
 Layout-only or experimental:
 
 - Antigravity
 - Gemini CLI
-- OpenCode
 - Kilo
 - Cursor
 - GitHub Copilot
@@ -80,7 +80,18 @@ Layout-only or experimental:
 - Hermes Agent
 - CodeBuddy
 
-Layout-only installs write files to expected runtime locations, but this repository does not verify that those hosts load the files or emit all hook events needed for clean-room enforcement.
+Layout-only installs write files to expected runtime locations, but this repository does not verify that those hosts load the files or emit all hook events needed for clean-room enforcement. OpenCode installs are verified through a generated local plugin bridge at `plugins/clean-room.ts`; `doctor` verifies that bridge and the Python guardrails, not every OpenCode tool surface.
+
+### Pi Package Compatibility
+
+Pi can install this package and load the bundled skills from the package metadata:
+
+```bash
+pi install npm:clean-room-skill@latest
+pi install https://github.com/whit3rabbit/clean-room-skill
+```
+
+Pi invokes skills as `/skill:<name>`, for example `/skill:clean-room`. Pi support is package compatibility only: it does not add a `--pi` installer target, does not participate in `--all`, and does not register clean-room hooks. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
 
 Global install roots:
 
@@ -103,12 +114,20 @@ Global install roots:
 
 Local installs use each runtime's project config directory. Antigravity local installs write `.agents/plugins/clean-room/`.
 
+## Agent Metadata Compatibility
+
+Runtime agent metadata is intentionally runtime-specific. Claude Code Markdown agents support documented `model`, `effort`, `color`, and optional `memory` frontmatter. Clean-room role agents use `model`, `effort`, and `color` only. They do not use persistent `memory`, because clean-room state must come from durable artifacts, role-session briefs, and fresh role sessions rather than runtime recall.
+
+Codex TOML agents support documented session config fields such as `model`, `model_reasoning_effort`, `developer_instructions`, `sandbox_mode`, `mcp_servers`, and `skills.config`. Do not copy Claude aliases such as `sonnet` or `opus`, Claude `color`, or Claude `memory` fields into Codex TOML templates.
+
+Codex hooks support `updatedInput`, but clean-room hook enforcement should stay fail-closed through exit status and explicit deny decisions. Do not rewrite clean-room tool calls in hooks; command mutation makes boundary behavior harder to review and test.
+
 ## Hook Modes And Doctor
 
 Hook modes:
 
 - `safe`: default. Copies hooks and registers a wrapper that no-ops until role sessions provide clean-room environment variables. `CLEAN_ROOM_HOOK_ENFORCE=1` remains available for explicit smoke tests.
-- `strict`: fail-closed mode for dedicated Codex or Claude clean-room homes.
+- `strict`: fail-closed mode for dedicated Codex, Claude, or OpenCode clean-room homes.
 - `copy-only`: copies hook files without runtime hook registration.
 
 Smoke test generated hook registration:
@@ -117,11 +136,12 @@ Smoke test generated hook registration:
 clean-room-skill doctor --runtime codex --hooks=safe
 clean-room-skill doctor --runtime codex --hooks=strict
 clean-room-skill doctor --runtime codex --hooks=strict --coverage
+clean-room-skill doctor --runtime opencode --hooks=strict --coverage
 ```
 
 Use `--runtime claude` for Claude Code, and add `--config-dir <path>` when testing an alternate config root.
 
-`doctor` checks that Codex or Claude hook config exists, contains generated clean-room hooks, uses absolute wrapper paths, uses the requested safe or strict mode, and that smoke payloads fail for missing environment, source reads, source writes, shell use, and malformed post-write JSON. Safe mode also verifies no-op behavior without clean-room env.
+`doctor` checks that Codex or Claude hook config exists, or that the OpenCode local plugin exists. It verifies generated clean-room hooks or plugin wiring, absolute wrapper paths, the requested safe or strict mode, and smoke payload failures for missing environment, source reads, source writes, shell use, and malformed post-write JSON. Safe mode also verifies no-op behavior without clean-room env.
 
 It does not prove legal sufficiency, full runtime hook event coverage, host-side feature enablement, or full JSON Schema conformance.
 

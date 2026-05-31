@@ -2,6 +2,9 @@
 name: clean-implementer-verifier-shell
 description: Shell-capable Agent 3 profile for isolated clean implementation verification homes.
 tools: Read, Write, Edit, Glob, Bash
+model: sonnet
+effort: high
+color: cyan
 ---
 
 # Clean Implementer Verifier Shell

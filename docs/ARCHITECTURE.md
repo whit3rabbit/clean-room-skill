@@ -288,7 +288,7 @@ Note: Even though clean and source-denied roles (such as Agent 1.5, 2, 3, and 4)
 
 ## Guardrails and Hooks
 
-The architecture relies on agent/tool hook scaffolding located in `hooks/` to enforce boundary rules dynamically during agent sessions. Use installer-generated Codex or Claude hook configs with absolute wrapper paths. Static cwd-relative plugin hook declarations are not treated as an enforcement boundary. Use strict hooks for dedicated Codex or Claude clean-room homes; safe hooks are compatibility-only between runs and begin enforcing when init/onboarding launches role sessions with clean-room environment variables.
+The architecture relies on agent/tool hook scaffolding located in `hooks/` to enforce boundary rules dynamically during agent sessions. Use installer-generated Codex or Claude hook configs with absolute wrapper paths, or the generated OpenCode local plugin bridge. Static cwd-relative plugin hook declarations are not treated as an enforcement boundary. Use strict hooks for dedicated Codex, Claude, or OpenCode clean-room homes; safe hooks are compatibility-only between runs and begin enforcing when init/onboarding launches role sessions with clean-room environment variables.
 
 Matcher coverage depends on the host runtime emitting hook events for the tool invocation. Hosts that do not emit a pre/post tool event for a file, terminal, or resource tool are not protected by adding that tool name to the generated hook config. Run `clean-room-skill doctor --runtime codex --hooks=strict --coverage` or the Claude equivalent after install.
 

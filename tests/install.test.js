@@ -20,6 +20,7 @@ const {
   listFiles,
   sha256Bytes,
 } = require('../lib/fs-utils.cjs');
+const { OPENCODE_PLUGIN_MARKER } = require('../lib/hooks.cjs');
 const {
   assertManagedHookDetails,
   HOOK,
@@ -74,6 +75,29 @@ function firstManagedHookCommand(configPath) {
   const commands = managedHookCommands(readJson(configPath));
   assert.ok(commands.length > 0);
   return commands[0];
+}
+
+function assertOpenCodePlugin(root, mode = 'safe') {
+  const pluginPath = path.join(root, 'plugins', 'clean-room.ts');
+  assert.ok(fs.existsSync(pluginPath));
+  const content = fs.readFileSync(pluginPath, 'utf8');
+  assert.ok(content.includes(OPENCODE_PLUGIN_MARKER));
+  assert.match(content, /"tool\.execute\.before"/);
+  assert.match(content, /"tool\.execute\.after"/);
+  assert.match(content, /shell: false/);
+  assert.match(content, new RegExp(`const CLEAN_ROOM_HOOK_MODE = "${mode}"`));
+  const wrapper = content.match(/const CLEAN_ROOM_HOOK_WRAPPER = "([^"]+)"/)?.[1];
+  assert.ok(wrapper);
+  assert.equal(path.isAbsolute(wrapper), true);
+  assert.equal(
+    fs.realpathSync.native(wrapper),
+    fs.realpathSync.native(path.join(root, 'hooks', 'clean-room', 'clean-room-hook.py'))
+  );
+  assert.match(content, /deny-clean-room-shell\.py/);
+  assert.match(content, /deny-clean-source-read\.py/);
+  assert.match(content, /deny-contaminated-clean-write\.py/);
+  assert.match(content, /validate-handoff-package\.py/);
+  return content;
 }
 
 function symlinkDirOrSkip(t, target, linkPath) {
@@ -981,6 +1005,25 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(ROOT, 'hooks', 'hooks.json')), false);
   });
 
+  test('bundled skills satisfy OpenCode frontmatter requirements', () => {
+    const skillsRoot = path.join(ROOT, 'skills');
+    for (const entry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const skillPath = path.join(skillsRoot, entry.name, 'SKILL.md');
+      if (!fs.existsSync(skillPath)) continue;
+      const content = fs.readFileSync(skillPath, 'utf8');
+      assert.ok(content.startsWith('---\n'), entry.name);
+      const end = content.indexOf('\n---\n', 4);
+      assert.notEqual(end, -1, entry.name);
+      const frontmatter = content.slice(4, end);
+      const name = frontmatter.match(/^name:\s*(.+)$/m)?.[1]?.trim();
+      const description = frontmatter.match(/^description:\s*(.+)$/m)?.[1]?.trim();
+      assert.equal(name, entry.name);
+      assert.match(name, /^[a-z0-9]+(-[a-z0-9]+)*$/);
+      assert.ok(description && description.length <= 1024, entry.name);
+    }
+  });
+
   test('installs Antigravity as a CLI plugin without enabling hooks', () => {
     const antigravityPlugin = path.join(tempDir('clean-room-antigravity'), 'plugins', 'clean-room');
     const result = runInstall(['--antigravity', '--global', '--yes'], {
@@ -1013,7 +1056,9 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(cwd, '.codex', 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(cwd, '.claude', 'commands', 'clean-room', 'clean-room.md')));
     assert.ok(fs.existsSync(path.join(cwd, '.gemini', 'commands', 'clean-room', 'clean-room.md')));
-    assert.ok(fs.existsSync(path.join(cwd, '.opencode', 'command', 'clean-room-clean-room.md')));
+    assert.ok(fs.existsSync(path.join(cwd, '.opencode', 'skills', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(cwd, '.opencode', 'commands', 'clean-room-clean-room.md')));
+    assertOpenCodePlugin(path.join(cwd, '.opencode'));
     assert.ok(fs.existsSync(path.join(cwd, '.agents', 'plugins', 'clean-room', 'skills', 'clean-room', 'SKILL.md')));
   });
 
@@ -1062,7 +1107,9 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'clean-polish-reviewer.md')));
     assert.ok(fs.existsSync(path.join(antigravityPlugin, 'agents', 'contaminated-handoff-sanitizer.md')));
     assert.ok(fs.existsSync(path.join(geminiHome, 'commands', 'clean-room', 'clean-room.md')));
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-clean-room.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'skills', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-clean-room.md')));
+    assertOpenCodePlugin(opencodeHome);
     assert.ok(fs.existsSync(path.join(kiloHome, 'command', 'clean-room-clean-room.md')));
     assert.ok(fs.existsSync(path.join(cursorHome, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(copilotHome, 'skills', 'clean-room', 'SKILL.md')));
@@ -1332,21 +1379,50 @@ describe('clean-room-skill installer', () => {
 
     result = runInstall(['--opencode', '--global', '--yes'], { OPENCODE_CONFIG_DIR: opencodeHome });
     assert.equal(result.status, 0, result.stderr);
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-clean-room.md')));
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-init.md')));
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-attended.md')));
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-refocus.md')));
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-resume.md')));
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-start-over.md')));
-    assert.ok(fs.existsSync(path.join(opencodeHome, 'command', 'clean-room-unattended.md')));
-    const opencodeCleanRoom = fs.readFileSync(path.join(opencodeHome, 'command', 'clean-room-clean-room.md'), 'utf8');
-    const opencodeAttended = fs.readFileSync(path.join(opencodeHome, 'command', 'clean-room-attended.md'), 'utf8');
-    const opencodeUnattended = fs.readFileSync(path.join(opencodeHome, 'command', 'clean-room-unattended.md'), 'utf8');
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'skills', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-clean-room.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-init.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-attended.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-refocus.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-resume.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-start-over.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-unattended.md')));
+    assertOpenCodePlugin(opencodeHome);
+    const opencodeCleanRoom = fs.readFileSync(path.join(opencodeHome, 'commands', 'clean-room-clean-room.md'), 'utf8');
+    const opencodeAttended = fs.readFileSync(path.join(opencodeHome, 'commands', 'clean-room-attended.md'), 'utf8');
+    const opencodeUnattended = fs.readFileSync(path.join(opencodeHome, 'commands', 'clean-room-unattended.md'), 'utf8');
     assert.match(opencodeCleanRoom, /Run State Discovery Before Wizard/);
     assert.match(opencodeAttended, /Run State Discovery Before Wizard/);
     assert.match(opencodeUnattended, /Run State Discovery Before Wizard/);
     assert.match(opencodeAttended, /schema errors instead of restarting preflight/);
     assert.match(opencodeUnattended, /schema errors instead of restarting preflight/);
+  });
+
+  test('installs OpenCode native skills, commands, and local plugin hook bridge', () => {
+    const opencodeHome = path.join(tempDir('clean-room-opencode'), 'opencode');
+
+    let result = runInstall(['--opencode', '--global', '--yes'], { OPENCODE_CONFIG_DIR: opencodeHome });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'skills', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-clean-room.md')));
+    assertOpenCodePlugin(opencodeHome, 'safe');
+    assert.equal(fs.existsSync(path.join(opencodeHome, 'opencode.json')), false);
+
+    result = runInstall(['status', '--opencode', '--global'], { OPENCODE_CONFIG_DIR: opencodeHome });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /opencode \(global\) installed/);
+    assert.match(result.stdout, /hooks: safe; registration present/);
+
+    result = runInstall(['--opencode', '--global', '--hooks=strict', '--yes'], { OPENCODE_CONFIG_DIR: opencodeHome });
+    assert.equal(result.status, 0, result.stderr);
+    assertOpenCodePlugin(opencodeHome, 'strict');
+    assert.equal(readJson(path.join(opencodeHome, 'clean-room-install-manifest.json')).hooks_mode, 'strict');
+
+    result = runInstall(['--opencode', '--global', '--hooks=copy-only', '--yes'], { OPENCODE_CONFIG_DIR: opencodeHome });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(path.join(opencodeHome, 'plugins', 'clean-room.ts')), false);
+    assert.ok(fs.existsSync(path.join(opencodeHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
+    assert.equal(readJson(path.join(opencodeHome, 'clean-room-install-manifest.json')).hooks_mode, 'copy-only');
   });
 
   test('strict hooks fail before mutating unsupported runtimes', () => {
@@ -1430,10 +1506,11 @@ describe('clean-room-skill installer', () => {
     assert.match(hook.stderr, /environment check failed/);
   });
 
-  test('doctor validates generated Codex and Claude hook configs', () => {
+  test('doctor validates generated Codex, Claude, and OpenCode hook registration', () => {
     const root = tempDir('clean-room-doctor');
     const codexHome = path.join(root, 'codex');
     const claudeHome = path.join(root, 'claude');
+    const opencodeHome = path.join(root, 'opencode');
     let result = runInstall(['--codex', '--global', '--yes'], { CODEX_HOME: codexHome });
     assert.equal(result.status, 0, result.stderr);
     result = runInstall(['doctor', '--runtime', 'codex', '--hooks=safe', '--config-dir', codexHome]);
@@ -1453,6 +1530,16 @@ describe('clean-room-skill installer', () => {
     result = runInstall(['doctor', '--runtime=claude', '--hooks=strict', '--config-dir', claudeHome]);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /clean-room doctor passed for claude/);
+
+    result = runInstall(['--opencode', '--global', '--hooks=strict', '--yes'], {
+      OPENCODE_CONFIG_DIR: opencodeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    result = runInstall(['doctor', '--runtime=opencode', '--hooks=strict', '--coverage', '--config-dir', opencodeHome]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /clean-room doctor passed for opencode/);
+    assert.match(result.stdout, /clean-room OpenCode plugin coverage:/);
+    assert.match(result.stdout, /tool\.execute\.before/);
   });
 
   test('doctor rejects managed hook commands with shell suffixes', () => {
@@ -1756,6 +1843,26 @@ describe('clean-room-skill installer', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(readJson(stub.statePath).plugins, [CLAUDE_PLUGIN_ID]);
     assert.equal(readClaudeStubCalls(stub).some((call) => call.startsWith('plugin uninstall ')), false);
+  });
+
+  test('uninstall removes OpenCode managed files and preserves unrelated plugins', () => {
+    const opencodeHome = tempDir('clean-room-opencode-uninstall');
+    const userPlugin = path.join(opencodeHome, 'plugins', 'user.ts');
+    fs.mkdirSync(path.dirname(userPlugin), { recursive: true });
+    fs.writeFileSync(userPlugin, 'export const UserPlugin = async () => ({})\n');
+
+    let result = runInstall(['--opencode', '--global', '--yes'], { OPENCODE_CONFIG_DIR: opencodeHome });
+    assert.equal(result.status, 0, result.stderr);
+    assertOpenCodePlugin(opencodeHome);
+
+    result = runInstall(['--opencode', '--global', '--yes', '--uninstall'], {
+      OPENCODE_CONFIG_DIR: opencodeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(path.join(opencodeHome, 'plugins', 'clean-room.ts')), false);
+    assert.equal(fs.existsSync(path.join(opencodeHome, 'skills', 'clean-room', 'SKILL.md')), false);
+    assert.equal(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-clean-room.md')), false);
+    assert.equal(fs.readFileSync(userPlugin, 'utf8'), 'export const UserPlugin = async () => ({})\n');
   });
 
   test('uninstall warns about untracked package-path files without deleting them', () => {

@@ -35,7 +35,11 @@ const EXPECTED_GLOBAL = {
     hooks: false,
   },
   gemini: { root: '/tmp/clean-room/gemini', kinds: ['commands:commands/clean-room', 'hooks:hooks/clean-room'], hooks: false },
-  opencode: { root: '/tmp/clean-room/opencode', kinds: ['commands:command', 'hooks:hooks/clean-room'], hooks: false },
+  opencode: {
+    root: '/tmp/clean-room/opencode',
+    kinds: ['skills:skills', 'commands:commands', 'opencode-plugin:plugins/clean-room.ts', 'hooks:hooks/clean-room'],
+    hooks: true,
+  },
   kilo: { root: '/tmp/clean-room/kilo', kinds: ['commands:command', 'hooks:hooks/clean-room'], hooks: false },
   cursor: { root: '/tmp/clean-room/cursor', kinds: ['skills:skills', 'hooks:hooks/clean-room'], hooks: false },
   copilot: { root: '/tmp/clean-room/copilot', kinds: ['skills:skills', 'hooks:hooks/clean-room'], hooks: false },

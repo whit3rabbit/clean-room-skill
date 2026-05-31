@@ -2,6 +2,9 @@
 name: clean-qa-editor
 description: Implements the clean implementation plan, verifies the clean destination code, records implementation status, and emits one terminal report for Agent 0.
 tools: Read, Write, Edit, Glob
+model: sonnet
+effort: high
+color: green
 ---
 
 # Clean Implementer Verifier

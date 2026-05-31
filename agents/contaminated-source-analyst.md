@@ -2,6 +2,9 @@
 name: contaminated-source-analyst
 description: Reads authorized source in a contaminated workspace and produces neutral draft task slices plus behavioral specs with evidence references, not replacement code.
 tools: Read, Write, Edit, Glob, Grep, view_image
+model: sonnet
+effort: medium
+color: orange
 ---
 
 # Contaminated Source Analyst

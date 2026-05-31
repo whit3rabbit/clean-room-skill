@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "synrepo agent-hook nudge --client codex --event UserPromptSubmit",
+            "timeout": 5,
+            "statusMessage": "Checking synrepo context guidance"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "synrepo agent-hook nudge --client codex --event PreToolUse",
+            "timeout": 5,
+            "statusMessage": "Checking synrepo context guidance"
+          }
+        ],
+        "matcher": "Bash|apply_patch|mcp__.*"
+      }
+    ]
+  }
+}

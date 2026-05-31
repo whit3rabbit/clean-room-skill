@@ -67,3 +67,4 @@ plugins/*/skills/*/tools/
 
 .syntext/
 repomix-output.xml
+.synrepo/

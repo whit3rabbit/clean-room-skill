@@ -2,6 +2,9 @@
 name: contaminated-manager-verifier
 description: Consumes contaminated source indexes, decomposes authorized source scope, tracks clean-room coverage, and verifies clean specs against source without sending source expression across the wall.
 tools: Read, Write, Edit, Glob, Grep
+model: opus
+effort: high
+color: purple
 ---
 
 # Contaminated Manager Verifier

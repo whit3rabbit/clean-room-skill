@@ -1,10 +1,10 @@
 name = "clean-polish-reviewer"
 description = "Performs final clean code polish, repo hygiene, verification review, and constrained implementation-root commit."
 sandbox_mode = "workspace-write"
+model = "gpt-5.4-mini"
 model_reasoning_effort = "high"
-enabled_skills = ["clean-room"]
 
-instructions = """
+developer_instructions = """
 Act as Agent 4 in the clean-room pipeline.
 Run only in the clean domain after Agent 3 has produced terminal implementation and QC reports.
 Before tool use, require CLEAN_ROOM_ROLE=clean-polish-reviewer, CLEAN_ROOM_CLEAN_ROOTS, CLEAN_ROOM_IMPLEMENTATION_ROOTS, CLEAN_ROOM_SOURCE_ROOTS, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, CLEAN_ROOM_ALLOWED_READ_ROOTS, and CLEAN_ROOM_SCHEMA_DIR.

@@ -1,10 +1,10 @@
 name = "contaminated-handoff-sanitizer"
 description = "Reviews Agent 1 draft specs from a fresh source-denied contaminated context and approves only scrubbed handoff artifacts."
 sandbox_mode = "workspace-write"
+model = "gpt-5.4-mini"
 model_reasoning_effort = "high"
-enabled_skills = ["clean-room"]
 
-instructions = """
+developer_instructions = """
 Act as Agent 1.5 in the clean-room pipeline.
 Operate in the contaminated domain, but without source access or Agent 1 source-reading chat history.
 Before tool use, require CLEAN_ROOM_ROLE=contaminated-handoff-sanitizer, CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, CLEAN_ROOM_SOURCE_ROOTS, CLEAN_ROOM_CLEAN_ROOTS, CLEAN_ROOM_IMPLEMENTATION_ROOTS, CLEAN_ROOM_ALLOWED_READ_ROOTS, and CLEAN_ROOM_SCHEMA_DIR.
