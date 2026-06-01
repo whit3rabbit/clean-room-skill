@@ -19,9 +19,12 @@ const FOUNDATION_SPEC_ID = 'spec-foundation';
 const FOUNDATION_SPEC_FILE = 'foundation-behavior-spec.json';
 const BEHAVIOR_UNIT_ID = 'unit-example-flow';
 const BEHAVIOR_SPEC_ID = 'spec-example-flow';
+const SECOND_UNIT_ID = 'unit-second-flow';
+const SECOND_SPEC_ID = 'spec-second-flow';
+const SECOND_SPEC_FILE = 'second-behavior-spec.json';
 const TEST_TIMEOUT_MS = 30_000;
 const RUN_TEST_DEBUG = process.env.CLEAN_ROOM_RUN_TEST_DEBUG === '1';
-const RUN_CLI_EXPECTED_COUNT = 70;
+const RUN_CLI_EXPECTED_COUNT = 74;
 const TMP_DIRS = [];
 let runCliCounter = 0;
 let runCliCompleted = 0;
@@ -285,6 +288,67 @@ function writeEvidenceLedger(contaminated, entries = null) {
   });
 }
 
+function writeTwoUnitCoverage(workspace, firstState = 'gap', secondState = 'gap') {
+  writeJson(path.join(workspace.contaminated, 'coverage-ledger.json'), {
+    ledger_id: 'coverage-test',
+    task_id: 'task-example',
+    updated_by_role: 'contaminated-manager-verifier',
+    source_units: [
+      {
+        unit_id: FOUNDATION_UNIT_ID,
+        coverage_state: 'covered',
+        evidence_refs: ['evidence-ledger:item-foundation'],
+      },
+      {
+        unit_id: BEHAVIOR_UNIT_ID,
+        coverage_state: firstState,
+        evidence_refs: firstState === 'covered' ? ['evidence-ledger:item-001'] : [],
+      },
+      {
+        unit_id: SECOND_UNIT_ID,
+        coverage_state: secondState,
+        evidence_refs: secondState === 'covered' ? ['evidence-ledger:item-002'] : [],
+      },
+    ],
+    behavior_spec_refs: [FOUNDATION_SPEC_ID, BEHAVIOR_SPEC_ID, SECOND_SPEC_ID],
+    coverage_status: firstState === 'covered' && secondState === 'covered' ? 'complete' : 'partial',
+    abstract_delta_tickets: [],
+    review_history: [
+      {
+        reviewer_role: 'contaminated-manager-verifier',
+        status: 'test',
+        notes: '',
+      },
+    ],
+  });
+  writeEvidenceLedger(workspace.contaminated, [
+    {
+      evidence_id: 'item-foundation',
+      source_unit_ref: FOUNDATION_UNIT_ID,
+      evidence_type: 'source-observation',
+      description: 'Neutral test evidence that the foundation unit was source-verified.',
+      evidence_location_ref: 'contaminated-only:unit-foundation:item-foundation',
+      retained_in_contaminated_domain: true,
+    },
+    {
+      evidence_id: 'item-001',
+      source_unit_ref: BEHAVIOR_UNIT_ID,
+      evidence_type: 'source-observation',
+      description: 'Neutral test evidence that the first unit was source-verified.',
+      evidence_location_ref: 'contaminated-only:unit-example-flow:item-001',
+      retained_in_contaminated_domain: true,
+    },
+    {
+      evidence_id: 'item-002',
+      source_unit_ref: SECOND_UNIT_ID,
+      evidence_type: 'source-observation',
+      description: 'Neutral test evidence that the second unit was source-verified.',
+      evidence_location_ref: 'contaminated-only:unit-second-flow:item-002',
+      retained_in_contaminated_domain: true,
+    },
+  ]);
+}
+
 function commandConfig(filePath, stages) {
   writeJson(filePath, { version: 1, stages });
   return filePath;
@@ -338,6 +402,29 @@ function writeStageEnvCaptureScript(root, capturePath) {
 const fs = require('node:fs');
 fs.writeFileSync(${JSON.stringify(capturePath)}, JSON.stringify(process.env, null, 2) + '\\n');
 `);
+  return script;
+}
+
+function writeClaudeAgentCaptureScript(root, capturePath) {
+  const script = path.join(root, 'claude');
+  fs.writeFileSync(script, `#!${process.execPath}
+'use strict';
+
+const fs = require('node:fs');
+const input = fs.readFileSync(0, 'utf8');
+fs.appendFileSync(${JSON.stringify(capturePath)}, JSON.stringify({
+  args: process.argv.slice(2),
+  cwd: process.cwd(),
+  input,
+  env: {
+    CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+    CLEAN_ROOM_ROLE: process.env.CLEAN_ROOM_ROLE,
+    CLEAN_ROOM_CONTROLLER_PHASE: process.env.CLEAN_ROOM_CONTROLLER_PHASE,
+    CLEAN_ROOM_SELECTED_UNIT_ID: process.env.CLEAN_ROOM_SELECTED_UNIT_ID
+  }
+}) + '\\n');
+`);
+  fs.chmodSync(script, 0o755);
   return script;
 }
 
@@ -480,6 +567,66 @@ function validFoundationBehaviorSpec(overrides = {}) {
     ],
     ...overrides,
   });
+}
+
+function validSecondBehaviorSpec(overrides = {}) {
+  return validBehaviorSpec({
+    spec_id: SECOND_SPEC_ID,
+    unit_id: SECOND_UNIT_ID,
+    source_unit_refs: [SECOND_UNIT_ID],
+    evidence_refs: ['evidence-ledger:item-002'],
+    summary: 'Second behavior unit captures another observable flow.',
+    observable_surface: [
+      {
+        claim_id: 'second-surface',
+        claim: 'The second behavior exposes a distinct user-visible flow.',
+        evidence_refs: ['evidence-ledger:item-002'],
+        evidence_status: 'observed',
+        confidence: 'high',
+      },
+    ],
+    observable_behaviors: [
+      {
+        claim_id: 'second-behavior',
+        claim: 'The second flow completes using clean implementation behavior.',
+        evidence_refs: ['evidence-ledger:item-002'],
+        evidence_status: 'observed',
+        confidence: 'high',
+      },
+    ],
+    test_scenarios: [
+      {
+        scenario_id: 'test-second-flow',
+        scenario: 'Run the second clean behavior flow.',
+        expected_result: 'The second clean flow completes.',
+        coverage: [],
+      },
+    ],
+    ...overrides,
+  });
+}
+
+function addSecondApprovedUnit(workspace) {
+  const manifest = readJson(workspace.manifestPath);
+  manifest.controller_policy.max_iterations = 4;
+  manifest.loop_context.max_inner_iterations = 4;
+  manifest.loop_context.approved_scope_refs = [BEHAVIOR_UNIT_ID, SECOND_UNIT_ID];
+  manifest.units.push({
+    unit_id: SECOND_UNIT_ID,
+    unit_kind: 'behavior',
+    description: 'Second observable flow.',
+    status: 'pending',
+    source_index_refs: ['source-index:batch-0001'],
+    notes: 'Second neutral unit id.',
+  });
+  writeJson(workspace.manifestPath, manifest);
+  writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+  writeJson(path.join(workspace.clean, SECOND_SPEC_FILE), validSecondBehaviorSpec());
+  writeCleanRunContext(workspace, ['behavior-spec.json', SECOND_SPEC_FILE]);
+  writeArchitectureArtifacts(workspace);
+  writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json', SECOND_SPEC_FILE]);
+  writeCompleteCleanReports(workspace);
+  writeTwoUnitCoverage(workspace, 'gap', 'gap');
 }
 
 function writeFoundationCleanArtifacts(workspace) {
@@ -937,6 +1084,30 @@ fs.writeFileSync(path.join(contaminated, 'coverage-ledger.json'), JSON.stringify
     notes: ''
   }]
 }, null, 2) + '\\n');
+`);
+  return script;
+}
+
+function writeSelectedUnitCoveredScript(root) {
+  const script = path.join(root, 'write-selected-unit-covered.js');
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+const path = require('node:path');
+const contaminated = process.env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.split(path.delimiter)[0];
+const selected = process.env.CLEAN_ROOM_SELECTED_UNIT_ID;
+const coveragePath = path.join(contaminated, 'coverage-ledger.json');
+const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+for (const unit of coverage.source_units || []) {
+  if (unit.unit_id === selected) {
+    unit.coverage_state = 'covered';
+    unit.evidence_refs = [selected === 'unit-second-flow' ? 'evidence-ledger:item-002' : 'evidence-ledger:item-001'];
+  }
+}
+coverage.coverage_status = coverage.source_units
+  .every((unit) => unit.coverage_state === 'covered' || unit.coverage_state === 'out-of-scope')
+  ? 'complete'
+  : 'partial';
+fs.writeFileSync(coveragePath, JSON.stringify(coverage, null, 2) + '\\n');
 `);
   return script;
 }
@@ -1474,6 +1645,61 @@ describe('clean-room run command', () => {
     assert.equal(result.status, 0, result.stderr);
   });
 
+  test('rejects combining built-in agent runtime with custom commands', () => {
+    const workspace = baseWorkspace('clean-room-run-agent-runtime-conflict');
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+    ]);
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--agent-commands',
+      config,
+      '--agent-runtime',
+      'claude',
+    ]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /cannot be used with --agent-commands/);
+  });
+
+  test('built-in Claude agent runtime invokes plugin role agents', () => {
+    const workspace = baseWorkspace('clean-room-run-claude-agent-runtime');
+    const capturePath = path.join(workspace.root, 'claude-calls.jsonl');
+    const claude = writeClaudeAgentCaptureScript(workspace.root, capturePath);
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--agent-runtime',
+      'claude',
+      '--agent-config-dir',
+      workspace.root,
+      '--once',
+    ], ROOT, {
+      CLEAN_ROOM_CLAUDE_EXECUTABLE: claude,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readJsonLines(capturePath);
+    assert.deepEqual(calls.map((call) => call.env.CLEAN_ROOM_CONTROLLER_PHASE), [
+      'contaminated-manager-prepare',
+      'contaminated-analysis',
+      'sanitize-handoff',
+      'clean-plan',
+      'clean-implement-qc',
+      'contaminated-coverage-verify',
+    ]);
+    assert.ok(calls.every((call) => call.args.includes('--no-session-persistence')));
+    assert.ok(calls.every((call) => call.args.includes('--plugin-dir')));
+    assert.ok(calls.some((call) => call.args.includes('clean-room:contaminated-manager-verifier')));
+    assert.ok(calls.some((call) => call.input.includes('Do not use prior chat history as state.')));
+    assert.equal(calls[0].env.CLAUDE_CONFIG_DIR, workspace.root);
+  });
+
   test('validates clean polish review stage order', () => {
     const workspace = baseWorkspace('clean-room-run-agent4-order');
     const config = commandConfig(path.join(workspace.root, 'commands.json'), [
@@ -1554,6 +1780,64 @@ describe('clean-room run command', () => {
     const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
     assert.equal(ledger.iterations.length, 1);
     assert.equal(ledger.iterations[0].stop_reason, 'no-progress-detected');
+  });
+
+  test('continues across approved units until coverage is complete', () => {
+    const workspace = baseWorkspace('clean-room-run-multiple-units');
+    addSecondApprovedUnit(workspace);
+    const hookShim = writeHookCaptureShim(workspace.root, path.join(workspace.root, 'hook-env.jsonl'));
+    const script = writeSelectedUnitCoveredScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      coverageStage(workspace.contaminated, script),
+    ]);
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--agent-commands',
+      config,
+      '--python',
+      hookShim,
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-slice-complete/);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations.length, 2);
+    assert.deepEqual(ledger.iterations.map((entry) => entry.unit_id), [BEHAVIOR_UNIT_ID, SECOND_UNIT_ID]);
+    assert.equal(ledger.iterations[0].stop_reason, 'unit-complete');
+    assert.equal(ledger.iterations[1].stop_reason, 'spec-slice-complete');
+  });
+
+  test('once caps a multi-unit unattended run after one selected unit', () => {
+    const workspace = baseWorkspace('clean-room-run-multiple-units-once');
+    addSecondApprovedUnit(workspace);
+    const hookShim = writeHookCaptureShim(workspace.root, path.join(workspace.root, 'hook-env.jsonl'));
+    const script = writeSelectedUnitCoveredScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      coverageStage(workspace.contaminated, script),
+    ]);
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--agent-commands',
+      config,
+      '--once',
+      '--python',
+      hookShim,
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /iteration-limit-reached/);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations.length, 1);
+    assert.equal(ledger.iterations[0].unit_id, BEHAVIOR_UNIT_ID);
+    assert.equal(ledger.iterations[0].stop_reason, 'unit-complete');
+    const coverage = readJson(path.join(workspace.contaminated, 'coverage-ledger.json'));
+    assert.equal(coverage.source_units.find((unit) => unit.unit_id === SECOND_UNIT_ID).coverage_state, 'gap');
   });
 
   test('run lock recovers stale locks and preserves fresh locks', () => {
@@ -1667,7 +1951,7 @@ describe('clean-room run command', () => {
     const coverageSchemaChecks = captures.filter((item) => {
       return item.script === 'validate-json-schema.py' && item.input.includes('coverage-ledger.json');
     });
-    assert.equal(coverageSchemaChecks.length, 2);
+    assert.equal(coverageSchemaChecks.length, 3);
   });
 
   test('passes only allowlisted parent and hook-only env to validation hooks', () => {

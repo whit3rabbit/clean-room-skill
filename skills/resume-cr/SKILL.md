@@ -11,6 +11,8 @@ Resume an existing clean-room run from durable artifacts. Never use prior chat h
 
 Use the canonical `clean-room` skill workflow and references in this plugin. Read `skills/clean-room/references/CONTROLLER-LOOP.md` when the manifest records `loop_context` or unattended mode. Preserve the same clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
+If `task-manifest.json` records `controller_policy.mode: "unattended"` in Claude Code, prefer launching `clean-room-skill run --task-manifest <path> --agent-runtime claude` and let the durable runner assign role agents. The main conversation must not perform Agent 1, Agent 2, Agent 3, or Agent 4 work. Do not ask to continue while unattended policy, iteration budget, and approved pending or gap units still permit progress. If the runner or Claude role-agent dispatch is unavailable, stop with `BLOCKERS: Claude role-agent dispatch unavailable` rather than silently continuing in the main chat.
+
 ## Load Order
 
 Load these artifacts from the paths recorded in `task-manifest.json` and the configured root environment. Treat missing optional artifacts as blockers only when the current gate requires them.

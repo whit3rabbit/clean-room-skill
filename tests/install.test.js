@@ -179,10 +179,33 @@ const marketplaceName = ${JSON.stringify(CLAUDE_MARKETPLACE_NAME)};
 const pluginId = ${JSON.stringify(CLAUDE_PLUGIN_ID)};
 const pluginSource = ${JSON.stringify(CLAUDE_PLUGIN_SOURCE_URL)};
 const version = ${JSON.stringify(packageVersion())};
+const agentFiles = ${JSON.stringify([
+  'clean-architect.md',
+  'clean-implementer-verifier-shell.md',
+  'clean-polish-reviewer.md',
+  'clean-qa-editor.md',
+  'contaminated-handoff-sanitizer.md',
+  'contaminated-manager-verifier.md',
+  'contaminated-source-analyst.md',
+])};
 const args = process.argv.slice(2);
 
 function pluginInstallPath() {
   return path.join(configDir, 'plugins', 'cache', marketplaceName, 'clean-room', version);
+}
+
+function writePluginFiles() {
+  const root = pluginInstallPath();
+  fs.mkdirSync(path.join(root, 'skills', 'clean-room', 'assets'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'plugin.json'), JSON.stringify({
+    name: 'clean-room',
+    skills: './skills/',
+    agents: './agents/'
+  }, null, 2) + '\\n');
+  for (const file of agentFiles) {
+    fs.writeFileSync(path.join(root, 'agents', file), '# stub agent\\n');
+  }
 }
 
 function readState() {
@@ -245,6 +268,7 @@ if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'update') {
 }
 
 if (args[0] === 'plugin' && args[1] === 'list' && args.includes('--json')) {
+  if (has(pluginId, state.plugins)) writePluginFiles();
   console.log(JSON.stringify((state.plugins || []).map((id) => ({
     id,
     version,
@@ -258,13 +282,14 @@ if (args[0] === 'plugin' && args[1] === 'list' && args.includes('--json')) {
 
 if (args[0] === 'plugin' && args[1] === 'install') {
   if (!has(pluginId, state.plugins)) state.plugins.push(pluginId);
-  fs.mkdirSync(path.join(pluginInstallPath(), 'skills', 'clean-room', 'assets'), { recursive: true });
+  writePluginFiles();
   console.log('stub plugin installed');
   writeState(state);
   process.exit(0);
 }
 
 if (args[0] === 'plugin' && args[1] === 'update') {
+  if (has(pluginId, state.plugins)) writePluginFiles();
   console.log('stub plugin updated');
   writeState(state);
   process.exit(0);
@@ -1009,6 +1034,16 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(ROOT, 'hooks', 'hooks.json')), false);
   });
 
+  test('unattended prompts fail closed instead of doing role work in main chat', () => {
+    for (const relPath of ['skills/unattended/SKILL.md', 'skills/resume-cr/SKILL.md']) {
+      const content = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
+      assert.match(content, /--agent-runtime claude/, relPath);
+      assert.match(content, /must not perform Agent 1, Agent 2, Agent 3, or Agent 4 work/, relPath);
+      assert.match(content, /Do not ask to continue while/, relPath);
+      assert.match(content, /Claude role-agent dispatch unavailable/, relPath);
+    }
+  });
+
   test('bundled skills satisfy OpenCode frontmatter requirements', () => {
     const skillsRoot = path.join(ROOT, 'skills');
     for (const entry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
@@ -1269,6 +1304,18 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /hooks: safe; registration present/);
     assert.match(result.stdout, /files: [0-9]+; missing 0; modified 0; stale 0; conflicts 0/);
     assert.match(result.stdout, /plugin: clean-room@clean-room-skill; marketplace clean-room-skill/);
+    assert.match(result.stdout, /plugin agents: ok; present 7; missing 0/);
+
+    const manifest = readJson(path.join(claudeHome, 'clean-room-install-manifest.json'));
+    fs.rmSync(path.join(manifest.claude_plugin.install_path, 'agents', 'clean-architect.md'));
+    result = runInstall(['status', '--claude', '--global'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /claude \(global\) update-available/);
+    assert.match(result.stdout, /plugin agents: missing; present 6; missing 1/);
+    assert.match(result.stdout, /Claude role-agent dispatch unavailable/);
   });
 
   test('update refreshes an installed runtime without rerunning onboarding', () => {
@@ -1535,6 +1582,10 @@ describe('clean-room-skill installer', () => {
     result = runInstall(['doctor', '--runtime=claude', '--hooks=strict', '--config-dir', claudeHome]);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /clean-room doctor passed for claude/);
+    assert.match(result.stdout, /plugin agents: 7/);
+    result = runInstall(['doctor', '--runtime=claude', '--hooks=strict', '--coverage', '--config-dir', claudeHome]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /clean-room Claude plugin agent coverage:/);
 
     result = runInstall(['--opencode', '--global', '--hooks=strict', '--yes'], {
       OPENCODE_CONFIG_DIR: opencodeHome,
@@ -1545,6 +1596,25 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /clean-room doctor passed for opencode/);
     assert.match(result.stdout, /clean-room OpenCode plugin coverage:/);
     assert.match(result.stdout, /tool\.execute\.before/);
+  });
+
+  test('doctor rejects Claude installs without plugin role agents', () => {
+    const root = tempDir('clean-room-doctor-claude-missing-agents');
+    const claudeHome = path.join(root, 'claude');
+    const claudeStub = createClaudeStub(path.join(root, 'claude-stub'));
+    let result = runInstall(['--claude', '--global', '--hooks=strict', '--yes'], {
+      ...claudeStub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    const manifest = readJson(path.join(claudeHome, 'clean-room-install-manifest.json'));
+    fs.rmSync(path.join(manifest.claude_plugin.install_path, 'agents', 'clean-architect.md'));
+
+    result = runInstall(['doctor', '--runtime=claude', '--hooks=strict', '--config-dir', claudeHome]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Claude role-agent dispatch unavailable/);
+    assert.match(result.stderr, /clean-architect\.md/);
   });
 
   test('doctor rejects managed hook commands with shell suffixes', () => {

@@ -214,7 +214,7 @@ Usage:
 ```bash
 npx clean-room-skill@latest run \
   --task-manifest ~/Documents/CleanRoom/task-1234abcd/contaminated/task-manifest.json \
-  --agent-commands ./agent-commands.json \
+  --agent-runtime claude \
   --max-iterations 3
 ```
 
@@ -223,7 +223,9 @@ Options:
 | Option | Description |
 | --- | --- |
 | `--task-manifest <path>` | Required path to `task-manifest.json`. |
-| `--agent-commands <path>` | Required role command adapter JSON unless `--dry-run` is set. |
+| `--agent-commands <path>` | Role command adapter JSON unless `--agent-runtime` or `--dry-run` is set. |
+| `--agent-runtime claude` | Use the built-in Claude Code adapter to launch plugin role agents. Mutually exclusive with `--agent-commands`. |
+| `--agent-config-dir <path>` | Claude config directory for `--agent-runtime claude`; defaults to `CLAUDE_CONFIG_DIR` or `~/.claude`. |
 | `--max-iterations <n>` | May only lower the manifest and `loop_context` cap. |
 | `--once` | Run at most one inner-loop iteration. |
 | `--dry-run` | Validate and print the selected unit without writing or spawning agents. |
@@ -259,9 +261,9 @@ Minimal agent command adapter shape for advisory or disabled context management:
 }
 ```
 
-Supported phases are `contaminated-analysis`, `sanitize-handoff`, `clean-plan`, `clean-implement-qc`, optional `clean-polish-review`, and `contaminated-coverage-verify`. The coverage verification phase is required. When present, `clean-polish-review` must run after `clean-implement-qc` and before `contaminated-coverage-verify`.
+Supported phases are `contaminated-manager-prepare`, `contaminated-analysis`, `sanitize-handoff`, `clean-plan`, `clean-implement-qc`, optional `clean-polish-review`, and `contaminated-coverage-verify`. The coverage verification phase is required. The built-in Claude adapter includes `contaminated-manager-prepare` so Agent 0 can prepare controller state before downstream role agents run. When present, `clean-polish-review` must run after `clean-implement-qc` and before `contaminated-coverage-verify`.
 
-When `task-manifest.json` sets `context_management.mode` to `role-session-briefs` and `context_management.enforcement` to `strict`, every configured stage must include `context.fresh_session: true` and `context.brief_path`. The runner validates the brief before spawn, passes only the brief path plus environment facts in the stage prompt, and records the brief ref/hash in `controller-run-ledger.json`.
+When `task-manifest.json` sets `context_management.mode` to `role-session-briefs` and `context_management.enforcement` to `strict`, every configured worker stage after `contaminated-manager-prepare` must include `context.fresh_session: true` and `context.brief_path`. The runner validates the brief before spawn, passes only the brief path plus environment facts in the stage prompt, and records the brief ref/hash in `controller-run-ledger.json`.
 
 Strict context-management adapter example:
 

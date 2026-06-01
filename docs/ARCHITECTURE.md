@@ -250,14 +250,14 @@ The outer loop owns spec development: scope, behavior specs, acceptance criteria
 
 Agent 3's terminal report is not enough to return. If configured, Agent 4 must produce a passing `polish-report.json`. Agent 0 must then consume the terminal clean reports, verify contaminated-side coverage, and write `clean-room-result.json`.
 
-`clean-room-skill run` is the executable v1 inner-loop runner. It requires preflight refs, the required handoff sequence, unattended `controller_policy`, schema-valid `loop_context`, and a user-supplied agent command adapter. It does not automate outer spec development. The runner:
+`clean-room-skill run` is the executable v1 inner-loop runner. It requires preflight refs, the required handoff sequence, unattended `controller_policy`, schema-valid `loop_context`, and either a user-supplied agent command adapter or the built-in Claude Code agent runtime. It does not automate outer spec development. The runner:
 
 *   Locks the contaminated artifact root with `.clean-room-run.lock`.
 *   Reloads durable artifacts before each iteration.
 *   Selects at most one pending or gap unit inside `loop_context.approved_scope_refs`.
 *   Requires exactly one `unit_kind: "foundation"` unit, named by `loop_context.foundation_unit_ref`; behavior units cannot run or complete until that foundation unit is covered.
 *   Spawns configured role commands with `shell: false`, bounded output, and bounded timeout.
-*   In strict context-management mode, requires each configured stage to provide `context.fresh_session: true` and `context.brief_path`, then validates the session brief before spawn.
+*   In strict context-management mode, requires each configured worker stage after `contaminated-manager-prepare` to provide `context.fresh_session: true` and `context.brief_path`, then validates the session brief before spawn.
 *   Supports the optional `clean-polish-review` phase between `clean-implement-qc` and `contaminated-coverage-verify`.
 *   Validates schema, leakage, and handoff integrity before advancing state.
 *   Rejects `covered` coverage-ledger units that still have unresolved high-priority `discovery_leads`.
