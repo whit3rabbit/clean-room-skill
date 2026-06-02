@@ -27,6 +27,77 @@ const {
 } = require('./helpers/hook-policy.cjs');
 
 const REPAIR_HINT = 'Fix or update the JSON artifact to satisfy the reported schema errors, then write it again.';
+const PUBLIC_COMMAND_REF = 'public_surface:spec-example-flow:command:/mcp';
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function writeJson(filePath, data) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
+}
+
+function writeCompletionGuardArtifacts(root, options = {}) {
+  const env = policyEnv(root, 'contaminated-manager-verifier');
+  const contaminated = env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS;
+  const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+  const taskManifest = copyExample('task-manifest.json', contaminated);
+  const coverageLedger = copyExample('coverage-ledger.json', contaminated);
+  copyExample('evidence-ledger.json', contaminated);
+
+  const behaviorSpec = copyExample('behavior-spec.json', clean);
+  const spec = readJson(behaviorSpec);
+  spec.public_surface = [
+    {
+      name: '/mcp',
+      kind: 'command',
+      visibility: 'user-required',
+      compatibility_reason: '/mcp is part of the required user-visible command surface.',
+    },
+  ];
+  spec.test_scenarios[0].coverage = ['claim-001', PUBLIC_COMMAND_REF];
+  writeJson(behaviorSpec, spec);
+
+  const implementationPlan = copyExample('implementation-plan.json', clean);
+  const plan = readJson(implementationPlan);
+  plan.work_items[0].public_contract_refs = options.planRefs ?? [PUBLIC_COMMAND_REF];
+  writeJson(implementationPlan, plan);
+
+  const implementationReport = copyExample('implementation-report.json', clean);
+  const report = readJson(implementationReport);
+  report.implementation_status = 'complete';
+  report.agent0_reporting.report_state = 'terminal-report';
+  report.completed_work_items = options.completedWorkItems ?? ['work-example-flow'];
+  report.verification_results[0].status = 'passed';
+  report.verification_results[0].output_summary = 'Fixture verification passed.';
+  report.final_status = 'complete';
+  writeJson(implementationReport, report);
+
+  copyExample('qc-report.json', clean);
+
+  const coverage = readJson(coverageLedger);
+  const behaviorUnit = coverage.source_units.find((unit) => unit.unit_id === 'unit-example-flow');
+  if (options.includePublicSurfaceCoverage !== false) {
+    behaviorUnit.public_surface_coverage = [
+      {
+        ref: PUBLIC_COMMAND_REF,
+        status: 'covered',
+        evidence_refs: ['evidence-ledger:item-001'],
+        work_item_refs: ['work-example-flow'],
+        verification_refs: ['verification:npm-test'],
+      },
+    ];
+  }
+  writeJson(coverageLedger, coverage);
+
+  return {
+    env,
+    taskManifest,
+    coverageLedger,
+    cleanRoomResult: path.join(contaminated, 'clean-room-result.json'),
+  };
+}
 
 describe('clean-room schema hook policy', () => {
   test('post-write schema hook handles supported payload path variants and fails closed on bad payloads', () => {
@@ -307,6 +378,150 @@ describe('clean-room schema hook policy', () => {
 
     const taskManifest = copyExample('task-manifest.json', clean);
     result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: taskManifest } }, env);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
+  test('completion guard rejects completed behavior unit without clean behavior spec', () => {
+    const root = tempDir('clean-room-completion-no-spec');
+    const env = policyEnv(root, 'contaminated-manager-verifier');
+    const taskManifest = copyExample('task-manifest.json', env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS);
+    const manifest = readJson(taskManifest);
+    manifest.units.find((unit) => unit.unit_id === 'unit-example-flow').status = 'complete';
+    writeJson(taskManifest, manifest);
+
+    const result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: taskManifest },
+    }, env);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /completion claim has no clean behavior spec: unit-example-flow/);
+  });
+
+  test('completion guard rejects legacy incomplete clean-room result', () => {
+    const root = tempDir('clean-room-completion-legacy-result');
+    const env = policyEnv(root, 'contaminated-manager-verifier');
+    const resultPath = path.join(env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, 'clean-room-result-unit-mcp.json');
+    writeJson(resultPath, {
+      version: 'legacy-test',
+      task_id: 'task-a35f0a9c',
+      created: '2026-05-31T13:19:16Z',
+      result: 'spec-slice-complete',
+      selected_spec_slice_ref: 'unit-mcp',
+      coverage_state: {
+        test_coverage: '30.6%',
+        notes: 'Synthetic completion should not pass.',
+      },
+      return_timestamp: '2026-05-31T13:19:16Z',
+    });
+
+    const result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: resultPath },
+    }, env);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /missing required field 'terminal_report_ref'/);
+    assert.match(result.stderr, /missing required field 'qc_report_ref'/);
+  });
+
+  test('completion guard rejects implementation complete with pending behavior units', () => {
+    const root = tempDir('clean-room-completion-manifest-overall-complete');
+    const env = policyEnv(root, 'contaminated-manager-verifier');
+    const taskManifest = copyExample('task-manifest.json', env.CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS);
+    const manifest = readJson(taskManifest);
+    manifest.implementation_status.state = 'complete';
+    writeJson(taskManifest, manifest);
+
+    const result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: taskManifest },
+    }, env);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task-manifest implementation_status complete but behavior unit is not complete: unit-example-flow/);
+  });
+
+  test('completion guard rejects complete coverage ledger without behavior spec refs', () => {
+    const root = tempDir('clean-room-completion-ledger-no-spec-refs');
+    const { env, coverageLedger } = writeCompletionGuardArtifacts(root);
+    const coverage = readJson(coverageLedger);
+    coverage.behavior_spec_refs = [];
+    writeJson(coverageLedger, coverage);
+
+    const result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: coverageLedger },
+    }, env);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /coverage-ledger completion has no behavior_spec_refs/);
+  });
+
+  test('completion guard rejects complete coverage ledger without behavior unit coverage', () => {
+    const root = tempDir('clean-room-completion-ledger-no-behavior-unit');
+    const { env, coverageLedger } = writeCompletionGuardArtifacts(root);
+    const coverage = readJson(coverageLedger);
+    coverage.source_units = coverage.source_units.filter((unit) => unit.unit_id !== 'unit-example-flow');
+    writeJson(coverageLedger, coverage);
+
+    const result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: coverageLedger },
+    }, env);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /coverage-ledger completion does not cover behavior unit: unit-example-flow/);
+  });
+
+  test('completion guard rejects covered public surface without ledger mapping', () => {
+    const root = tempDir('clean-room-completion-public-surface-missing-ledger');
+    const { env, coverageLedger } = writeCompletionGuardArtifacts(root, {
+      includePublicSurfaceCoverage: false,
+    });
+
+    const result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: coverageLedger },
+    }, env);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /coverage-ledger missing public_surface_coverage for: public_surface:spec-example-flow:command:\/mcp/);
+  });
+
+  test('completion guard accepts complete mapped artifacts', () => {
+    const root = tempDir('clean-room-completion-mapped');
+    const { env, taskManifest, coverageLedger, cleanRoomResult } = writeCompletionGuardArtifacts(root);
+    const manifest = readJson(taskManifest);
+    manifest.units.find((unit) => unit.unit_id === 'unit-example-flow').status = 'complete';
+    writeJson(taskManifest, manifest);
+    writeJson(cleanRoomResult, {
+      task_id: 'task-example',
+      result: 'spec-slice-complete',
+      spec_slice_ref: 'behavior-spec:unit-example-flow',
+      coverage_state: 'complete',
+      terminal_report_ref: 'implementation-report.json',
+      qc_report_ref: 'qc-report.json',
+      abstract_delta_tickets: [],
+      returned_at: '2024-01-01T00:00:00Z',
+    });
+
+    let result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: taskManifest },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: coverageLedger },
+    }, env);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: cleanRoomResult },
+    }, env);
     assert.equal(result.status, 0, result.stderr);
   });
 

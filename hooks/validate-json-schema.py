@@ -71,6 +71,8 @@ TASK_MANIFEST_HANDOFF_SEQUENCE_WITH_POLISH = [
     "clean-polish-review",
     TASK_MANIFEST_HANDOFF_SEQUENCE[-1],
 ]
+PUBLIC_SURFACE_COMPLETION_LEVELS = {"exact-public-contract", "behavior-compatible"}
+MAX_COMPLETION_ARTIFACT_SCAN = 500
 MAX_REPORTED_ERRORS = 20
 MAX_VALIDATION_ERRORS = MAX_REPORTED_ERRORS + 1
 REPAIR_HINT = "Fix or update the JSON artifact to satisfy the reported schema errors, then write it again."
@@ -318,6 +320,500 @@ def task_manifest_handoff_sequence_errors(data: dict[str, Any]) -> list[str]:
     return []
 
 
+def completion_guard_enabled(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    tool = payload.get("tool_name") or payload.get("tool")
+    if not isinstance(tool, str):
+        return False
+    return tool.lower() in {"write", "edit", "multiedit", "notebookedit", "apply_patch"}
+
+
+def read_json_artifact(path: Path, label: str) -> tuple[dict[str, Any] | None, str | None]:
+    text, read_error = read_artifact_text(path, label)
+    if read_error:
+        return None, read_error
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return None, f"{label} JSON parse failed for {describe_path(path)}: {redact_text(exc)}"
+    if not isinstance(data, dict):
+        return None, f"{label} must be a JSON object: {describe_path(path)}"
+    return data, None
+
+
+def relative_ref_candidates(ref: str) -> list[str]:
+    refs = [ref]
+    for prefix in ("clean/", "contaminated/"):
+        if ref.startswith(prefix):
+            refs.append(ref.removeprefix(prefix))
+    return refs
+
+
+def find_json_by_ref(ref: Any, roots: list[Path], label: str) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(ref, str) or not ref:
+        return None, f"{label} ref is missing"
+    try:
+        raw = Path(ref).expanduser()
+    except OSError as exc:
+        return None, f"{label} ref is invalid: {redact_text(exc)}"
+    candidates: list[Path] = []
+    if raw.is_absolute():
+        try:
+            candidates.append(raw.resolve())
+        except OSError as exc:
+            return None, f"{label} ref is invalid: {redact_text(exc)}"
+    else:
+        for root in roots:
+            for candidate_ref in relative_ref_candidates(ref):
+                try:
+                    candidates.append((root / candidate_ref).resolve())
+                except OSError as exc:
+                    return None, f"{label} ref is invalid: {redact_text(exc)}"
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return read_json_artifact(candidate, label)
+        except OSError as exc:
+            return None, f"{label} could not stat {describe_path(candidate)}: {redact_text(exc)}"
+    return None, f"{label} does not exist: {ref}"
+
+
+def scan_json_artifacts(roots: list[Path], wanted_kind: str) -> list[tuple[Path, dict[str, Any]]]:
+    matches: list[tuple[Path, dict[str, Any]]] = []
+    scanned = 0
+    for root in roots:
+        try:
+            for candidate in root.rglob("*.json"):
+                scanned += 1
+                if scanned > MAX_COMPLETION_ARTIFACT_SCAN:
+                    return matches
+                try:
+                    if not candidate.is_file():
+                        continue
+                except OSError:
+                    continue
+                data, error = read_json_artifact(candidate, f"{wanted_kind} artifact")
+                if error or not data:
+                    continue
+                if artifact_kind(candidate, data) == wanted_kind:
+                    matches.append((candidate, data))
+        except OSError:
+            continue
+    return matches
+
+
+def first_json_artifact(roots: list[Path], name: str, label: str) -> tuple[dict[str, Any] | None, str | None]:
+    for root in roots:
+        candidate = root / name
+        try:
+            if candidate.is_file():
+                return read_json_artifact(candidate, label)
+        except OSError as exc:
+            return None, f"{label} could not stat {describe_path(candidate)}: {redact_text(exc)}"
+    return None, None
+
+
+def unit_ref_values(unit_id: str) -> set[str]:
+    return {unit_id, f"unit:{unit_id}", f"task-manifest:{unit_id}", f"behavior-spec:{unit_id}"}
+
+
+def evidence_id_from_ref(ref: Any) -> str | None:
+    prefix = "evidence-ledger:"
+    if isinstance(ref, str) and ref.startswith(prefix):
+        return ref.removeprefix(prefix)
+    return None
+
+
+def evidence_entry_map(evidence_ledger: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    entries: dict[str, dict[str, Any]] = {}
+    if not isinstance(evidence_ledger, dict):
+        return entries
+    for entry in evidence_ledger.get("entries") or []:
+        if isinstance(entry, dict) and isinstance(entry.get("evidence_id"), str):
+            entries[entry["evidence_id"]] = entry
+    return entries
+
+
+def public_surface_ref(spec: dict[str, Any], item: dict[str, Any]) -> str:
+    return f"public_surface:{spec.get('spec_id')}:{item.get('kind')}:{item.get('name')}"
+
+
+def required_public_surface_obligations(spec: dict[str, Any]) -> list[str]:
+    if spec.get("compatibility_level") not in PUBLIC_SURFACE_COMPLETION_LEVELS:
+        return []
+    obligations: list[str] = []
+    for item in spec.get("public_surface") or []:
+        if isinstance(item, dict) and isinstance(item.get("name"), str) and isinstance(item.get("kind"), str):
+            obligations.append(public_surface_ref(spec, item))
+    return obligations
+
+
+def behavior_spec_test_coverage_refs(spec: dict[str, Any]) -> set[str]:
+    refs: set[str] = set()
+    for scenario in spec.get("test_scenarios") or []:
+        if not isinstance(scenario, dict):
+            continue
+        for ref in scenario.get("coverage") or []:
+            if isinstance(ref, str):
+                refs.add(ref)
+    return refs
+
+
+def matching_behavior_specs(
+    specs: list[tuple[Path, dict[str, Any]]],
+    unit_id: str,
+    spec_slice_ref: str | None = None,
+) -> list[tuple[Path, dict[str, Any]]]:
+    matches: list[tuple[Path, dict[str, Any]]] = []
+    accepted_refs = unit_ref_values(unit_id)
+    if spec_slice_ref:
+        accepted_refs.add(spec_slice_ref)
+    for spec_path, spec in specs:
+        source_refs = spec.get("source_unit_refs") if isinstance(spec.get("source_unit_refs"), list) else []
+        spec_refs = {
+            ref
+            for ref in [spec.get("spec_id"), spec.get("unit_id"), *source_refs]
+            if isinstance(ref, str)
+        }
+        if spec_refs & accepted_refs or spec.get("unit_id") == unit_id or unit_id in source_refs:
+            matches.append((spec_path, spec))
+    return matches
+
+
+def unit_id_from_spec_slice_ref(spec_slice_ref: Any, specs: list[tuple[Path, dict[str, Any]]]) -> str | None:
+    if not isinstance(spec_slice_ref, str) or not spec_slice_ref:
+        return None
+    for spec_ref, unit_id_prefix in (("unit:", "unit:"), ("task-manifest:", "task-manifest:"), ("behavior-spec:", "behavior-spec:")):
+        if spec_slice_ref.startswith(spec_ref):
+            return spec_slice_ref.removeprefix(unit_id_prefix)
+    if spec_slice_ref.startswith("unit-"):
+        return spec_slice_ref
+    for _spec_path, spec in specs:
+        if spec.get("spec_id") == spec_slice_ref:
+            return spec.get("unit_id") if isinstance(spec.get("unit_id"), str) else None
+    return None
+
+
+def plan_work_items_by_public_ref(plans: list[tuple[Path, dict[str, Any]]]) -> dict[str, list[str]]:
+    refs: dict[str, list[str]] = {}
+    for _plan_path, plan in plans:
+        for work_item in plan.get("work_items") or []:
+            if not isinstance(work_item, dict) or not isinstance(work_item.get("work_item_id"), str):
+                continue
+            for ref in work_item.get("public_contract_refs") or []:
+                if isinstance(ref, str):
+                    refs.setdefault(ref, []).append(work_item["work_item_id"])
+    return refs
+
+
+def plan_work_items_for_specs(plans: list[tuple[Path, dict[str, Any]]], specs: list[dict[str, Any]]) -> set[str]:
+    spec_ids = {spec.get("spec_id") for spec in specs if isinstance(spec.get("spec_id"), str)}
+    work_items: set[str] = set()
+    for _plan_path, plan in plans:
+        for work_item in plan.get("work_items") or []:
+            if not isinstance(work_item, dict) or not isinstance(work_item.get("work_item_id"), str):
+                continue
+            refs = {ref for ref in work_item.get("spec_ids") or [] if isinstance(ref, str)}
+            if refs & spec_ids:
+                work_items.add(work_item["work_item_id"])
+    return work_items
+
+
+def completed_work_items(reports: list[tuple[Path, dict[str, Any]]]) -> set[str]:
+    completed: set[str] = set()
+    for _report_path, report in reports:
+        for work_item_id in report.get("completed_work_items") or []:
+            if isinstance(work_item_id, str):
+                completed.add(work_item_id)
+    return completed
+
+
+def terminal_implementation_reports(reports: list[tuple[Path, dict[str, Any]]]) -> list[tuple[Path, dict[str, Any]]]:
+    terminal: list[tuple[Path, dict[str, Any]]] = []
+    for report_path, report in reports:
+        if (
+            report.get("implementation_status") == "complete"
+            and report.get("final_status") == "complete"
+            and isinstance(report.get("agent0_reporting"), dict)
+            and report["agent0_reporting"].get("report_state") == "terminal-report"
+        ):
+            terminal.append((report_path, report))
+    return terminal
+
+
+def passed_qc_reports(qc_reports: list[tuple[Path, dict[str, Any]]]) -> list[tuple[Path, dict[str, Any]]]:
+    passed: list[tuple[Path, dict[str, Any]]] = []
+    for report_path, report in qc_reports:
+        if (
+            report.get("final_status") in {"passed", "passed-with-gaps"}
+            and report.get("coverage_status") == "complete"
+            and report.get("schema_status") == "passed"
+            and report.get("leakage_status") == "passed"
+            and report.get("required_rerun") is False
+        ):
+            passed.append((report_path, report))
+    return passed
+
+
+def source_unit_for_unit(coverage_ledger: dict[str, Any] | None, unit_id: str) -> dict[str, Any] | None:
+    if not isinstance(coverage_ledger, dict):
+        return None
+    for source_unit in coverage_ledger.get("source_units") or []:
+        if isinstance(source_unit, dict) and source_unit.get("unit_id") == unit_id:
+            return source_unit
+    return None
+
+
+def validate_evidence_refs(
+    errors: list[str],
+    unit_id: str,
+    refs: Any,
+    evidence_ledger: dict[str, Any] | None,
+    label: str,
+) -> None:
+    if not isinstance(refs, list) or not refs:
+        add_error(errors, f"{label} has no evidence_refs: {unit_id}")
+        return
+    entries = evidence_entry_map(evidence_ledger)
+    if not entries:
+        add_error(errors, f"{label} references evidence but evidence-ledger.json is missing or empty: {unit_id}")
+        return
+    for ref in refs:
+        evidence_id = evidence_id_from_ref(ref)
+        if not evidence_id:
+            continue
+        entry = entries.get(evidence_id)
+        if not entry:
+            add_error(errors, f"{label} references missing evidence-ledger item: {ref}")
+            continue
+        source_ref = entry.get("source_unit_ref")
+        if isinstance(source_ref, str) and source_ref not in unit_ref_values(unit_id):
+            add_error(errors, f"{label} evidence ref points at a different source unit: {ref}")
+
+
+def manifest_behavior_unit_ids(manifest: dict[str, Any] | None) -> set[str]:
+    ids: set[str] = set()
+    if not isinstance(manifest, dict):
+        return ids
+    for unit in manifest.get("units") or []:
+        if isinstance(unit, dict) and unit.get("unit_kind") == "behavior" and isinstance(unit.get("unit_id"), str):
+            ids.add(unit["unit_id"])
+    return ids
+
+
+def manifest_completion_behavior_unit_ids(manifest: dict[str, Any] | None) -> set[str]:
+    ids: set[str] = set()
+    if not isinstance(manifest, dict):
+        return ids
+    for unit in manifest.get("units") or []:
+        if (
+            isinstance(unit, dict)
+            and unit.get("unit_kind") == "behavior"
+            and unit.get("status") != "out-of-scope"
+            and isinstance(unit.get("unit_id"), str)
+        ):
+            ids.add(unit["unit_id"])
+    return ids
+
+
+def behavior_unit_is_in_scope(unit_id: str, manifest: dict[str, Any] | None, specs: list[tuple[Path, dict[str, Any]]]) -> bool:
+    behavior_ids = manifest_behavior_unit_ids(manifest)
+    if behavior_ids:
+        return unit_id in behavior_ids
+    if matching_behavior_specs(specs, unit_id):
+        return True
+    return unit_id != "unit-foundation"
+
+
+def completion_context(path: Path, kind: str, data: dict[str, Any]) -> dict[str, Any]:
+    clean_roots = env_roots("CLEAN_ROOM_CLEAN_ROOTS")
+    contaminated_roots = env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS")
+    manifest = data if kind == "task-manifest" else first_json_artifact(contaminated_roots, "task-manifest.json", "task-manifest")[0]
+    coverage = data if kind == "coverage-ledger" else first_json_artifact(contaminated_roots, "coverage-ledger.json", "coverage-ledger")[0]
+    evidence = first_json_artifact(contaminated_roots, "evidence-ledger.json", "evidence-ledger")[0]
+    specs = scan_json_artifacts(clean_roots, "behavior-spec")
+    plans = scan_json_artifacts(clean_roots, "implementation-plan")
+    reports = scan_json_artifacts(clean_roots, "implementation-report")
+    qcs = scan_json_artifacts(clean_roots, "qc-report")
+    if kind == "clean-room-result" and data.get("result") == "spec-slice-complete":
+        report, report_error = find_json_by_ref(data.get("terminal_report_ref"), clean_roots, "clean-room-result terminal_report_ref")
+        qc, qc_error = find_json_by_ref(data.get("qc_report_ref"), clean_roots, "clean-room-result qc_report_ref")
+        if report:
+            reports = [(path, report)]
+        if qc:
+            qcs = [(path, qc)]
+        return {
+            "clean_roots": clean_roots,
+            "contaminated_roots": contaminated_roots,
+            "manifest": manifest,
+            "coverage": coverage,
+            "evidence": evidence,
+            "specs": specs,
+            "plans": plans,
+            "reports": reports,
+            "qcs": qcs,
+            "report_error": report_error if not report else None,
+            "qc_error": qc_error if not qc else None,
+        }
+    return {
+        "clean_roots": clean_roots,
+        "contaminated_roots": contaminated_roots,
+        "manifest": manifest,
+        "coverage": coverage,
+        "evidence": evidence,
+        "specs": specs,
+        "plans": plans,
+        "reports": reports,
+        "qcs": qcs,
+        "report_error": None,
+        "qc_error": None,
+    }
+
+
+def validate_behavior_unit_completion(
+    errors: list[str],
+    unit_id: str,
+    context: dict[str, Any],
+    spec_slice_ref: str | None = None,
+) -> None:
+    specs = matching_behavior_specs(context["specs"], unit_id, spec_slice_ref)
+    if not specs:
+        add_error(errors, f"completion claim has no clean behavior spec: {unit_id}")
+        return
+    spec_data = [spec for _spec_path, spec in specs]
+    terminal_reports = terminal_implementation_reports(context["reports"])
+    if not terminal_reports:
+        add_error(errors, f"completion claim has no terminal implementation report: {unit_id}")
+    passed_qcs = passed_qc_reports(context["qcs"])
+    if not passed_qcs:
+        add_error(errors, f"completion claim has no passed QC report: {unit_id}")
+    work_item_ids = plan_work_items_for_specs(context["plans"], spec_data)
+    if not work_item_ids:
+        add_error(errors, f"completion claim has no implementation-plan work item for clean behavior spec: {unit_id}")
+    elif not (work_item_ids & completed_work_items(terminal_reports)):
+        add_error(errors, f"completion claim has no completed implementation work item for clean behavior spec: {unit_id}")
+
+    source_unit = source_unit_for_unit(context["coverage"], unit_id)
+    if not source_unit or source_unit.get("coverage_state") != "covered":
+        add_error(errors, f"completion claim has no covered coverage-ledger source unit: {unit_id}")
+    else:
+        validate_evidence_refs(errors, unit_id, source_unit.get("evidence_refs"), context["evidence"], "coverage-ledger source unit")
+
+    public_coverage_by_ref = {
+        item.get("ref"): item
+        for item in (source_unit or {}).get("public_surface_coverage") or []
+        if isinstance(item, dict) and isinstance(item.get("ref"), str)
+    }
+    plan_refs = plan_work_items_by_public_ref(context["plans"])
+    completed = completed_work_items(terminal_reports)
+    for spec_path, spec in specs:
+        coverage_refs = behavior_spec_test_coverage_refs(spec)
+        for obligation in required_public_surface_obligations(spec):
+            if obligation not in coverage_refs:
+                add_error(errors, f"public_surface obligation missing from behavior spec test coverage: {obligation} ({describe_path(spec_path)})")
+            coverage = public_coverage_by_ref.get(obligation)
+            if not coverage:
+                add_error(errors, f"coverage-ledger missing public_surface_coverage for: {obligation}")
+                continue
+            if coverage.get("status") != "covered":
+                add_error(errors, f"coverage-ledger public_surface_coverage is not covered: {obligation}")
+            validate_evidence_refs(errors, unit_id, coverage.get("evidence_refs"), context["evidence"], "coverage-ledger public_surface_coverage")
+            mapped_items = set(plan_refs.get(obligation) or [])
+            if not mapped_items:
+                add_error(errors, f"public_surface obligation missing from implementation plan: {obligation}")
+            elif not (mapped_items & completed):
+                add_error(errors, f"public_surface obligation work item is not complete: {obligation}")
+            if error_limit_reached(errors):
+                return
+
+
+def completion_guard_errors(path: Path, kind: str, data: dict[str, Any]) -> list[str]:
+    if kind not in {"task-manifest", "coverage-ledger", "clean-room-result"}:
+        return []
+    if not env_roots("CLEAN_ROOM_CLEAN_ROOTS") or not env_roots("CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS"):
+        return []
+    errors: list[str] = []
+    context = completion_context(path, kind, data)
+    if context.get("report_error"):
+        add_error(errors, context["report_error"])
+    if context.get("qc_error"):
+        add_error(errors, context["qc_error"])
+
+    if kind == "task-manifest":
+        manifest_complete = isinstance(data.get("implementation_status"), dict) and data["implementation_status"].get("state") == "complete"
+        completed_behavior_ids: set[str] = set()
+        for unit in data.get("units") or []:
+            if not isinstance(unit, dict):
+                continue
+            if unit.get("unit_kind") != "behavior" or not isinstance(unit.get("unit_id"), str):
+                continue
+            unit_id = unit["unit_id"]
+            if unit.get("status") == "complete":
+                completed_behavior_ids.add(unit_id)
+                validate_behavior_unit_completion(errors, unit_id, context)
+            elif manifest_complete and unit.get("status") != "out-of-scope":
+                add_error(errors, f"task-manifest implementation_status complete but behavior unit is not complete: {unit_id}")
+                if error_limit_reached(errors):
+                    break
+        if manifest_complete and not completed_behavior_ids:
+            add_error(errors, "task-manifest implementation_status complete has no completed behavior units")
+    elif kind == "coverage-ledger":
+        if data.get("coverage_status") != "complete":
+            return errors
+        if not isinstance(context["manifest"], dict):
+            add_error(errors, "coverage-ledger completion has no task-manifest.json")
+        if not data.get("behavior_spec_refs"):
+            add_error(errors, "coverage-ledger completion has no behavior_spec_refs")
+        required_behavior_ids = manifest_completion_behavior_unit_ids(context["manifest"])
+        if isinstance(context["manifest"], dict) and not required_behavior_ids:
+            add_error(errors, "coverage-ledger completion has no behavior units to complete")
+        covered_behavior_ids: set[str] = set()
+        behavior_spec_refs = {ref for ref in data.get("behavior_spec_refs") or [] if isinstance(ref, str)}
+        for source_unit in data.get("source_units") or []:
+            if not isinstance(source_unit, dict):
+                continue
+            unit_id = source_unit.get("unit_id")
+            if not isinstance(unit_id, str):
+                continue
+            if unit_id in required_behavior_ids and source_unit.get("coverage_state") != "covered":
+                add_error(errors, f"coverage-ledger completion does not cover behavior unit: {unit_id}")
+            if source_unit.get("coverage_state") != "covered":
+                continue
+            validate_evidence_refs(errors, unit_id, source_unit.get("evidence_refs"), context["evidence"], "coverage-ledger source unit")
+            is_behavior_completion = (
+                unit_id in required_behavior_ids
+                if required_behavior_ids
+                else behavior_unit_is_in_scope(unit_id, context["manifest"], context["specs"])
+            )
+            if is_behavior_completion:
+                covered_behavior_ids.add(unit_id)
+                validate_behavior_unit_completion(errors, unit_id, context)
+                for _spec_path, spec in matching_behavior_specs(context["specs"], unit_id):
+                    spec_id = spec.get("spec_id")
+                    if isinstance(spec_id, str) and spec_id not in behavior_spec_refs:
+                        add_error(errors, f"coverage-ledger completion missing behavior_spec_refs entry: {spec_id}")
+            if error_limit_reached(errors):
+                break
+        for unit_id in sorted(required_behavior_ids - covered_behavior_ids):
+            add_error(errors, f"coverage-ledger completion does not cover behavior unit: {unit_id}")
+            if error_limit_reached(errors):
+                break
+    elif kind == "clean-room-result" and data.get("result") == "spec-slice-complete":
+        if not isinstance(context["manifest"], dict):
+            add_error(errors, "clean-room-result completion has no task-manifest.json")
+        if not isinstance(context["coverage"], dict):
+            add_error(errors, "clean-room-result completion has no coverage-ledger.json")
+        if data.get("coverage_state") != "complete":
+            add_error(errors, "clean-room-result spec-slice-complete must have coverage_state complete")
+        unit_id = unit_id_from_spec_slice_ref(data.get("spec_slice_ref"), context["specs"])
+        if not unit_id:
+            add_error(errors, "clean-room-result spec_slice_ref does not resolve to a behavior unit")
+        elif behavior_unit_is_in_scope(unit_id, context["manifest"], context["specs"]):
+            validate_behavior_unit_completion(errors, unit_id, context, data.get("spec_slice_ref"))
+    return errors
+
+
 def is_clean_room_task_manifest_schema(schema: dict[str, Any]) -> bool:
     properties = schema.get("properties")
     return isinstance(properties, dict) and "handoff_sequence" in properties and "agent_pipeline" in properties
@@ -525,6 +1021,7 @@ def main() -> int:
         for error in path_errors:
             print(f"clean-room schema check failed: {redact_text(error)}", file=sys.stderr)
         return 1
+    run_completion_guard = completion_guard_enabled(payload)
     for path in paths:
         if path.suffix.lower() != ".json" or not path.is_file():
             continue
@@ -587,6 +1084,8 @@ def main() -> int:
             extend_errors(errors, role_session_brief_path_errors(data))
         if kind == "task-manifest" and is_clean_room_task_manifest_schema(schema):
             extend_errors(errors, task_manifest_handoff_sequence_errors(data))
+        if run_completion_guard:
+            extend_errors(errors, completion_guard_errors(path, kind, data))
         if errors:
             print(f"clean-room schema check failed for {describe_path(path)}:", file=sys.stderr)
             for error in errors[:MAX_REPORTED_ERRORS]:

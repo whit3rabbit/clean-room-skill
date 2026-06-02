@@ -8,23 +8,28 @@
 - Full local verifier: `bin/verify.sh`.
 - Node requirement: `>=22`.
 - CI runs Node 24 with Python 3.12 on macOS.
-- This repo installs clean-room skills, role agents, hooks, schemas, and examples for multiple agent runtimes.
+- This repo installs clean-room skills, role agents, hooks, schemas, examples, and optional verification templates for multiple agent runtimes.
+- Installer runtime flags: Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, Kilo, Cursor, GitHub Copilot, Windsurf, Augment, Trae, Qwen Code, Hermes Agent, and CodeBuddy.
+- Hook registration is verified for Codex, Claude Code, and OpenCode. Other runtime layouts are best-effort installs unless code and tests prove otherwise.
 - The workflow creates clean behavioral spec packages and clean implementation outputs. It does not generate replacement code directly from source.
 - Full docs: [README.md](README.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/REFERENCE.md](docs/REFERENCE.md).
 
 ## Repo Map
 
 - `bin/`: installer CLI and local verification script.
-- `lib/`: installer helpers, hook config helpers, runtime layout logic, and inner-loop runner.
-- `skills/`: skill entrypoints, schemas, references, scripts, and example spec packages.
+- `lib/`: installer helpers, TUI, hook config helpers, runtime layout logic, preflight helpers, doctor checks, and inner-loop runner.
+- `skills/`: skill entrypoints, schemas, references, source and visual index scripts, and example spec packages.
 - `agents/`: Claude role-agent prompts.
 - `examples/codex/`: Codex role-agent templates.
 - `hooks/`: Python guardrail hooks.
-- `tests/`: Node tests and JSON Schema validation helper.
+- `templates/docker/`: optional Agent 3 verification images and example verification command policies.
+- `tests/`: Node tests, JSON Schema fixtures, schema parity fixtures, and validation helper.
 - `.github/workflows/`: CI and npm publish workflows.
 - `.agents/plugins/marketplace.json`: Codex repo marketplace.
+- `.agents/skills/synrepo/`: repo-bundled synrepo skill metadata.
+- `.codex/`: repo-local Codex config and hook config used for this workspace.
 - `.claude-plugin/marketplace.json`: Claude Code marketplace.
-- `.codex-plugin/plugin.json` and `.claude-plugin/plugin.json`: runtime-specific plugin manifests.
+- `plugin.json`, `.codex-plugin/plugin.json`, and `.claude-plugin/plugin.json`: runtime-specific plugin manifests.
 
 ## Commands
 
@@ -40,17 +45,26 @@
 - Check runtime install state: `node bin/install.js status --global`.
 - Dry-run runtime updates: `node bin/install.js update --global --dry-run`.
 - Smoke-test generated hooks: `node bin/install.js doctor --runtime codex --hooks=safe --config-dir <path>`.
-- Dry-run inner-loop runner: `node bin/install.js run --task-manifest <path> --agent-commands <path> --dry-run`.
+- Smoke-test strict OpenCode hook bridge coverage: `node bin/install.js doctor --runtime opencode --hooks=strict --coverage --config-dir <path>`.
+- Dry-run inner-loop unit selection: `node bin/install.js run --task-manifest <path> --dry-run`.
+- Run inner-loop with adapter commands: `node bin/install.js run --task-manifest <path> --agent-commands <path>`.
+- Run inner-loop with built-in Claude role-agent dispatch: `node bin/install.js run --task-manifest <path> --agent-runtime claude [--agent-config-dir <path>]`.
+- Build source index help: `python3 skills/clean-room/scripts/build_source_index.py --help`.
+- Build visual index help: `python3 skills/clean-room/scripts/build_visual_index.py --help`.
+- Build optional Docker verification profiles: `docker compose -f templates/docker/compose.clean-room.yml build`.
 - No lint script exists. Do not invent one.
 
 ## Verification
 
 - JS changes: run `node --check` on touched JS/CJS files and `npm test`.
-- Runner changes: run `node --check lib/run.cjs bin/install.js`, `node --test tests/run.test.js`, and `npm test`.
+- CLI/preflight/doctor/runner changes: run `node --check bin/install.js lib/doctor.cjs lib/preflight.cjs lib/run.cjs` plus touched JS/CJS files, then `npm test`.
+- Runner changes: run `node --check lib/run.cjs lib/run-cli.cjs lib/run-controller.cjs bin/install.js`, `node --test tests/run.test.js`, and `npm test`.
 - Installer/runtime layout changes: run `npm run test:install` and `npm run verify`.
 - Installer TUI changes: use the MCP TUI test tool for at least one representative interactive flow.
-- Python hook or script changes: run `python3 -m py_compile hooks/*.py skills/clean-room/scripts/*.py skills/clean-room/scripts/source_index/*.py`.
+- Python hook or script changes: run `python3 -m compileall -q hooks skills/clean-room/scripts`.
 - Schema or example changes: run `.venv/bin/python tests/validate_jsonschema.py` if `.venv` exists, otherwise use a Python with `jsonschema[format]>=4.18,<5`.
+- Source or visual index changes: run `node --test tests/source-index-policy.test.js tests/visual-index-policy.test.js` and the relevant `--help` command for the changed script.
+- Docker template or container verification changes: run the relevant `node --test tests/hook-shell-policy.test.js` coverage. Build `templates/docker/compose.clean-room.yml` when Docker is available.
 - Marketplace metadata changes: run `jq empty` on changed JSON files, confirm plugin names match runtime manifests, and confirm local source paths start with `./` and resolve inside the repo.
 - Package or release-facing changes: run `npm pack --dry-run`.
 - Documentation-only changes usually need review plus link/path checks, not the full test suite.
@@ -59,6 +73,9 @@
 
 - Codex marketplace file: `.agents/plugins/marketplace.json`.
 - Claude Code marketplace file: `.claude-plugin/marketplace.json`.
+- Root plugin manifest: `plugin.json`.
+- Codex plugin manifest: `.codex-plugin/plugin.json`.
+- Claude Code plugin manifest: `.claude-plugin/plugin.json`.
 - This repo exposes the plugin at the repository root, so local marketplace sources should use `"./"`, not `"."`.
 - Codex local entries must include `policy.installation`, `policy.authentication`, and `category`.
 - Codex `policy.installation` values are `NOT_AVAILABLE`, `AVAILABLE`, or `INSTALLED_BY_DEFAULT`.
@@ -101,6 +118,7 @@ Ask before changing:
 - Hook policy, role boundaries, path checks, leakage checks, or deny-by-default behavior.
 - Installer conflict handling, backup behavior, uninstall behavior, or runtime layout.
 - Public CLI flags, CLI output, config format, or compatibility behavior.
+- Docker or Podman verification policy, container profiles, network policy, dependency install policy, or clean/container mount behavior.
 - CI, release, publishing, or provenance workflows.
 
 ## Installer And Indexer Safety
@@ -114,21 +132,27 @@ Ask before changing:
 - Bootstrap `init` must use atomic no-clobber writes unless `--force` is set.
 - `listFiles()` must stay iterative and bounded. Do not remove max depth, max file count, or readdir error handling.
 - Source indexing must enforce per-file and total byte limits after read, record changed-during-read files as skipped, use `os.walk(onerror=...)`, and prune traversal after global limits with one aggregate skipped entry.
+- Visual indexing must enforce non-overlapping visual roots, keep output under contaminated artifact roots, reject output under visual roots, enforce per-file and total byte limits after read, skip outside-root symlinks, record changed-during-read files as skipped, and write `visual-index.json` atomically.
 - Local npm helper installs must hold the cache-local install lock before mutating the shared npm prefix and must preserve the structured JSON contract for prefix creation errors, subprocess timeouts, and subprocess `OSError`s.
+- OpenCode hook support uses a generated managed local plugin bridge at `plugins/clean-room.ts`. It must keep the marker, `tool.execute.before` and `tool.execute.after` hooks, absolute wrapper path checks, bounded output, timeout handling, and `shell: false`.
+- Agent 3 container verification is only a verification backend. It must never mount source roots or contaminated artifact roots into clean verification containers.
 
 ## Hook Failure Behavior
 
 - Post-write hooks must fail closed without Python tracebacks when artifact `stat`, `read_text`, `read_bytes`, or referenced-artifact hashing raises `OSError`.
 - Hook error output must use redacted path labels through `describe_path()` / `redact_text()` for clean and source-denied roles.
 - `validate-json-schema.py` artifact kind inference is intentionally conservative. Ambiguous clean-root JSON should fail closed unless allowlisted.
-- `clean-room-skill doctor` is a smoke test. It should assert expected failure reasons and include spawn status, signal/error, stdout, and stderr snippets when a hook command fails.
+- `clean-room-skill doctor` is a smoke test for Codex, Claude Code, and OpenCode hook wiring. It should assert expected failure reasons and include spawn status, signal/error, stdout, and stderr snippets when a hook command fails.
+- `doctor --coverage` reports generated matcher/check coverage, but it does not prove host event coverage or full runtime isolation.
 
 ## Clean-Room Architecture
 
 - The process separates contaminated source analysis from clean behavioral specification.
+- Visual fallback evidence is contaminated source-domain input. Raw screenshots, visual roots, image hashes, exact UI palettes/layouts/iconography, copied visible words, and `visual-index.json` must not enter clean handoff packages.
 - The outer loop evolves specs. The inner clean-room loop completes one approved spec slice, then returns `clean-room-result.json`.
-- `clean-room-skill run` executes only the inner clean-room loop. It requires schema-valid `loop_context`, selects at most one pending/gap unit inside `approved_scope_refs`, supports optional `clean-polish-review`, and uses a user-supplied `agent-commands` adapter with `shell: false`.
+- `clean-room-skill run` executes only the inner clean-room loop. It requires schema-valid `loop_context`, selects at most one pending/gap unit inside `approved_scope_refs`, supports optional `clean-polish-review`, and uses either a user-supplied `agent-commands` adapter with `shell: false` or built-in Claude role-agent dispatch.
 - `coverage-ledger.json` may record contaminated-only `discovery_leads` for authorized related surfaces that Agent 1 detected but could not analyze in the assigned unit. High-priority leads must be resolved before a unit can be marked `covered`.
+- Container execution policy supports `host`, `docker`, or `podman`; first-phase profiles are `node22`, `python312`, `go126`, and `rust-stable`. Container verification metadata is policy, not a shell escape hatch.
 - Prompt rules are not a boundary. Use path separation, role-specific sessions, hooks, schema validation, and artifact quarantine.
 - Recovery entry points must reload durable artifacts, not prior chat history.
 - Never expose `source-index.json`, contaminated ledgers, source paths, private identifiers, or contaminated chat history to clean roles.
@@ -139,7 +163,7 @@ Ask before changing:
 - `preflight`: create or review the required `preflight-goal.json` before source discovery or controller execution.
 - `init`: record durable run preferences, separated roots, schema profile, model policy, and clean-safe/contaminated-only rules.
 - `attended`: start with `controller_policy.mode` fixed to `attended`.
-- `unattended`: start with bounded unattended defaults and `loop_context` for one approved spec slice.
+- `unattended`: start with bounded unattended defaults and `loop_context` for one approved spec slice. In Claude Code, prefer the durable runner with `--agent-runtime claude` when a valid unattended manifest can continue.
 - `resume-cr`: continue from existing durable artifacts.
 - `start-over`: archive or quarantine current artifacts without deletion, then restart with a fresh `task_id`.
 - `refocus`: audit current artifacts against declared scope without expanding scope.
@@ -168,6 +192,8 @@ Set these before any clean-room role session:
 - `CLEAN_ROOM_SCHEMA_DIR`
 
 Clean roles may read only clean roots, implementation roots, schema roots, and approved public/reference roots. Contaminated roles may read authorized source roots and write only contaminated artifacts. Shell-style tools should be disabled inside role sessions because they can bypass path-aware hooks. Agent 3 and Agent 4 runner exceptions require their explicit `CLEAN_ROOM_ALLOW_AGENT*_SHELL` flags and cwd under implementation roots. Normal repo maintenance commands are allowed outside role sessions.
+
+For visual fallback runs, screenshot or image roots belong in `CLEAN_ROOM_SOURCE_ROOTS` so clean/source-denied read hooks can protect them. `visual-index.json` stays under contaminated artifact roots.
 
 ## Local Artifacts
 
