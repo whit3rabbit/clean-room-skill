@@ -179,6 +179,7 @@ The architecture delegates work across six distinct custom role agents to enforc
     *   Influences Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts, never direct chat, progress feedback, implementation hints, or priority changes.
     *   Performs final verification of clean specification and implementation coverage against the source scope.
     *   Blocks handoff or coverage completion when high-priority contaminated discovery leads remain unresolved.
+    *   Treats completion as deny-by-default unless durable canonical artifacts prove the clean behavior gate.
     *   Writes the inner-loop `clean-room-result.json` only after contaminated-side coverage verification.
     *   Consumes Agent 3 reports only after Agent 3 reaches a terminal state, and consumes Agent 4 reports only after the configured polish review reaches a terminal state, then sends only abstract delta tickets into a fresh clean artifact cycle.
 
@@ -250,6 +251,8 @@ The outer loop owns spec development: scope, behavior specs, acceptance criteria
 
 Agent 3's terminal report is not enough to return. If configured, Agent 4 must produce a passing `polish-report.json`. Agent 0 must then consume the terminal clean reports, verify contaminated-side coverage, and write `clean-room-result.json`.
 
+Completion is deny-by-default. `task-manifest.json`, `coverage-ledger.json`, and `clean-room-result*.json` writes that claim completion must be backed by durable canonical clean artifacts: a matching clean behavior spec, implementation plan mappings, a terminal implementation report, a passed QC report, valid evidence references, and required public-surface mappings. Synthetic or manual completion summaries are not completion evidence.
+
 `clean-room-skill run` is the executable v1 inner-loop runner. It requires preflight refs, the required handoff sequence, unattended `controller_policy`, schema-valid `loop_context`, and either a user-supplied agent command adapter or the built-in Claude Code agent runtime. It does not automate outer spec development. The runner:
 
 *   Locks the contaminated artifact root with `.clean-room-run.lock`.
@@ -261,6 +264,7 @@ Agent 3's terminal report is not enough to return. If configured, Agent 4 must p
 *   Supports the optional `clean-polish-review` phase between `clean-implement-qc` and `contaminated-coverage-verify`.
 *   Validates schema, leakage, and handoff integrity before advancing state.
 *   Rejects `covered` coverage-ledger units that still have unresolved high-priority `discovery_leads`.
+*   Rejects completion claims that lack canonical clean specs, plans, terminal reports, QC, evidence, or public-surface coverage mappings.
 *   Records controller memory in contaminated-side `controller-run-ledger.json`.
 *   Writes `clean-room-result.json` before returning to the outer spec loop.
 
@@ -302,7 +306,7 @@ Post-write hook failures are deny-by-default and redacted. If an artifact disapp
 *   [deny-clean-source-read.py](../hooks/deny-clean-source-read.py): Enforces that clean roles and Agent 1.5 cannot read source or visual roots or unapproved paths; clean roles may read implementation roots, and source-denied roles are denied direct `preflight-goal.json` reads. Agent 1.5 is also denied clean roots, implementation roots, and direct `source-index.json` or `visual-index.json` reads.
 *   [deny-contaminated-clean-write.py](../hooks/deny-contaminated-clean-write.py): Enforces role write roots. Agent 2 writes clean artifacts only, Agent 3 writes implementation files and clean reports, Agent 4 writes clean polish reports and implementation-root polish changes, contaminated roles write only to `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, and clean-room artifact JSON files are denied under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 *   [check-artifact-leakage.py](../hooks/check-artifact-leakage.py): Scans clean artifacts and Agent 1.5 staged contaminated artifacts for high-risk leakage markers, source-like identifiers, and private identifier denylist terms. The private identifier denylist (loaded via `CLEAN_ROOM_PRIVATE_IDENTIFIER_DENYLIST`) is subject to hard limits to protect hook execution performance: a maximum of 1,000,000 bytes per file, 20,000 total terms, and 512 characters per individual term.
-*   [validate-json-schema.py](../hooks/validate-json-schema.py): Verifies JSON syntax and structural conformance against schemas under `CLEAN_ROOM_SCHEMA_DIR`, including controller-side `preflight-goal.schema.json` and `init-config.schema.json`. Under clean roots, any unrecognized JSON files that do not conform to canonical schemas will trigger a failure unless they are explicitly registered in the path-separated `CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST` environment variable.
+*   [validate-json-schema.py](../hooks/validate-json-schema.py): Verifies JSON syntax and structural conformance against schemas under `CLEAN_ROOM_SCHEMA_DIR`, including controller-side `preflight-goal.schema.json` and `init-config.schema.json`. Under clean roots, any unrecognized JSON files that do not conform to canonical schemas will trigger a failure unless they are explicitly registered in the path-separated `CLEAN_ROOM_AUXILIARY_JSON_ALLOWLIST` environment variable. Post-write validation also rejects completion claims in `task-manifest.json`, `coverage-ledger.json`, and `clean-room-result*.json` unless durable canonical completion artifacts prove the gate.
 *   [validate-handoff-package.py](../hooks/validate-handoff-package.py): Verifies that handoff packages stay within clean roots, do not reference contaminated paths, `task-manifest.json`, `preflight-goal.json`, `source-index.json`, or `visual-index.json`, and match declared `sha256` checksums.
 
 For detailed guidelines on the clean-room process, refer to:

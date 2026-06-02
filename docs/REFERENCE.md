@@ -238,6 +238,8 @@ Unattended code-development manifests must include exactly one `unit_kind: "foun
 
 `coverage-ledger.json` may record contaminated-only `source_units[].discovery_leads` for authorized related surfaces that were detected but not analyzed in the assigned unit. The runner rejects a `covered` unit while any high-priority discovery lead remains open or deferred. It does not add follow-up units or expand `loop_context.approved_scope_refs`; Agent 0 must return an abstract delta, mark coverage partial or blocked, or pause for attended approval.
 
+Completion is valid only when canonical durable artifacts prove the gate. A completed behavior unit or `spec-slice-complete` result must have a matching clean behavior spec, implementation-plan work item mapping, terminal implementation report, passed QC report, valid contaminated evidence refs, and required public-surface mappings across the behavior spec, coverage ledger, implementation plan, and terminal report. Manual summaries or synthetic result files are not completion evidence.
+
 Minimal agent command adapter shape for advisory or disabled context management:
 
 ```json

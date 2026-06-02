@@ -171,6 +171,8 @@ Post-write JSON artifact validator.
 - Implements the lightweight schema keywords used by bundled schemas, including object and array constraints, required fields, enum/const, patterns, `format: date-time`, `$ref`, `allOf`, `anyOf`, `oneOf`, and `if`/`then`/`else`.
 - Adds clean-run-context path checks so clean artifact paths stay relative, do not use `~`, do not contain `..`, and do not resolve into source or contaminated roots.
 - Requires task manifest handoff stages to match the expected clean-room sequence when validating the task manifest schema.
+- Performs semantic completion validation for `task-manifest.json`, `coverage-ledger.json`, and `clean-room-result*.json` post-write payloads.
+- Rejects completion claims unless canonical durable artifacts prove the gate: matching clean behavior specs, implementation-plan work item mappings, terminal implementation reports, passed QC reports, valid evidence references, and required public-surface coverage mappings.
 
 ### `validate-handoff-package.py`
 
