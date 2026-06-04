@@ -81,7 +81,11 @@ pi install https://github.com/whit3rabbit/clean-room-skill
 npx clean-room-skill@latest --pi --global --yes
 ```
 
-Pi-native package install is preferred. The installer also supports `--pi` for users managing all runtime layouts from one CLI. Both paths load bundled skills as `/skill:<name>`, for example `/skill:clean-room`. Pi installs do not register clean-room hooks; installer-managed Pi layouts copy hook scripts only. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
+Pi-native package install is preferred. This package declares `pi.skills: ["./skills"]`, so `pi install npm:clean-room-skill@latest` lets Pi discover the bundled `SKILL.md` entry points directly. Use the `npx ... --pi` installer only when you want this repo's compatibility installer to manage the same files alongside other runtimes. Global Pi compatibility installs target `~/.pi/agent`; local installs target `.pi`.
+
+Both Pi install paths load bundled skills as `/skill:<name>`, for example `/skill:clean-room`. Pi installs do not currently register clean-room hooks. Installer-managed Pi layouts copy the hook scripts to `hooks/clean-room/` for inspection and future bridge work, but those files are not active enforcement in Pi.
+
+Pi hook enforcement would need a Pi extension, not a `settings.json` edit. Pi extensions can subscribe to tool events such as `tool_call` and `tool_result`, block or mutate tool calls, and are declared with `pi.extensions` in `package.json`; see the [Pi extension docs](https://pi.dev/docs/latest/extensions). This package does not ship that extension yet, so clean-room safety in Pi still depends on role separation, path isolation, schema validation, and any supported hook runtime used for enforcement.
 
 ## How To Run
 
