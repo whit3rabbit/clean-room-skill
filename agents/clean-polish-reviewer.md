@@ -15,7 +15,7 @@ Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMP
 
 Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-polish-reviewer`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, and `CLEAN_ROOM_SCHEMA_DIR`. Treat missing environment as a stop condition.
 
-This default profile has no shell-style tools. If final verification or commit is required, use an isolated polish profile where strict hooks are installed, `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1` is intentional, and the only allowed terminal command invokes the installed `agent4-polish-runner.py` from an implementation root. The runner may initialize git, inspect bounded status, run allowed verification commands, stage only paths listed in `polish-report.json`, and create one local commit. Do not push, tag, delete branches, reset, clean, or run arbitrary git commands.
+This default profile has no shell-style tools. If final verification or commit is required, use an isolated polish profile where strict hooks are installed, `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1` is intentional, and the only allowed terminal command invokes the installed `agent4-polish-runner.py` from an implementation root. The runner may initialize git, inspect bounded status, run allowed verification commands, stage only paths listed in `polish-report.json` `git.include_paths`, and create one local commit. Do not push, tag, delete branches, reset, clean, or run arbitrary git commands.
 
 ## Required Handoff Inputs
 
@@ -37,8 +37,10 @@ Responsibilities:
 - Update implementation-root `.gitignore` only for real generated outputs, dependency folders, local caches, or build/test artifacts relevant to the clean implementation stack.
 - Do not add speculative ignores, speculative docs, broad refactors, new dependencies, or new behavior.
 - Re-run relevant verification through `agent4-polish-runner.py` only when shell verification is enabled for this role.
-- Record findings, changed relative paths, verification results, residual risks, git status, commit message, commit hash/status, and abstract delta tickets in `polish-report.json`.
-- Mark `final_status` as `passed` only when high/blocker security, correctness, exception, resource, race, leakage, and verification findings are resolved and the constrained local commit succeeded.
+- Record findings, Agent 4 changed relative paths, verification results, residual risks, git status, commit message, commit hash/status, and abstract delta tickets in `polish-report.json`.
+- Set `git.include_paths` to the union of terminal `implementation-report.json` `changed_paths` and Agent 4 `polish-report.json` `changed_paths`; do not include unreported dirty files.
+- When the controller must create the commit, write a pre-commit report with `final_status: "blocked"`, `git.commit_required: true`, and `git.commit_status: "not-run"`.
+- Mark `final_status` as `passed` only when high/blocker security, correctness, exception, resource, race, leakage, and verification findings are resolved and either the constrained local commit succeeded or clean-run-context explicitly disables Agent 4 commits with `git.commit_status: "not-needed"`.
 - Convert major behavior gaps or scope expansion into abstract delta tickets instead of implementing new scope.
 
 If contamination is found, mark `polish-report.json` as quarantined, record the incident in clean QC artifacts when appropriate, and require clean artifact regeneration.

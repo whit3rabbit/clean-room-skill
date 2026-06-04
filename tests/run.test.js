@@ -24,7 +24,7 @@ const SECOND_SPEC_ID = 'spec-second-flow';
 const SECOND_SPEC_FILE = 'second-behavior-spec.json';
 const TEST_TIMEOUT_MS = 30_000;
 const RUN_TEST_DEBUG = process.env.CLEAN_ROOM_RUN_TEST_DEBUG === '1';
-const RUN_CLI_EXPECTED_COUNT = 74;
+const RUN_CLI_EXPECTED_COUNT = 77;
 const TMP_DIRS = [];
 let runCliCounter = 0;
 let runCliCompleted = 0;
@@ -401,6 +401,19 @@ function writeStageEnvCaptureScript(root, capturePath) {
   fs.writeFileSync(script, `
 const fs = require('node:fs');
 fs.writeFileSync(${JSON.stringify(capturePath)}, JSON.stringify(process.env, null, 2) + '\\n');
+`);
+  return script;
+}
+
+function writeImplementationFileScript(root, relPath, contents) {
+  const script = path.join(root, `write-${relPath.replace(/[^A-Za-z0-9]+/g, '-')}.js`);
+  fs.writeFileSync(script, `
+const fs = require('node:fs');
+const path = require('node:path');
+const implementation = process.env.CLEAN_ROOM_IMPLEMENTATION_ROOTS.split(path.delimiter)[0];
+const target = path.join(implementation, ${JSON.stringify(relPath)});
+fs.mkdirSync(path.dirname(target), { recursive: true });
+fs.writeFileSync(target, ${JSON.stringify(contents)});
 `);
   return script;
 }
@@ -1691,6 +1704,7 @@ describe('clean-room run command', () => {
       'sanitize-handoff',
       'clean-plan',
       'clean-implement-qc',
+      'clean-polish-review',
       'contaminated-coverage-verify',
     ]);
     assert.ok(calls.every((call) => call.args.includes('--no-session-persistence')));
@@ -2595,10 +2609,14 @@ describe('clean-room run command', () => {
     writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
     writeCompleteCleanReports(workspace);
     writePolishReport(workspace);
+    const polishScript = writeImplementationFileScript(workspace.root, 'AGENTS.md', '# Commands\n\n- npm test\n');
     const script = writeCoveredCoverageScript(workspace.root);
     const config = commandConfig(path.join(workspace.root, 'commands.json'), [
       noOpStage('clean-implement-qc', 'clean-qa-editor', workspace.implementation),
-      noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+      {
+        ...noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+        argv: [process.execPath, polishScript],
+      },
       coverageStage(workspace.root, script),
     ]);
 
@@ -2609,6 +2627,196 @@ describe('clean-room run command', () => {
     const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
     assert.equal(runResult.result, 'spec-slice-complete');
     assert.equal(runResult.polish_report_ref, 'polish-report.json');
+  });
+
+  test('controller finalizes Agent 4 commit before coverage verification', () => {
+    const workspace = baseWorkspace('clean-room-run-polish-controller-commit');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    const implementationReportPath = path.join(workspace.clean, 'implementation-report.json');
+    const implementationReport = readJson(implementationReportPath);
+    implementationReport.changed_paths = [
+      {
+        path: 'src/example-flow.js',
+        kind: 'code',
+        work_item_ids: ['wi-test'],
+      },
+    ];
+    writeJson(implementationReportPath, implementationReport);
+    writePolishReport(workspace, {
+      git: {
+        repository_status: 'not-initialized',
+        commit_required: true,
+        commit_status: 'not-run',
+        include_paths: ['AGENTS.md', 'src/example-flow.js'],
+        commit_message: 'Complete clean-room spec slice behavior-spec:unit-example-flow',
+        commit_hash: null,
+        status_summary: 'Commit pending controller finalization.',
+      },
+      final_status: 'blocked',
+    });
+    const implementationScript = writeImplementationFileScript(
+      workspace.root,
+      'src/example-flow.js',
+      'export function exampleFlow() { return true; }\n'
+    );
+    const polishScript = writeImplementationFileScript(workspace.root, 'AGENTS.md', '# Commands\n\n- npm test\n');
+    const coverageScript = writeCoveredCoverageScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      {
+        ...noOpStage('clean-implement-qc', 'clean-qa-editor', workspace.implementation),
+        argv: [process.execPath, implementationScript],
+      },
+      {
+        ...noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+        argv: [process.execPath, polishScript],
+      },
+      coverageStage(workspace.root, coverageScript),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-slice-complete/);
+    const polishReport = readJson(path.join(workspace.clean, 'polish-report.json'));
+    assert.equal(polishReport.final_status, 'passed');
+    assert.equal(polishReport.git.commit_status, 'committed');
+    assert.match(polishReport.git.commit_hash, /^[0-9a-f]{40}$/);
+    assert.deepEqual([...polishReport.git.include_paths].sort(), ['AGENTS.md', 'src/example-flow.js']);
+    const tree = spawnSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], {
+      cwd: workspace.implementation,
+      encoding: 'utf8',
+    });
+    assert.equal(tree.status, 0, tree.stderr);
+    assert.match(tree.stdout, /^AGENTS\.md$/m);
+    assert.match(tree.stdout, /^src\/example-flow\.js$/m);
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations[0].phases[1].agent4_commit.status, 'committed');
+  });
+
+  test('controller blocks Agent 4 commit when implementation paths are omitted', () => {
+    const workspace = baseWorkspace('clean-room-run-polish-commit-missing-path');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    const implementationReportPath = path.join(workspace.clean, 'implementation-report.json');
+    const implementationReport = readJson(implementationReportPath);
+    implementationReport.changed_paths = [
+      {
+        path: 'src/example-flow.js',
+        kind: 'code',
+        work_item_ids: ['wi-test'],
+      },
+    ];
+    writeJson(implementationReportPath, implementationReport);
+    writePolishReport(workspace, {
+      git: {
+        repository_status: 'not-initialized',
+        commit_required: true,
+        commit_status: 'not-run',
+        include_paths: ['AGENTS.md'],
+        commit_message: 'Complete clean-room spec slice behavior-spec:unit-example-flow',
+        commit_hash: null,
+        status_summary: 'Commit pending controller finalization.',
+      },
+      final_status: 'blocked',
+    });
+    const implementationScript = writeImplementationFileScript(
+      workspace.root,
+      'src/example-flow.js',
+      'export function exampleFlow() { return true; }\n'
+    );
+    const polishScript = writeImplementationFileScript(workspace.root, 'AGENTS.md', '# Commands\n\n- npm test\n');
+    const coverageScript = writeCoveredCoverageScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      {
+        ...noOpStage('clean-implement-qc', 'clean-qa-editor', workspace.implementation),
+        argv: [process.execPath, implementationScript],
+      },
+      {
+        ...noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+        argv: [process.execPath, polishScript],
+      },
+      coverageStage(workspace.root, coverageScript),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-slice-blocked/);
+    assert.equal(fs.existsSync(path.join(workspace.implementation, '.git')), false);
+    const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
+    assert.equal(runResult.result, 'spec-slice-blocked');
+    const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
+    assert.equal(ledger.iterations[0].phases[1].status, 'failed');
+    assert.match(ledger.iterations[0].phases[1].stderr, /missing changed implementation path/);
+  });
+
+  test('disabled Agent 4 commit policy completes only when commit is not required', () => {
+    const workspace = baseWorkspace('clean-room-run-polish-commit-disabled');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    const contextPath = path.join(workspace.clean, 'clean-run-context.json');
+    const context = readJson(contextPath);
+    context.implementation.polish_commit = {
+      agent4_shell_allowed: false,
+      cwd_policy: 'implementation-root',
+      git_policy: 'disabled',
+    };
+    writeJson(contextPath, context);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    writeCompleteCleanReports(workspace);
+    const implementationReportPath = path.join(workspace.clean, 'implementation-report.json');
+    const implementationReport = readJson(implementationReportPath);
+    implementationReport.changed_paths = [
+      {
+        path: 'src/example-flow.js',
+        kind: 'code',
+        work_item_ids: ['wi-test'],
+      },
+    ];
+    writeJson(implementationReportPath, implementationReport);
+    writePolishReport(workspace, {
+      changed_paths: [],
+      git: {
+        repository_status: 'not-initialized',
+        commit_required: false,
+        commit_status: 'not-needed',
+        include_paths: [],
+        commit_message: '',
+        commit_hash: null,
+        status_summary: 'Agent 4 commit policy is disabled.',
+      },
+      final_status: 'passed',
+    });
+    const implementationScript = writeImplementationFileScript(
+      workspace.root,
+      'src/example-flow.js',
+      'export function exampleFlow() { return true; }\n'
+    );
+    const coverageScript = writeCoveredCoverageScript(workspace.root);
+    const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+      {
+        ...noOpStage('clean-implement-qc', 'clean-qa-editor', workspace.implementation),
+        argv: [process.execPath, implementationScript],
+      },
+      noOpStage('clean-polish-review', 'clean-polish-reviewer', workspace.implementation),
+      coverageStage(workspace.root, coverageScript),
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /spec-slice-complete/);
+    assert.equal(fs.existsSync(path.join(workspace.implementation, '.git')), false);
+    const polishReport = readJson(path.join(workspace.clean, 'polish-report.json'));
+    assert.equal(polishReport.git.commit_status, 'not-needed');
   });
 
   test('strict context management accepts clean polish review briefs', () => {

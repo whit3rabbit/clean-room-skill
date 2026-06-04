@@ -241,7 +241,7 @@ The architecture delegates work across six distinct custom role agents to enforc
     *   Updates `.gitignore` only for real generated outputs, dependencies, caches, or build/test artifacts.
     *   Writes `CLEAN_ROOM_CLEAN_ROOTS/polish-report.json`.
     *   Uses `agent4-polish-runner.py` only with `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1`, cwd under implementation roots, and strict hooks.
-    *   May initialize git and create one local commit containing only paths listed in `polish-report.json`; it must not push, tag, reset, clean, or delete branches.
+    *   May initialize git and create one local commit containing only paths listed in `polish-report.json` `git.include_paths`; that list must include terminal Agent 3 implementation changes plus Agent 4 polish changes. It must not push, tag, reset, clean, or delete branches.
 
 ### Nested Controller Loop
 

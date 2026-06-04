@@ -41,6 +41,8 @@
     "commit_required": true,
     "commit_status": "committed",
     "include_paths": [
+      "src/example-flow.js",
+      "test/example-flow.test.js",
       "AGENTS.md",
       ".gitignore"
     ],

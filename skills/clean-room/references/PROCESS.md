@@ -197,8 +197,10 @@ Clean polish reviewer:
 - Update implementation-root `AGENTS.md` with gotchas and build/test/dev commands discovered from clean files.
 - Update implementation-root `.gitignore` only for real generated outputs, dependencies, caches, or build/test artifacts.
 - Run verification and commit only through `agent4-polish-runner.py` with `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1`.
-- Stage only paths listed in `polish-report.json` and create at most one local implementation-root commit.
+- Stage only paths listed in `polish-report.json` `git.include_paths` and create at most one local implementation-root commit.
+- Set `git.include_paths` to the union of terminal Agent 3 `implementation-report.json` `changed_paths` and Agent 4 `polish-report.json` `changed_paths`; leave unreported dirty files uncommitted.
 - Write `polish-report.json` with findings, changed paths, verification results, git status, commit hash/status, residual risks, and abstract delta tickets.
+- For controller-finalized commits, write a pre-commit `polish-report.json` with `final_status: "blocked"`, `git.commit_required: true`, and `git.commit_status: "not-run"`.
 - Do not report progress or ask Agent 0 for guidance while implementing. Mark `implementation-report.json` as terminal only after the selected slice work is complete, blocked, or quarantined.
 
 ## Workflow
@@ -284,7 +286,7 @@ Clean polish reviewer:
    - Start from a fresh role session brief when context management is enabled.
    - Agent 4 starts from the clean domain, reviews only clean implementation-root files and clean artifacts, and writes `CLEAN_ROOM_CLEAN_ROOTS/polish-report.json`.
    - Create or update implementation-root `AGENTS.md` and `.gitignore` only when the clean implementation actually needs them.
-   - Commit only through `agent4-polish-runner.py`, with no push, tag, reset, clean, branch deletion, or arbitrary git commands.
+   - Commit only through `agent4-polish-runner.py`, with `git.include_paths` covering terminal Agent 3 changed paths plus Agent 4 polish paths, and with no push, tag, reset, clean, branch deletion, or arbitrary git commands.
 13. Verify coverage:
    - Contaminated manager checks gaps against source behavior, discovered source tests, equal-output requirements, public contract compatibility, terminal implementation reports, and terminal polish reports when configured.
    - Reject completion when any required public-surface obligation is missing from behavior spec test coverage, implementation-plan `public_contract_refs`, terminal implementation completion, or coverage-ledger `public_surface_coverage`.

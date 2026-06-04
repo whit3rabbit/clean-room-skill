@@ -344,7 +344,7 @@ Do not include raw source excerpts, contaminated evidence, or source stack trace
 - residual risks and abstract delta tickets
 - final status
 
-Do not include source excerpts, contaminated evidence, source paths, private identifiers, raw diffs, or source-shaped pseudocode. A passing polish report requires the constrained local commit to have succeeded.
+Do not include source excerpts, contaminated evidence, source paths, private identifiers, raw diffs, or source-shaped pseudocode. A passing polish report with `git.commit_required: true` requires the constrained local commit to have succeeded and a real commit hash to be recorded. A passing report with `git.commit_required: false` is valid only when the clean-run-context commit policy is disabled and `git.commit_status` is `not-needed`.
 
 ## Clean-Room Result Content
 

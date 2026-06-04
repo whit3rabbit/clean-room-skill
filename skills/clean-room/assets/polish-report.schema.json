@@ -214,10 +214,21 @@
         "properties": {
           "final_status": {
             "const": "passed"
+          },
+          "git": {
+            "properties": {
+              "commit_required": {
+                "const": true
+              }
+            },
+            "required": [
+              "commit_required"
+            ]
           }
         },
         "required": [
-          "final_status"
+          "final_status",
+          "git"
         ]
       },
       "then": {
@@ -226,6 +237,78 @@
             "properties": {
               "commit_status": {
                 "const": "committed"
+              },
+              "commit_hash": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{40,64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "final_status": {
+            "const": "passed"
+          },
+          "git": {
+            "properties": {
+              "commit_required": {
+                "const": false
+              }
+            },
+            "required": [
+              "commit_required"
+            ]
+          }
+        },
+        "required": [
+          "final_status",
+          "git"
+        ]
+      },
+      "then": {
+        "properties": {
+          "git": {
+            "properties": {
+              "commit_status": {
+                "const": "not-needed"
+              },
+              "commit_hash": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "git": {
+            "properties": {
+              "commit_status": {
+                "const": "committed"
+              }
+            },
+            "required": [
+              "commit_status"
+            ]
+          }
+        },
+        "required": [
+          "git"
+        ]
+      },
+      "then": {
+        "properties": {
+          "git": {
+            "properties": {
+              "commit_hash": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{40,64}$"
               }
             }
           }

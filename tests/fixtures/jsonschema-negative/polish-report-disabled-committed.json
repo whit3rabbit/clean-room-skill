@@ -7,15 +7,22 @@
         "git",
         "commit_required"
       ],
-      "value": true
+      "value": false
     },
     {
       "path": [
         "git",
         "commit_status"
       ],
-      "value": "failed"
+      "value": "committed"
+    },
+    {
+      "path": [
+        "git",
+        "commit_hash"
+      ],
+      "value": "0123456789abcdef0123456789abcdef01234567"
     }
   ],
-  "expected_error": "committed"
+  "expected_error": "not-needed"
 }
