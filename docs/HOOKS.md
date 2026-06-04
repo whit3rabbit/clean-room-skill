@@ -15,6 +15,7 @@ The installer copies the Python hook files for every supported runtime layout. R
 | Antigravity | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
 | Gemini CLI | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
 | OpenCode | `<targetRoot>/hooks/clean-room/*.py` | `<targetRoot>/plugins/clean-room.ts` |
+| Pi | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
 | Kilo | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
 | Cursor | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |
 | GitHub Copilot | `<targetRoot>/hooks/clean-room/*.py` | Unsupported, copy only |

@@ -51,6 +51,12 @@ function readUtf8IfText(filePath) {
 }
 
 describe('release hygiene', () => {
+  test('package manifest declares Pi package skills', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    assert.equal(manifest.keywords.includes('pi-package'), true);
+    assert.deepEqual(manifest.pi?.skills, ['./skills']);
+  });
+
   test('research memo is not included in npm package contents', () => {
     assert.equal(packagedFiles().includes('docs/research-skill-spec.md'), false);
     assert.equal(packagedFiles().includes('docs/research/archive/ARCHIVED-research-skill-spec.md'), false);

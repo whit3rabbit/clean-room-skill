@@ -42,6 +42,7 @@ Non-interactive installs:
 ```bash
 npx clean-room-skill@latest --codex --global --yes
 npx clean-room-skill@latest --claude --global --yes
+npx clean-room-skill@latest --pi --global --yes
 npx clean-room-skill@latest --all --global --yes
 ```
 
@@ -77,9 +78,10 @@ Pi:
 ```bash
 pi install npm:clean-room-skill@latest
 pi install https://github.com/whit3rabbit/clean-room-skill
+npx clean-room-skill@latest --pi --global --yes
 ```
 
-Pi loads bundled skills as `/skill:<name>`, for example `/skill:clean-room`. Pi package install is skill compatibility only; it does not register clean-room hooks. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
+Pi-native package install is preferred. The installer also supports `--pi` for users managing all runtime layouts from one CLI. Both paths load bundled skills as `/skill:<name>`, for example `/skill:clean-room`. Pi installs do not register clean-room hooks; installer-managed Pi layouts copy hook scripts only. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
 
 ## How To Run
 

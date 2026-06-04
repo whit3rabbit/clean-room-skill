@@ -442,8 +442,9 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /npx clean-room-skill@latest --claude --global --uninstall --yes/);
     assert.match(result.stdout, /Pi:/);
     assert.match(result.stdout, /pi install npm:clean-room-skill@latest/);
+    assert.match(result.stdout, /npx clean-room-skill@latest --pi --global --yes/);
     assert.match(result.stdout, /start in Pi: \/skill:init, then \/skill:clean-room or \/skill:attended/);
-    assert.match(result.stdout, /Pi package install does not register clean-room hooks/);
+    assert.match(result.stdout, /Pi installs do not register clean-room hooks/);
     const codexStartLine = result.stdout.split('\n').find((line) => line.includes('start in Codex:'));
     assert.ok(codexStartLine);
     assert.doesNotMatch(codexStartLine, /\/clean-room/);
@@ -1088,6 +1089,50 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(cwd, '.agents', 'plugins', 'clean-room', 'skills', 'clean-room', 'SKILL.md')));
   });
 
+  test('installs Pi skills and copied hooks without hook registration', () => {
+    const root = tempDir('clean-room-pi');
+    const piHome = path.join(root, 'pi-agent');
+
+    let result = runInstall(['--pi', '--global', '--config-dir', piHome, '--yes']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(fs.existsSync(path.join(piHome, 'skills', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(piHome, 'skills', 'init', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(piHome, 'hooks', 'clean-room', 'clean-room-hook.py')));
+    assert.ok(fs.existsSync(path.join(piHome, 'hooks', 'clean-room', 'agent3-verification-runner.py')));
+    assert.ok(fs.existsSync(path.join(piHome, 'clean-room-install-manifest.json')));
+    assert.equal(fs.existsSync(path.join(piHome, 'settings.json')), false);
+    assert.match(result.stdout, /hook registration unsupported/);
+
+    result = runInstall(['status', '--pi', '--global', '--config-dir', piHome]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /pi \(global\) installed/);
+    assert.match(result.stdout, /hooks: safe; registration unsupported/);
+
+    fs.rmSync(path.join(piHome, 'skills', 'init', 'SKILL.md'));
+    result = runInstall(['status', '--pi', '--global', '--config-dir', piHome]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /pi \(global\) update-available/);
+    assert.match(result.stdout, /managed file\(s\) missing/);
+
+    result = runInstall(['update', '--pi', '--global', '--config-dir', piHome, '--yes']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(fs.existsSync(path.join(piHome, 'skills', 'init', 'SKILL.md')));
+
+    result = runInstall(['--pi', '--global', '--config-dir', piHome, '--uninstall', '--yes']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(path.join(piHome, 'clean-room-install-manifest.json')), false);
+    assert.equal(fs.existsSync(path.join(piHome, 'skills', 'clean-room', 'SKILL.md')), false);
+  });
+
+  test('installs Pi locally to .pi skill layout', () => {
+    const cwd = tempDir('clean-room-pi-local');
+    const result = runInstall(['--pi', '--local', '--yes'], {}, cwd);
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(fs.existsSync(path.join(cwd, '.pi', 'skills', 'clean-room', 'SKILL.md')));
+    assert.ok(fs.existsSync(path.join(cwd, '.pi', 'hooks', 'clean-room', 'clean-room-hook.py')));
+    assert.equal(fs.existsSync(path.join(cwd, '.pi', 'settings.json')), false);
+  });
+
   test('installs all known runtime layouts locally', () => {
     const cwd = tempDir('clean-room-all-local');
     const result = runInstall(['--all', '--local', '--yes'], {}, cwd);
@@ -1098,6 +1143,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(cwd, '.opencode', 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(cwd, '.opencode', 'commands', 'clean-room-clean-room.md')));
     assertOpenCodePlugin(path.join(cwd, '.opencode'));
+    assert.ok(fs.existsSync(path.join(cwd, '.pi', 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(cwd, '.agents', 'plugins', 'clean-room', 'skills', 'clean-room', 'SKILL.md')));
   });
 
@@ -1109,6 +1155,7 @@ describe('clean-room-skill installer', () => {
     const antigravityPlugin = path.join(root, 'antigravity-cli', 'plugins', 'clean-room');
     const geminiHome = path.join(root, 'gemini');
     const opencodeHome = path.join(root, 'opencode');
+    const homeDir = path.join(root, 'home');
     const kiloHome = path.join(root, 'kilo');
     const cursorHome = path.join(root, 'cursor');
     const copilotHome = path.join(root, 'copilot');
@@ -1120,6 +1167,7 @@ describe('clean-room-skill installer', () => {
     const codebuddyHome = path.join(root, 'codebuddy');
     const result = runInstall(['--all', '--global', '--yes'], {
       ...claudeStub.env,
+      HOME: homeDir,
       CODEX_HOME: codexHome,
       CLAUDE_CONFIG_DIR: claudeHome,
       ANTIGRAVITY_PLUGIN_DIR: antigravityPlugin,
@@ -1149,6 +1197,7 @@ describe('clean-room-skill installer', () => {
     assert.ok(fs.existsSync(path.join(opencodeHome, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(opencodeHome, 'commands', 'clean-room-clean-room.md')));
     assertOpenCodePlugin(opencodeHome);
+    assert.ok(fs.existsSync(path.join(homeDir, '.pi', 'agent', 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(kiloHome, 'command', 'clean-room-clean-room.md')));
     assert.ok(fs.existsSync(path.join(cursorHome, 'skills', 'clean-room', 'SKILL.md')));
     assert.ok(fs.existsSync(path.join(copilotHome, 'skills', 'clean-room', 'SKILL.md')));
@@ -1485,6 +1534,12 @@ describe('clean-room-skill installer', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /--hooks=strict is not supported for gemini/);
     assert.equal(fs.existsSync(geminiHome), false);
+
+    const piHome = path.join(tempDir('clean-room-pi-strict-hooks'), 'pi-agent');
+    const piResult = runInstall(['--pi', '--global', '--config-dir', piHome, '--hooks=strict', '--yes']);
+    assert.notEqual(piResult.status, 0);
+    assert.match(piResult.stderr, /--hooks=strict is not supported for pi/);
+    assert.equal(fs.existsSync(piHome), false);
   });
 
   test('install lock recovers stale locks and preserves fresh locks', () => {

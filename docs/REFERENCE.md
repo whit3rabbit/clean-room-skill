@@ -21,6 +21,7 @@ Runtime flags:
 | `--antigravity` | Antigravity |
 | `--gemini` | Gemini CLI |
 | `--opencode` | OpenCode |
+| `--pi` | Pi |
 | `--kilo` | Kilo |
 | `--cursor` | Cursor |
 | `--copilot` | GitHub Copilot |
@@ -70,6 +71,7 @@ Layout-only or experimental:
 
 - Antigravity
 - Gemini CLI
+- Pi
 - Kilo
 - Cursor
 - GitHub Copilot
@@ -82,7 +84,7 @@ Layout-only or experimental:
 
 Layout-only installs write files to expected runtime locations, but this repository does not verify that those hosts load the files or emit all hook events needed for clean-room enforcement. OpenCode installs are verified through a generated local plugin bridge at `plugins/clean-room.ts`; `doctor` verifies that bridge and the Python guardrails, not every OpenCode tool surface.
 
-### Pi Package Compatibility
+### Pi Compatibility
 
 Pi can install this package and load the bundled skills from the package metadata:
 
@@ -91,7 +93,13 @@ pi install npm:clean-room-skill@latest
 pi install https://github.com/whit3rabbit/clean-room-skill
 ```
 
-Pi invokes skills as `/skill:<name>`. Use `/skill:init` for the setup pass, `/skill:clean-room` for the startup wizard, `/skill:attended` for attended controller mode, and `/skill:unattended` for bounded unattended mode. Pi support is package compatibility only: it does not add a `--pi` installer target, does not participate in `--all`, and does not register clean-room hooks. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
+Pi-native package install is preferred. The installer also supports a layout target:
+
+```bash
+npx clean-room-skill@latest --pi --global --yes
+```
+
+Pi invokes skills as `/skill:<name>`. Use `/skill:init` for the setup pass, `/skill:clean-room` for the startup wizard, `/skill:attended` for attended controller mode, and `/skill:unattended` for bounded unattended mode. Pi installs do not register clean-room hooks; installer-managed Pi layouts copy hook scripts only. Clean-room safety still depends on role separation, path isolation, schema validation, and supported hook runtimes.
 
 Global install roots:
 
@@ -102,6 +110,7 @@ Global install roots:
 | Antigravity | `ANTIGRAVITY_PLUGIN_DIR`, `ANTIGRAVITY_CLI_PLUGIN_DIR`, `ANTIGRAVITY_CONFIG_DIR/plugins/clean-room`, or `~/.gemini/antigravity-cli/plugins/clean-room` |
 | Gemini CLI | `GEMINI_CONFIG_DIR` or `~/.gemini` |
 | OpenCode | `OPENCODE_CONFIG_DIR`, `OPENCODE_CONFIG`, `XDG_CONFIG_HOME/opencode`, or `~/.config/opencode` |
+| Pi | `~/.pi/agent` |
 | Kilo | `KILO_CONFIG_DIR`, `KILO_CONFIG`, `XDG_CONFIG_HOME/kilo`, or `~/.config/kilo` |
 | Cursor | `CURSOR_CONFIG_DIR` or `~/.cursor` |
 | GitHub Copilot | `COPILOT_CONFIG_DIR` or `~/.copilot` |
@@ -112,7 +121,7 @@ Global install roots:
 | Hermes Agent | `HERMES_HOME` or `~/.hermes` |
 | CodeBuddy | `CODEBUDDY_CONFIG_DIR` or `~/.codebuddy` |
 
-Local installs use each runtime's project config directory. Antigravity local installs write `.agents/plugins/clean-room/`.
+Local installs use each runtime's project config directory. Pi local installs write `.pi/`. Antigravity local installs write `.agents/plugins/clean-room/`.
 
 ## Agent Metadata Compatibility
 
