@@ -83,6 +83,7 @@ DENYLIST_ONLY_JSON_STRING_KEYS = {
     "expected_artifacts",
     "implementation_root_ref",
     "implementation_root_refs",
+    "include_paths",
     "incident_id",
     "manifest_id",
     "native_artifacts",

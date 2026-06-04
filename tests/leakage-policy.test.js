@@ -197,6 +197,7 @@ describe('clean-room leakage hook policy', () => {
     fs.writeFileSync(filePath, JSON.stringify({
       path: 'specs/com.example.product/spec.md',
       owned_path_prefixes: ['test/example-flow.test.js'],
+      include_paths: ['src/example-flow.js', 'test/example-flow.test.js'],
     }));
 
     const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
