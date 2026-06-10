@@ -11,7 +11,7 @@ Create or validate `preflight-goal.json` before active clean-room artifacts star
 
 Use the canonical `clean-room` workflow and read `skills/clean-room/references/PREFLIGHT.md` when collecting missing goal details. Preserve the clean-room boundary: `preflight-goal.json` is a controller/contaminated-side artifact and must not be placed in clean-role readable roots.
 
-If the user provides output from CLI `clean-room-skill init`, check the generated bootstrap scaffold before creating or copying `preflight-goal.json`: `clean-room-bootstrap.json`, `contaminated/`, `clean/`, `implementation/`, `quarantine/`, and the target repo `.clean-room/README.md` must exist and agree. Treat that scaffold as convenience output only; it is not an active `preflight-goal.json`, `init-config.json`, `task-manifest.json`, or `clean-run-context.json`.
+If the user provides output from CLI `clean-room-skill init` (or `npx clean-room-skill@latest init` if the binary is not available), check the generated bootstrap scaffold before creating or copying `preflight-goal.json`: `clean-room-bootstrap.json`, `contaminated/`, `clean/`, `implementation/`, `quarantine/`, and the target repo `.clean-room/README.md` must exist and agree. Treat that scaffold as convenience output only; it is not an active `preflight-goal.json`, `init-config.json`, `task-manifest.json`, or `clean-run-context.json`.
 
 ## Required Contract
 
@@ -46,7 +46,7 @@ Do not infer target language, license, dependency policy, exactness policy, outp
 
 ## CLI Helper
 
-Use the CLI only for template creation or validation/copying:
+Use the CLI (`clean-room-skill` if installed, or `npx clean-room-skill@latest` as fallback) only for template creation or validation/copying:
 
 ```bash
 clean-room-skill preflight --template --output ~/Documents/CleanRoom/task-xxxxxxxx/contaminated/preflight-goal.json
