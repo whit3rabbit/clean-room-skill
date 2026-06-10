@@ -31,7 +31,19 @@ For the full boundary model, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). F
 
 Requires Node.js `>=22`.
 
-Preferred interactive install:
+You can either install the CLI globally on your system, or run the commands on-demand using `npx`.
+
+### Global Installation (npm)
+
+To install the `clean-room-skill` executable globally:
+
+```bash
+npm install -g clean-room-skill
+```
+
+### Direct On-Demand Execution (npx)
+
+Preferred interactive install/onboarding flow:
 
 ```bash
 npx clean-room-skill@latest

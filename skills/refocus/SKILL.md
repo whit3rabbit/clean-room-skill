@@ -53,7 +53,7 @@ Emit missed-gate findings only:
 - Stale implementation report compared with latest implementation plan.
 - Controller policy not preserved.
 - Missing, invalid, or drifted preflight goal.
-- Noncanonical manifests, reports, ledgers, or manual result summaries used as completion evidence. Mark these `not verified` unless `clean-room-skill run --dry-run` succeeds against the canonical `task-manifest.json`.
+- Noncanonical manifests, reports, ledgers, or manual result summaries used as completion evidence. Mark these `not verified` unless `clean-room-skill run --dry-run` (or `npx clean-room-skill@latest run --dry-run` if the binary is not available) succeeds against the canonical `task-manifest.json`.
 - Missing public-surface inventory parity: required public commands, APIs, config keys, protocol entries, or user-visible behaviors listed in approved specs are not mapped through behavior spec tests, implementation-plan `public_contract_refs`, terminal implementation reports, and coverage-ledger `public_surface_coverage`.
 
 Do not suggest speculative improvements. Do not change source scope, target profile, public API, or implementation plan.
