@@ -51,6 +51,21 @@ function readUtf8IfText(filePath) {
 }
 
 describe('release hygiene', () => {
+  test('publish workflow creates a GitHub release after npm publish', () => {
+    const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/publish.yml'), 'utf8');
+    const publishIndex = workflow.indexOf('- name: Publish package');
+    const releaseIndex = workflow.indexOf('- name: Create GitHub release');
+    assert.match(workflow, /permissions:\n  contents: write\n  id-token: write/);
+    assert.ok(publishIndex > -1, 'publish step missing');
+    assert.ok(releaseIndex > publishIndex, 'release step must run after npm publish');
+    assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/);
+    assert.match(workflow, /gh release create "\$GITHUB_REF_NAME"/);
+    assert.match(workflow, /--generate-notes/);
+    assert.match(workflow, /gh release edit "\$GITHUB_REF_NAME"/);
+    assert.match(workflow, /--draft=false/);
+    assert.match(workflow, /--prerelease=false/);
+  });
+
   test('package manifest declares Pi package skills', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
     assert.equal(manifest.keywords.includes('pi-package'), true);
