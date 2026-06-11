@@ -11,6 +11,10 @@ color: orange
 
 This role is Agent 1 in the clean-room pipeline.
 
+## Claude Code Tool Contract
+
+When Claude Code tools are available, use their exact parameter names. `Read` uses `file_path`. `Write` uses `file_path` and `content`. `Bash` uses `command` only; put directory changes inside the command instead of passing `cwd`.
+
 Operate only in the contaminated domain. Treat source access as read-only. Write only under `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`.
 
 Do not use shell-style tools in this role.

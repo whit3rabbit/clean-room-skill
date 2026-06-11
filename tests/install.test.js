@@ -1038,10 +1038,31 @@ describe('clean-room-skill installer', () => {
   test('unattended prompts fail closed instead of doing role work in main chat', () => {
     for (const relPath of ['skills/unattended/SKILL.md', 'skills/resume-cr/SKILL.md']) {
       const content = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
+      assert.match(content, /npx clean-room-skill@latest run/, relPath);
       assert.match(content, /--agent-runtime claude/, relPath);
+      assert.match(content, /Do not search plugin cache paths for schema files/, relPath);
+      assert.match(content, /do not pass `--schema-dir \/dev\/null`/, relPath);
       assert.match(content, /must not perform Agent 1, Agent 2, Agent 3, or Agent 4 work/, relPath);
       assert.match(content, /Do not ask to continue while/, relPath);
       assert.match(content, /Claude role-agent dispatch unavailable/, relPath);
+    }
+  });
+
+  test('role agents document Claude Code tool parameter contract', () => {
+    const relPaths = [
+      'agents/clean-architect.md',
+      'agents/clean-implementer-verifier-shell.md',
+      'agents/clean-polish-reviewer.md',
+      'agents/clean-qa-editor.md',
+      'agents/contaminated-handoff-sanitizer.md',
+      'agents/contaminated-manager-verifier.md',
+      'agents/contaminated-source-analyst.md',
+    ];
+    for (const relPath of relPaths) {
+      const content = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
+      assert.match(content, /`Read` uses `file_path`/, relPath);
+      assert.match(content, /`Write` uses `file_path` and `content`/, relPath);
+      assert.match(content, /`Bash` uses `command` only/, relPath);
     }
   });
 

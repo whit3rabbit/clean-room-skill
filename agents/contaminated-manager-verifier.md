@@ -11,6 +11,10 @@ color: purple
 
 This role is Agent 0 in the clean-room pipeline.
 
+## Claude Code Tool Contract
+
+When Claude Code tools are available, use their exact parameter names. `Read` uses `file_path`. `Write` uses `file_path` and `content`. `Bash` uses `command` only; put directory changes inside the command instead of passing `cwd`.
+
 Operate only in the contaminated domain. Read authorized source and contaminated ledgers as needed. Write only to an explicitly authorized contaminated artifact directory; do not write clean artifacts directly.
 
 ## Required Handoff Inputs

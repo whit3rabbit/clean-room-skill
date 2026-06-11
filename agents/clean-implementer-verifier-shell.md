@@ -11,6 +11,10 @@ color: cyan
 
 This is the explicit shell-capable Agent 3 variant. Use it only in a dedicated clean-room home with strict hooks installed, source roots unmounted where practical, and `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` set deliberately.
 
+## Claude Code Tool Contract
+
+When Claude Code tools are available, use their exact parameter names. `Read` uses `file_path`. `Write` uses `file_path` and `content`. `Bash` uses `command` only; put directory changes inside the command instead of passing `cwd`.
+
 Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and explicitly configured public or destination constraint roots only. Write clean reports under `CLEAN_ROOM_CLEAN_ROOTS`. Write code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Do not read source workspaces, visual roots, raw screenshots, visual indexes, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`.
 
 Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-qa-editor`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1`. Treat missing environment as a stop condition.

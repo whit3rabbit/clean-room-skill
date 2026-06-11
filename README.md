@@ -142,11 +142,13 @@ For unattended inner-loop execution from durable artifacts:
 ```bash
 npx clean-room-skill@latest run \
   --task-manifest ~/Documents/CleanRoom/task-1234abcd/contaminated/task-manifest.json \
-  --agent-commands ./agent-commands.json \
+  --agent-runtime claude \
   --max-iterations 3
 ```
 
 The `run` command executes one bounded inner clean-room loop for an already approved spec slice. It does not replace the outer spec-development workflow.
+
+Use `--agent-commands ./agent-commands.json` only for a custom non-Claude role-session adapter.
 
 In strict context-management mode, every `agent-commands.json` stage must set `context.fresh_session: true` and `context.brief_path`; see the runner adapter example in `docs/REFERENCE.md`.
 

@@ -24,7 +24,7 @@ const SECOND_SPEC_ID = 'spec-second-flow';
 const SECOND_SPEC_FILE = 'second-behavior-spec.json';
 const TEST_TIMEOUT_MS = 30_000;
 const RUN_TEST_DEBUG = process.env.CLEAN_ROOM_RUN_TEST_DEBUG === '1';
-const RUN_CLI_EXPECTED_COUNT = 77;
+const RUN_CLI_EXPECTED_COUNT = 81;
 const TMP_DIRS = [];
 let runCliCounter = 0;
 let runCliCompleted = 0;
@@ -97,6 +97,10 @@ function truncateDebugOutput(value) {
   const text = String(value || '').trim();
   if (text.length <= 2000) return text;
   return `${text.slice(0, 2000)}...`;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function appendSpawnErrorDiagnostics(result, command, args, durationMs) {
@@ -1221,6 +1225,25 @@ describe('clean-room run command', () => {
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'clean-room-result.json')), false);
   });
 
+  test('rejects invalid schema-dir with bundled schema guidance', () => {
+    const workspace = baseWorkspace('clean-room-run-invalid-schema-dir');
+    const schemaDir = path.join(workspace.root, 'clean', 'schemas');
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--dry-run',
+      '--schema-dir',
+      schemaDir,
+    ]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /schema directory not found/);
+    assert.match(result.stderr, /Omit --schema-dir to use bundled schemas/);
+    assert.match(result.stderr, /skills\/clean-room\/assets/);
+  });
+
   test('rejects behavior slices before foundation coverage is complete', () => {
     const workspace = baseWorkspace('clean-room-run-behavior-before-foundation');
     writeCoverage(workspace.contaminated, 'gap', {}, { foundationCoverageState: 'gap' });
@@ -1278,6 +1301,19 @@ describe('clean-room run command', () => {
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /preflight goal not found/);
+    assert.match(result.stderr, new RegExp(escapeRegExp(path.join(workspace.contaminated, 'preflight-goal.json'))));
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
+  test('missing root-level manifest suggests contaminated manifest path', () => {
+    const workspace = baseWorkspace('clean-room-run-root-manifest-hint');
+    const rootManifest = path.join(workspace.root, 'task-manifest.json');
+
+    const result = runCli(['run', '--task-manifest', rootManifest, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /expected task manifest layout: <task-root>\/contaminated\/task-manifest\.json/);
+    assert.match(result.stderr, new RegExp(escapeRegExp(path.join(workspace.contaminated, 'task-manifest.json'))));
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
   });
 
@@ -2229,6 +2265,25 @@ describe('clean-room run command', () => {
     assert.equal(ledger.iterations[0].progress_detected, false);
     assert.equal(ledger.iterations[0].stop_reason, 'no-progress-detected');
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-status.json')), true);
+  });
+
+  test('stale artifact validation aggregates failures and ignores controller-status', () => {
+    const workspace = baseWorkspace('clean-room-run-stale-artifacts');
+    writeJson(path.join(workspace.clean, 'behavior-spec-stale.json'), {});
+    writeJson(path.join(workspace.clean, 'implementation-plan-stale.json'), {});
+    writeJson(path.join(workspace.contaminated, 'controller-status.json'), {
+      old_controller_shape: true,
+    });
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room artifact validation failed/);
+    assert.match(result.stderr, /behavior-spec-stale\.json/);
+    assert.match(result.stderr, /implementation-plan-stale\.json/);
+    assert.match(result.stderr, /move stale\/legacy JSON out of contaminated and clean artifact roots/);
+    assert.doesNotMatch(result.stderr, /controller-status\.json/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
   });
 
   test('repeated unit selection stops after prior no-progress iteration', () => {
