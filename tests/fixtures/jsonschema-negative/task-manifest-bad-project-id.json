@@ -1,0 +1,14 @@
+{
+  "schema_kind": "task-manifest",
+  "base": "task-manifest.json",
+  "description": "Optional project ids must stay neutral lowercase slugs.",
+  "set": [
+    {
+      "path": [
+        "project_id"
+      ],
+      "value": "Amber Meadow"
+    }
+  ],
+  "expected_error": "does not match"
+}

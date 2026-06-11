@@ -100,11 +100,14 @@ Unattended mode requires `unattended_allowed_after_preflight: true`, finite `max
 
 Default artifact roots live under `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not use the source folder name as the task ID.
 
+When tasks are grouped under a project, roots live under `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with a shared `~/Documents/CleanRoom/<project>/implementation/` root. Project names follow the same neutrality rules: a random neutral word pair or `proj-` plus 8 lowercase hex characters, never derived from source folder names.
+
 Clean artifact, contaminated artifact, and implementation roots must not contain source root basenames or meaningful non-generic tokens from those basenames. The environment preflight enforces this for `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, and `CLEAN_ROOM_IMPLEMENTATION_ROOTS`.
 
 Capture:
 
 - artifact base root, defaulting to `~/Documents/CleanRoom/<task-id>/` with a neutral task ID
+- optional `project_id` and `project_root` when grouping tasks under a clean-room project
 - source roots or fallback visual evidence roots, contaminated artifact root, clean artifact root, clean implementation roots, quarantine root, and approved public references
 - target profile
 - default model plus optional clean, contaminated, or per-role overrides

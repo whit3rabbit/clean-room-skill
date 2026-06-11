@@ -421,6 +421,10 @@ describe('clean-room-skill installer', () => {
     const metadata = readJson(path.join(outputRoot, 'clean-room-bootstrap.json'));
     assert.equal(metadata.task_id, taskIds[0]);
     assert.equal(metadata.target_profile, 'speckit-feature-folder');
+    assert.equal('layout' in metadata, false);
+    assert.equal('project_id' in metadata, false);
+    assert.equal(fs.existsSync(path.join(artifactBase, 'clean-room-project.json')), false);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'tasks')), false);
     assert.equal(metadata.roots.contaminated_artifacts, path.join(outputRoot, 'contaminated'));
     assert.equal(metadata.roots.clean_artifacts, path.join(outputRoot, 'clean'));
     assert.equal(metadata.roots.implementation_root, path.join(outputRoot, 'implementation'));
@@ -545,6 +549,232 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
   });
 
+  test('init project mode creates project layout with shared implementation root', () => {
+    const root = tempDir('clean-room-init-project-create');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    const taskRoot = path.join(projectRoot, 'tasks', 'task-aaaa1111');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const result = runInstall([
+      'init',
+      '--target-dir',
+      targetDir,
+      '--artifact-base',
+      artifactBase,
+      '--project',
+      'amber-meadow',
+      '--task-id',
+      'task-aaaa1111',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /project: amber-meadow \(new\)/);
+    assert.match(result.stdout, /implementation root \(shared\):/);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated')), true);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'clean')), true);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'quarantine')), true);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'implementation')), false);
+    assert.equal(fs.existsSync(path.join(projectRoot, 'implementation')), true);
+
+    const projectMetadata = readJson(path.join(projectRoot, 'clean-room-project.json'));
+    assert.equal(projectMetadata.schema, 1);
+    assert.equal(projectMetadata.project_id, 'amber-meadow');
+    assert.equal(projectMetadata.project_root, projectRoot);
+    assert.equal(projectMetadata.implementation_root, path.join(projectRoot, 'implementation'));
+    assert.equal(projectMetadata.tasks_dir, path.join(projectRoot, 'tasks'));
+
+    const metadata = readJson(path.join(taskRoot, 'clean-room-bootstrap.json'));
+    assert.equal(metadata.layout, 'project');
+    assert.equal(metadata.project_id, 'amber-meadow');
+    assert.equal(metadata.project_root, projectRoot);
+    assert.equal(metadata.task_id, 'task-aaaa1111');
+    assert.equal(metadata.output_root, taskRoot);
+    assert.equal(metadata.roots.contaminated_artifacts, path.join(taskRoot, 'contaminated'));
+    assert.equal(metadata.roots.implementation_root, path.join(projectRoot, 'implementation'));
+  });
+
+  test('init project mode joins existing project without force', () => {
+    const root = tempDir('clean-room-init-project-join');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const first = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.equal(first.status, 0, first.stderr);
+    const projectMetadataBefore = fs.readFileSync(path.join(projectRoot, 'clean-room-project.json'), 'utf8');
+
+    const second = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-bbbb2222',
+    ]);
+
+    assert.equal(second.status, 0, second.stderr);
+    assert.match(second.stdout, /project: amber-meadow \(existing\)/);
+    assert.equal(fs.existsSync(path.join(projectRoot, 'tasks', 'task-bbbb2222', 'contaminated')), true);
+    assert.equal(
+      fs.readFileSync(path.join(projectRoot, 'clean-room-project.json'), 'utf8'),
+      projectMetadataBefore,
+    );
+    const metadata = readJson(path.join(projectRoot, 'tasks', 'task-bbbb2222', 'clean-room-bootstrap.json'));
+    assert.equal(metadata.roots.implementation_root, path.join(projectRoot, 'implementation'));
+  });
+
+  test('init new-project generates a neutral project id', () => {
+    const root = tempDir('clean-room-init-new-project');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const result = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--new-project',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const projectIds = fs.readdirSync(artifactBase);
+    assert.equal(projectIds.length, 1);
+    assert.match(projectIds[0], /^proj-[0-9a-f]{8}$/);
+    assert.equal(fs.existsSync(path.join(artifactBase, projectIds[0], 'clean-room-project.json')), true);
+    assert.equal(fs.existsSync(path.join(artifactBase, projectIds[0], 'implementation')), true);
+  });
+
+  test('init rejects invalid project names and conflicting project flags', () => {
+    const root = tempDir('clean-room-init-project-invalid');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const badName = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--project', 'Amber_Meadow',
+    ]);
+    assert.notEqual(badName.status, 0);
+    assert.match(badName.stderr, /--project must match/);
+    assert.equal(fs.existsSync(artifactBase), false);
+
+    const conflicting = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--new-project',
+    ]);
+    assert.notEqual(conflicting.status, 0);
+    assert.match(conflicting.stderr, /--project and --new-project cannot be combined/);
+    assert.equal(fs.existsSync(artifactBase), false);
+  });
+
+  test('init rejects project names derived from the target workspace name', () => {
+    const root = tempDir('clean-room-init-project-neutrality');
+    const targetDir = path.join(root, 'widgetizer');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    for (const projectName of ['widgetizer', 'my-widgetizer-port']) {
+      const result = runInstall([
+        'init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--project', projectName,
+      ]);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /--project must be a neutral name/);
+    }
+    assert.equal(fs.existsSync(artifactBase), false);
+  });
+
+  test('init rejects existing project root without metadata unless forced', () => {
+    const root = tempDir('clean-room-init-project-adopt');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.mkdirSync(projectRoot, { recursive: true });
+
+    const result = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room-project\.json is missing; use --force to adopt/);
+    assert.equal(fs.existsSync(path.join(projectRoot, 'tasks')), false);
+
+    const forced = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111', '--force',
+    ]);
+    assert.equal(forced.status, 0, forced.stderr);
+    const projectMetadata = readJson(path.join(projectRoot, 'clean-room-project.json'));
+    assert.equal(projectMetadata.project_id, 'amber-meadow');
+  });
+
+  test('init force rewrite preserves original project created_at', () => {
+    const root = tempDir('clean-room-init-project-created-at');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectMetadataPath = path.join(artifactBase, 'amber-meadow', 'clean-room-project.json');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const first = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.equal(first.status, 0, first.stderr);
+
+    const metadata = readJson(projectMetadataPath);
+    metadata.created_at = '2020-01-02T03:04:05.000Z';
+    fs.writeFileSync(projectMetadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+
+    const forced = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-bbbb2222', '--force',
+    ]);
+    assert.equal(forced.status, 0, forced.stderr);
+    const rewritten = readJson(projectMetadataPath);
+    assert.equal(rewritten.created_at, '2020-01-02T03:04:05.000Z');
+    assert.equal(rewritten.project_id, 'amber-meadow');
+  });
+
+  test('init rejects existing generated task paths inside a project', () => {
+    const root = tempDir('clean-room-init-project-task-conflict');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const first = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.equal(first.status, 0, first.stderr);
+    fs.mkdirSync(path.join(projectRoot, 'tasks', 'task-bbbb2222', 'contaminated'), { recursive: true });
+
+    const result = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-bbbb2222',
+    ]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /bootstrap generated path already exists/);
+    assert.equal(fs.existsSync(path.join(projectRoot, 'tasks', 'task-bbbb2222', 'clean-room-bootstrap.json')), false);
+  });
+
+  test('init project dry run makes no changes', () => {
+    const root = tempDir('clean-room-init-project-dry-run');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const result = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111', '--dry-run',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Would create clean-room bootstrap/);
+    assert.match(result.stdout, /project: amber-meadow \(new\)/);
+    assert.match(result.stdout, /implementation root \(shared\):/);
+    assert.equal(fs.existsSync(artifactBase), false);
+    assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
+  });
+
   test('preflight template writes an attended draft with blocking questions', () => {
     const root = tempDir('clean-room-preflight-template');
     const output = path.join(root, 'preflight-goal.json');
@@ -648,6 +878,81 @@ describe('clean-room-skill installer', () => {
     const written = readJson(output);
     assert.equal(written.output_policy.artifact_base_root, taskRoot);
     assert.equal(written.output_policy.implementation_root, path.join(taskRoot, 'implementation'));
+  });
+
+  test('preflight bootstrap project task root writes goal with shared implementation root', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-project');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    const taskRoot = path.join(projectRoot, 'tasks', 'task-aaaa1111');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const init = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.equal(init.status, 0, init.stderr);
+
+    const result = runInstall(['preflight', '--template', '--bootstrap', taskRoot]);
+    const output = path.join(taskRoot, 'contaminated', 'preflight-goal.json');
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(output), true);
+    const goal = readJson(output);
+    assert.equal(goal.output_policy.artifact_base_root, taskRoot);
+    assert.equal(goal.output_policy.implementation_root, path.join(projectRoot, 'implementation'));
+  });
+
+  test('preflight rejects project scaffold with missing shared implementation root', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-project-broken');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    const taskRoot = path.join(projectRoot, 'tasks', 'task-aaaa1111');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const init = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.equal(init.status, 0, init.stderr);
+    fs.rmSync(path.join(projectRoot, 'implementation'), { recursive: true, force: true });
+
+    const result = runInstall(['preflight', '--template', '--bootstrap', taskRoot]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /bootstrap scaffold is invalid/);
+    assert.match(result.stderr, /bootstrap implementation directory missing/);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), false);
+  });
+
+  test('preflight rejects project scaffold with tampered project root metadata', () => {
+    const root = tempDir('clean-room-preflight-bootstrap-project-tampered');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    const taskRoot = path.join(projectRoot, 'tasks', 'task-aaaa1111');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const init = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.equal(init.status, 0, init.stderr);
+
+    const metadataPath = path.join(taskRoot, 'clean-room-bootstrap.json');
+    const metadata = readJson(metadataPath);
+    metadata.project_root = path.join(root, 'elsewhere');
+    metadata.roots.implementation_root = path.join(root, 'elsewhere', 'implementation');
+    fs.writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+
+    const result = runInstall(['preflight', '--template', '--bootstrap', taskRoot]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /bootstrap scaffold is invalid/);
+    assert.match(result.stderr, /project_root must match/);
+    assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), false);
   });
 
   test('preflight rejects broken bootstrap scaffold without writing', () => {

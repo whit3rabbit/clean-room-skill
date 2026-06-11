@@ -33,6 +33,8 @@ Optional Docker or Podman support is limited to Agent 3 verification containers.
 
 Artifact roots must not disclose private source names. New runs default to `~/Documents/CleanRoom/<task-id>/`; when no explicitly approved neutral task ID is provided, the controller generates `task-` plus 8 lowercase hex characters instead of using the source folder name.
 
+Multiple tasks targeting the same destination may be grouped under an optional clean-room project: `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with one shared `<project>/implementation/` root. Project names follow the same neutrality rule as task IDs: a random neutral word pair (such as `amber-meadow`) or a generated `proj-` plus 8 lowercase hex characters, matching `[a-z0-9][a-z0-9-]{0,63}` and never derived from source folder names. Because the implementation root is shared, run at most one active task per project at a time; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
+
 ![Artifact Roots](assets/2.png)
 
 The initialization wizard and `require-clean-room-env.py` audit clean, implementation, and contaminated artifact root names. They fail closed when a path contains a source root basename or meaningful non-generic tokens from that basename, while filtering generic terms such as `src`, `app`, `test`, `repo`, and `workspace`.

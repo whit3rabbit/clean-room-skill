@@ -47,6 +47,8 @@ Treat implementation identifiers as contaminated by default. Package names, name
 
 Public compatibility surface means the name is externally documented, required by an existing integration, visible in a public protocol or file format, or explicitly required by the destination scope. If a name is retained, place it in `public_surface` or `public_contracts` with `name`, `kind`, `visibility`, and a concrete compatibility reason. Valid `visibility` values are `public`, `destination`, `protocol`, and `user-required`. Do not mention source-private names in summaries, claims, tests, open questions, skeleton areas, QC findings, or delta tickets.
 
+Task IDs and project names are clean-visible path components: they appear in roots that clean roles read and in paths recorded by clean artifacts. Both must stay neutral. Use generated `task-` plus 8 lowercase hex IDs, and for projects a random neutral word pair or `proj-` plus 8 lowercase hex, matching `[a-z0-9][a-z0-9-]{0,63}`. Never derive a task ID or project name from source folder basenames or meaningful source-name tokens.
+
 The contaminated side should maintain a private identifier denylist for guardrail scanning when practical. The denylist is line-oriented, ignores blank lines and `#` comments, and is bounded to 1,000,000 bytes per file, 20,000 total terms, and 512 characters per term. Keep that list out of clean/source-denied readable roots and do not paste its contents into clean artifacts or model-visible reports.
 
 Agent 1.5 may use the denylist only through hook scanning. Do not include denylist terms in the neutral sanitizer brief, sanitizer prompts, sanitizer reports, clean artifacts, or model-visible feedback.

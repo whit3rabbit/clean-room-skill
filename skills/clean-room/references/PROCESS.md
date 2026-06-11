@@ -20,7 +20,9 @@ Use separate locations for each trust domain:
 
 Clean, contaminated, and implementation paths must remain neutral. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters and use it under `~/Documents/CleanRoom/`.
 
-Do not derive task IDs, clean roots, contaminated artifact roots, or implementation roots from source folder names. The initialization wizard and environment preflight reject artifact paths that contain a source root basename or meaningful non-generic tokens from that basename.
+Multiple tasks targeting the same destination may be grouped under an optional clean-room project: `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with one shared `<project>/implementation/` root. Project names follow the same neutrality rules as task IDs: a random neutral word pair (such as `amber-meadow`) or `proj-` plus 8 lowercase hex characters, matching `[a-z0-9][a-z0-9-]{0,63}`. Because the shared implementation root serves every task in the project, run at most one active task per project at a time; root-separation checks for one task cannot see a sibling task's concurrent clean implementation session. `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root, but manually launched role sessions outside the runner must still respect the rule.
+
+Do not derive task IDs, project names, clean roots, contaminated artifact roots, or implementation roots from source folder names. The initialization wizard and environment preflight reject artifact paths that contain a source root basename or meaningful non-generic tokens from that basename.
 
 Prefer separate agent profiles or homes when the host supports them. Do not rely on one chat context with role labels as the only separation control.
 
@@ -212,6 +214,7 @@ Clean polish reviewer:
 2. Initialization gate:
    - Record reusable preferences in `init-config.json` when requested.
    - Default the artifact base root to `~/Documents/CleanRoom/<task-id>/` unless the user selects another separated location. Generate a neutral `task-` plus 8 lowercase hex characters when the user does not provide an explicitly approved neutral task ID.
+   - When grouping tasks under a project, place the task root at `~/Documents/CleanRoom/<project>/tasks/<task-id>/`, share the project-level `implementation/` root, and record `project_id` and `project_root` in `init-config.json` and the manifest `initialization_snapshot`.
    - Reject clean, contaminated, or implementation roots that mirror source root basenames or meaningful non-generic source-name tokens.
    - Record model preferences as a default model plus optional domain or role overrides.
    - Split user rules into clean-safe and contaminated-only rules.

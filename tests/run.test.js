@@ -24,7 +24,7 @@ const SECOND_SPEC_ID = 'spec-second-flow';
 const SECOND_SPEC_FILE = 'second-behavior-spec.json';
 const TEST_TIMEOUT_MS = 30_000;
 const RUN_TEST_DEBUG = process.env.CLEAN_ROOM_RUN_TEST_DEBUG === '1';
-const RUN_CLI_EXPECTED_COUNT = 81;
+const RUN_CLI_EXPECTED_COUNT = 83;
 const TMP_DIRS = [];
 let runCliCounter = 0;
 let runCliCompleted = 0;
@@ -1926,6 +1926,48 @@ describe('clean-room run command', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /clean-room run lock is held/);
     assert.equal(fs.existsSync(freshLock), true);
+  });
+
+  test('implementation lock recovers stale locks and preserves fresh locks', () => {
+    const staleWorkspace = baseWorkspace('clean-room-run-impl-stale-lock');
+    const staleLock = path.join(staleWorkspace.implementation, '.clean-room-implementation.lock');
+    writeLock(staleLock, 2147483647, new Date(Date.now() - 120_000));
+    let config = commandConfig(path.join(staleWorkspace.root, 'commands.json'), [
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', staleWorkspace.root),
+    ]);
+
+    let result = runCli(['run', '--task-manifest', staleWorkspace.manifestPath, '--agent-commands', config]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      fs.readdirSync(staleWorkspace.implementation).some((name) => name.startsWith('.clean-room-implementation.lock.stale.')),
+      true
+    );
+    assert.equal(fs.existsSync(staleLock), false);
+
+    const freshWorkspace = baseWorkspace('clean-room-run-impl-fresh-lock');
+    const freshLock = path.join(freshWorkspace.implementation, '.clean-room-implementation.lock');
+    writeLock(freshLock, process.pid, new Date());
+    config = commandConfig(path.join(freshWorkspace.root, 'commands.json'), [
+      noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', freshWorkspace.root),
+    ]);
+
+    result = runCli([
+      'run',
+      '--task-manifest',
+      freshWorkspace.manifestPath,
+      '--agent-commands',
+      config,
+    ], ROOT, {
+      CLEAN_ROOM_IMPLEMENTATION_LOCK_WAIT_MS: '50',
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room implementation lock is held/);
+    assert.equal(fs.existsSync(freshLock), true);
+    // Implementation locks acquire before the contaminated run lock, so a
+    // held implementation lock must leave no run lock behind.
+    assert.equal(fs.existsSync(path.join(freshWorkspace.contaminated, '.clean-room-run.lock')), false);
   });
 
   test('timestamp-only artifact changes do not count as progress', () => {

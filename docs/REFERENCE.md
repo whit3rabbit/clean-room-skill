@@ -164,6 +164,7 @@ Usage:
 npx clean-room-skill@latest init
 npx clean-room-skill@latest init --target-dir . --target-profile speckit-feature-folder
 npx clean-room-skill@latest init --artifact-base ~/Documents/CleanRoom --task-id task-1234abcd
+npx clean-room-skill@latest init --project amber-meadow --task-id task-1234abcd
 ```
 
 Options:
@@ -173,11 +174,13 @@ Options:
 | `--target-dir <path>` | Repository to initialize; default is current directory. |
 | `--artifact-base <path>` | External CleanRoom base; default is `~/Documents/CleanRoom`. |
 | `--task-id <id>` | Neutral task id; default is generated `task-xxxxxxxx`. |
+| `--project <name>` | Group the task under a clean-room project; joins the project when it already exists. Names must be neutral (`[a-z0-9][a-z0-9-]{0,63}`, never derived from source or workspace folder names). |
+| `--new-project` | Create a project with a generated `proj-xxxxxxxx` name. Cannot be combined with `--project`. |
 | `--target-profile <name>` | `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`. |
 | `--dry-run` | Print actions without writing files. |
 | `--force` | Overwrite existing bootstrap metadata and repo stub. |
 
-By default, `init` creates:
+By default, `init` creates a single-task layout under `<artifact-base>/<task-id>/`:
 
 - `contaminated/`
 - `clean/`
@@ -185,6 +188,22 @@ By default, `init` creates:
 - `quarantine/`
 - `clean-room-bootstrap.json`
 - `.clean-room/README.md` in the target repository
+
+With `--project` or `--new-project`, `init` creates a project layout instead. Tasks live under `<artifact-base>/<project>/tasks/<task-id>/` with per-task `contaminated/`, `clean/`, and `quarantine/`, while every task in the project shares one `<artifact-base>/<project>/implementation/` root:
+
+```text
+<artifact-base>/<project>/
+├── clean-room-project.json
+├── implementation/            (shared by all tasks)
+└── tasks/
+    └── <task-id>/
+        ├── contaminated/
+        ├── clean/
+        ├── quarantine/
+        └── clean-room-bootstrap.json
+```
+
+Re-running `init --project <name>` with a new task id joins the existing project without `--force`: the project metadata and shared `implementation/` are reused, and only the new task folders must not already exist. Because tasks share the implementation root, run at most one active task per project at a time; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
 
 Do not commit source roots, contaminated artifact paths, private identifiers, source-derived names, `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `controller-status.json`, `role-session-brief.json`, or `clean-run-context.json` into the clean implementation repository.
 
@@ -198,6 +217,7 @@ Usage:
 npx clean-room-skill@latest preflight --template --output ~/Documents/CleanRoom/task-1234abcd/contaminated/preflight-goal.json
 npx clean-room-skill@latest preflight --input ./preflight-goal.json --output ~/Documents/CleanRoom/task-1234abcd/contaminated/preflight-goal.json
 npx clean-room-skill@latest preflight --template --bootstrap ~/Documents/CleanRoom/task-1234abcd
+npx clean-room-skill@latest preflight --template --bootstrap ~/Documents/CleanRoom/amber-meadow/tasks/task-1234abcd
 ```
 
 Options:
@@ -358,11 +378,13 @@ The runner exports `CLEAN_ROOM_SESSION_BRIEF_PATH`, `CLEAN_ROOM_ROLE_SESSION_ID`
 | `python3 is required to install clean-room hooks` | Python missing or not on `PATH` | Install Python 3 or use `--hooks=copy-only`. |
 | `safe hooks are installed; clean-room init/onboarding must set role environment variables` | Safe mode default | Start the clean-room init/onboarding flow, or use strict hooks in a dedicated profile. |
 | `install lock is held` | Another install or uninstall is mutating the same target root | Wait for the other process to finish; stale locks are handled conservatively. |
+| `clean-room run lock is held` | Another run is active for the same task's contaminated root, or a crashed run left a recent lock | Wait for the other run to finish. Locks from dead processes age out and are moved aside automatically; if no run is active, remove `.clean-room-run.lock` from the contaminated root and retry. |
+| `clean-room implementation lock is held` | Another task in the same clean-room project is running against the shared implementation root, or a crashed run left a recent lock | Wait for the other run to finish. Locks from dead processes age out and are moved aside automatically; if no run is active, remove `.clean-room-implementation.lock` from the implementation root and retry. |
 | Hook config write failed after files copied | Partial installer state | Fix the filesystem error, then re-run the same installer command. |
 | Install manifest remains `installing` | The previous install did not complete | Re-run the same installer command for that runtime and target root. |
 | `clean-room-skill` is not found | The CLI is not globally installed or the runtime PATH does not include it | Use `npx clean-room-skill@latest ...` immediately; do not search plugin caches for package internals. |
 | `--schema-dir` reports missing schemas | The override points at a stale plugin cache, clean root, or non-directory path | Omit `--schema-dir` to use bundled schemas. Pass it only for a real directory containing `task-manifest.schema.json`. Do not use `/dev/null`. |
-| `task manifest not found` for a task root | The runner needs the contaminated-side manifest file | Pass `~/Documents/CleanRoom/<task-id>/contaminated/task-manifest.json`, not the task root or clean root. |
+| `task manifest not found` for a task root | The runner needs the contaminated-side manifest file | Pass `~/Documents/CleanRoom/<task-id>/contaminated/task-manifest.json` (or `~/Documents/CleanRoom/<project>/tasks/<task-id>/contaminated/task-manifest.json` in the project layout), not the task root or clean root. |
 | `preflight goal not found` | `task-manifest.json` references a missing or misplaced contaminated-side preflight file | Restore `preflight-goal.json` under the contaminated artifact root, update `preflight_goal_ref` and `preflight_goal_sha256`, then retry `--dry-run`. |
 | `clean-room run` rejects the manifest | Invalid or incomplete unattended loop metadata | Fix `controller_policy`, `loop_context.foundation_unit_ref`, and `approved_scope_refs`, then retry `--dry-run`. |
 | `clean-room artifact validation failed` lists stale JSON files | Old or hand-written clean-room artifacts are still under contaminated or clean artifact roots | Update those artifacts to current schemas or move stale/legacy JSON to quarantine, then retry `--dry-run`. |

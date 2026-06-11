@@ -24,6 +24,7 @@ Record every default as an assumption. Good defaults:
 
 - Artifact base: `~/Documents/CleanRoom/<task-id>/`.
 - Implementation root: `~/Documents/CleanRoom/<task-id>/implementation/`.
+- Project layout (when grouping multiple tasks): task root `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with shared implementation root `~/Documents/CleanRoom/<project>/implementation/`.
 - Existing destination policy: `inspect-and-preserve`.
 - Dependency policy: allow new dependencies, prefer standard library, require approval for native/system dependencies.
 - Dependency licenses: allow MIT, Apache-2.0, BSD-2-Clause, and BSD-3-Clause; block GPL-3.0 and AGPL-3.0 unless the user explicitly approves otherwise.

@@ -15,7 +15,7 @@ If `task-manifest.json` records `controller_policy.mode: "unattended"` in Claude
 
 ## Load Order
 
-Load these artifacts from the paths recorded in `task-manifest.json` and the configured root environment. Treat missing optional artifacts as blockers only when the current gate requires them.
+Load these artifacts from the paths recorded in `task-manifest.json` and the configured root environment. Treat missing optional artifacts as blockers only when the current gate requires them. A task may live at `<base>/<project>/tasks/<task-id>/` with a shared project-level implementation root; trust the absolute paths recorded in `task-manifest.json` `artifact_paths` and never re-derive the layout from folder positions.
 
 - `task-manifest.json`
 - `preflight-goal.json`, when referenced by `task-manifest.json`, only on the contaminated/controller side
@@ -46,6 +46,7 @@ Before choosing work:
 - Confirm authorization still covers the recorded source scope and allowed actions.
 - Report `run_state` when present; do not infer generation from chat history when it is missing.
 - Trust `initialization_snapshot` before any reusable `init-config.json`. If they differ, report drift and stop before changing roots, model policy, schema profile, or rule classification.
+- When `initialization_snapshot` records `project_id` or `project_root`, confirm the on-disk `clean-room-project.json` at the project root still agrees with them and with the shared implementation root. Report drift and stop on mismatch.
 - Preserve the existing `controller_policy`; missing policy means `attended`.
 - Stop if new-run artifacts lack `preflight_goal_ref`, `preflight_goal_sha256`, or the required `handoff_sequence`. Treat this as legacy or incomplete preflight state and ask for a reviewed preflight goal before resuming.
 - Validate referenced `preflight-goal.json` before using goal, stack, dependency, license, exactness, output, or hygiene decisions.

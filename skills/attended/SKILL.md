@@ -13,7 +13,7 @@ In Pi, this entry point is invoked as `/skill:attended`.
 
 Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the same clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
-Before asking setup or preflight questions, use the canonical `clean-room` "Run State Discovery Before Wizard" rules. Resolve explicit artifact paths first, then configured clean-room roots, then bounded `~/Documents/CleanRoom/task-*` candidates. If a valid `task-manifest.json` exists, route to `resume-cr`. If a valid canonical `preflight-goal.json` exists without a manifest, continue at source/destination discovery and manifest creation. If a preflight artifact exists but is invalid, stop with schema errors instead of restarting preflight. If multiple candidates are found without an explicit path, list them and stop for selection.
+Before asking setup or preflight questions, use the canonical `clean-room` "Run State Discovery Before Wizard" rules. Resolve explicit artifact paths first, then configured clean-room roots, then bounded `~/Documents/CleanRoom/task-*` (legacy) and `~/Documents/CleanRoom/*/tasks/task-*` (project layout) candidates. If a valid `task-manifest.json` exists, route to `resume-cr`. If a valid canonical `preflight-goal.json` exists without a manifest, continue at source/destination discovery and manifest creation. If a preflight artifact exists but is invalid, stop with schema errors instead of restarting preflight. If multiple candidates are found without an explicit path, list them and stop for selection.
 
 Load or create `preflight-goal.json` first. Attended mode may continue with unresolved questions only when they are recorded as `open_questions`; blocking questions become pause gates before affected work starts.
 
@@ -21,6 +21,7 @@ Gather only required setup facts:
 
 - Authorization statement, requester, allowed actions, prohibited actions, and evidence handling.
 - Artifact base root, defaulting to `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
+- Optional project grouping for multi-task destinations, following the canonical `clean-room` project layout rules: `<base>/<project>/tasks/<task-id>/` with one shared `<base>/<project>/implementation/` root, a neutral project name (random word pair or `proj-` plus 8 lowercase hex, matching `[a-z0-9][a-z0-9-]{0,63}`, never source-derived), and at most one active task per project.
 - Source roots, contaminated artifact root, clean artifact root, clean implementation root, quarantine root, and optional public or destination reference roots.
 - Target stack, destination constraints, dependency/license policy, exactness policy, feature policy, code hygiene policy, and output policy from `preflight-goal.json`.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.

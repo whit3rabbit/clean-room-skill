@@ -80,15 +80,16 @@ Discovery order:
 
 1. Resolve explicit user-provided paths first. Accept a task root, `task-manifest.json`, `preflight-goal.json`, or `clean-room-bootstrap.json`.
 2. Inspect configured clean-room roots from the current request or environment, including `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, and `CLEAN_ROOM_IMPLEMENTATION_ROOTS` when present.
-3. Scan `~/Documents/CleanRoom/task-*` as a bounded fallback. Inspect only immediate task directories and their expected artifact names.
+3. Scan `~/Documents/CleanRoom/task-*` (legacy single-task layout) and `~/Documents/CleanRoom/*/clean-room-project.json` plus `~/Documents/CleanRoom/*/tasks/task-*` (project layout) as a bounded fallback. Inspect only immediate project directories, their `tasks/` children, and expected artifact names.
 
-If more than one candidate run is found without an explicit user path, list the candidate task roots and stop for explicit selection. Do not choose the newest candidate automatically.
+If more than one candidate run is found without an explicit user path, list the candidate task roots grouped by project and stop for explicit selection. Do not choose the newest candidate automatically.
 
 Classify the selected candidate before starting the wizard:
 
 - Valid `task-manifest.json`: route to `resume-cr` and continue from the earliest incomplete gate.
 - Valid canonical `preflight-goal.json` without `task-manifest.json`: continue at source/destination discovery and manifest creation. Do not ask the preflight wizard again.
 - `clean-room-bootstrap.json` only: run preflight using the bootstrap roots.
+- `clean-room-project.json` with no task directories under `tasks/`: treat as an empty project and offer to create its first task inside that project.
 - Invalid `preflight-goal.json`: stop, report canonical schema or required-field errors, and do not create a replacement preflight.
 - No artifacts found: start the normal preflight wizard.
 
@@ -98,6 +99,7 @@ Gather only the setup facts needed to decide whether the workflow may start, or 
 
 - Authorization statement, requester, allowed actions, prohibited actions, and evidence handling.
 - Artifact base root. Default to `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
+- Optional project grouping. Ask whether to group this run under a clean-room project when multiple tasks will target the same destination; default to the legacy single-task layout. Project layout is `<base>/<project>/tasks/<task-id>/` with one shared `<base>/<project>/implementation/` root for every task in the project. When the user does not supply an approved neutral project name, generate a random neutral word pair such as `amber-meadow`; it must match `[a-z0-9][a-z0-9-]{0,63}`, must never be derived from source or destination folder basenames or meaningful source-name tokens (project names appear in paths clean roles can see), and falls back to `proj-` plus 8 lowercase hex characters when no neutral word pair is available. Only one task per project may run at a time because tasks share the implementation root; the durable runner enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
 - Source roots or fallback visual evidence roots, contaminated artifact root, clean artifact root, clean implementation root, quarantine root, and optional public or destination reference roots.
 - Target stack and destination constraints from `preflight-goal.json`.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.
@@ -107,7 +109,7 @@ Gather only the setup facts needed to decide whether the workflow may start, or 
 - Run state. New runs use `generation: 1`, current `started_at`, and `restart_reason: user-requested`.
 - Role hook environment block. Derive `CLEAN_ROOM_ROLE`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_ALLOWED_READ_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and optional hook-only denylist variables from the approved roots before launching any role session. Do not ask the user to export `CLEAN_ROOM_HOOK_ENFORCE` for normal safe-hook runs.
 
-Before indexing or artifact generation, confirm that source roots, contaminated artifact roots, clean artifact roots, clean implementation roots, approved public reference roots, and schema directory are separate paths, and that clean/contaminated/implementation root path names are not source-derived. Stop if authorization is unclear, if clean and contaminated roots overlap, if implementation roots overlap any other trust-domain root, or if artifact/root paths contain source root basenames or meaningful non-generic source-name tokens. Agent 2, Agent 3, and Agent 4 must not receive source mounts or the full task manifest.
+Before indexing or artifact generation, confirm that source roots, contaminated artifact roots, clean artifact roots, clean implementation roots, approved public reference roots, and schema directory are separate paths, and that clean/contaminated/implementation root path names are not source-derived. In project layout the implementation root is the shared project-level folder; per-task contaminated, clean, and quarantine roots stay under the task root, and the project name itself must pass the same source-derived-name checks. Stop if authorization is unclear, if clean and contaminated roots overlap, if implementation roots overlap any other trust-domain root, or if artifact/root paths contain source root basenames or meaningful non-generic source-name tokens. Agent 2, Agent 3, and Agent 4 must not receive source mounts or the full task manifest.
 
 For `attended` mode, record a `controller_policy` that pauses for human review at scope gate, clean handoff, terminal implementation deltas, blocked units, and final coverage. Include stop conditions for `authorization-missing`, `scope-change`, `contamination-suspected`, `schema-validation-failed`, `leakage-scan-failed`, `unit-blocked`, `implementation-complete`, and `coverage-complete`; attended mode does not add an iteration-limit stop unless the user explicitly sets one.
 

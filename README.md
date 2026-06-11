@@ -109,6 +109,8 @@ npx clean-room-skill@latest init
 
 The default task root is `~/Documents/CleanRoom/<task-id>/` with `contaminated/`, `clean/`, `implementation/`, and `quarantine/` children. Keep active contaminated artifacts, clean artifacts, and clean implementation roots separate.
 
+When multiple tasks target the same destination, group them under a clean-room project with `init --project <name>` (or `--new-project` for a generated name). The project layout is `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with per-task `contaminated/`, `clean/`, and `quarantine/` children plus one shared `~/Documents/CleanRoom/<project>/implementation/` root for every task in the project. Project names must stay neutral, like task IDs: a random word pair such as `amber-meadow` or a generated `proj-xxxxxxxx`, never derived from source folder names. Run at most one active task per project at a time because tasks share the implementation root; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
+
 In Claude Code, invoke skills with the plugin namespace:
 
 ```text

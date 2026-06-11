@@ -124,6 +124,7 @@ Ask before changing:
 ## Installer And Indexer Safety
 
 - Runtime install/update/uninstall mutations are serialized per target root with `.clean-room-install.lock`.
+- `clean-room-skill run` mutations are serialized per contaminated root with `.clean-room-run.lock` and per implementation root with `.clean-room-implementation.lock`; `--dry-run` skips both locks.
 - `status` is read-only. It may inspect manifests, managed file hashes, stale managed paths, conflicts, and hook registration state, but must not mutate target roots or hook config.
 - `update` refreshes manifest-managed files without rerunning onboarding. It must preserve the prior manifest hook mode unless the user explicitly passes `--hooks=<mode>`.
 - `update` should select only manifest-backed installs by default. Hook-only remnants are uninstall/repair concerns, not update targets.
