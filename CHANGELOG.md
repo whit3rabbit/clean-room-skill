@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-06-13
+
+### Added
+
+- Added top-level `clean-room-skill --version` output.
+- Added `clean-room-skill init --single-task` for the legacy flat task layout.
+
+### Changed
+
+- `clean-room-skill init` now creates a neutral project layout by default, with task roots under `<artifact-base>/<project>/tasks/<task-id>/` and a shared project-level `implementation/` root.
+- Init output now prints `project root` and `task root` explicitly instead of the ambiguous `output folder`.
+- Runtime skill and reference docs now align with the project-default bootstrap flow and release guidance requires matching version, changelog, and GitHub Release updates.
+
 ## [0.3.1] - 2026-06-13
 
 ### Fixed

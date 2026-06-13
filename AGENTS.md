@@ -93,6 +93,7 @@
 
 - `package.json` version is the npm source of truth.
 - Keep plugin metadata versions synchronized when changing package version.
+- Every release must update `CHANGELOG.md` for the target version before tagging.
 - Publishing is triggered by pushing a `v*` tag.
 - The release tag must match `package.json` after stripping a leading `v`.
 - Publish workflow uses npm trusted publishing and runs `npm publish`.
@@ -101,13 +102,15 @@
 - Release builds use Node 24 and `package-manager-cache: false`; do not re-enable npm caching in the publish job.
 - Do not use `npm publish --provenance` here. Trusted publishing provides provenance with plain `npm publish`.
 - Every npm release must have a matching GitHub Release for the same `vX.Y.Z` tag. GitHub Releases are informational and do not trigger npm publishing.
+- GitHub Release notes should match or summarize the `CHANGELOG.md` entry for that version.
 - Release flow:
   1. Bump `package.json` and `package-lock.json`, normally with `npm version X.Y.Z --no-git-tag-version --ignore-scripts`.
   2. Sync version fields in `plugin.json`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, and `.claude-plugin/marketplace.json`.
-  3. Run release-facing checks: `jq empty` on changed JSON metadata, `npm pack --dry-run`, and `npm run verify`.
-  4. Commit the release changes, push the branch, create an annotated tag named exactly `vX.Y.Z`, and push the tag.
-  5. Confirm the `Publish` workflow succeeds, then verify `npm view clean-room-skill version` returns `X.Y.Z`.
-  6. Create or verify the GitHub Release for `vX.Y.Z`, and confirm it is not a draft or prerelease unless intentionally releasing a prerelease.
+  3. Update `CHANGELOG.md` with the same `X.Y.Z` version and release date.
+  4. Run release-facing checks: `jq empty` on changed JSON metadata, `npm pack --dry-run`, and `npm run verify`.
+  5. Commit the release changes, push the branch, create an annotated tag named exactly `vX.Y.Z`, and push the tag.
+  6. Confirm the `Publish` workflow succeeds, then verify `npm view clean-room-skill version` returns `X.Y.Z`.
+  7. Create or verify the GitHub Release for `vX.Y.Z`, and confirm it is not a draft or prerelease unless intentionally releasing a prerelease.
 - Do not move, overwrite, or recreate published tags without explicit user approval. If npm publish has succeeded, fix release mistakes with a new patch version instead of republishing the same version.
 
 ## High-Risk Areas

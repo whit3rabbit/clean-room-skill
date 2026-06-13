@@ -147,6 +147,10 @@ function writeLock(lockPath, pid, createdAt) {
   fs.utimesSync(lockPath, createdAt, createdAt);
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function packageVersion() {
   return readJson(path.join(ROOT, 'package.json')).version;
 }
@@ -375,6 +379,14 @@ function writeLegacyClaudeStandaloneInstall(claudeHome) {
 }
 
 describe('clean-room-skill installer', () => {
+  test('prints installed package version', () => {
+    const result = runInstall(['--version']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), packageVersion());
+    assert.equal(result.stderr, '');
+  });
+
   test('init dry run makes no target changes and prints bootstrap paths', () => {
     const root = tempDir('clean-room-init-dry-run');
     const targetDir = path.join(root, 'repo');
@@ -394,12 +406,13 @@ describe('clean-room-skill installer', () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Would create clean-room bootstrap/);
-    assert.match(result.stdout, new RegExp(path.join(artifactBase, 'task-dry').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(result.stdout, /project: proj-[0-9a-f]{8} \(new\)/);
+    assert.match(result.stdout, new RegExp(`${escapeRegExp(artifactBase)}[/\\\\]proj-[0-9a-f]{8}[/\\\\]tasks[/\\\\]task-dry`));
     assert.equal(fs.existsSync(artifactBase), false);
     assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
   });
 
-  test('init creates generated task directories, metadata, and clean repo stub', () => {
+  test('init creates generated project task directories, metadata, and clean repo stub', () => {
     const root = tempDir('clean-room-init-create');
     const targetDir = path.join(root, 'repo');
     const artifactBase = path.join(root, 'artifacts');
@@ -408,34 +421,49 @@ describe('clean-room-skill installer', () => {
     const result = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase]);
 
     assert.equal(result.status, 0, result.stderr);
-    const taskIds = fs.readdirSync(artifactBase);
+    const projectIds = fs.readdirSync(artifactBase);
+    assert.equal(projectIds.length, 1);
+    assert.match(projectIds[0], /^proj-[0-9a-f]{8}$/);
+
+    const projectRoot = path.join(artifactBase, projectIds[0]);
+    const taskIds = fs.readdirSync(path.join(projectRoot, 'tasks'));
     assert.equal(taskIds.length, 1);
     assert.match(taskIds[0], /^task-[0-9a-f]{8}$/);
 
-    const outputRoot = path.join(artifactBase, taskIds[0]);
+    const outputRoot = path.join(projectRoot, 'tasks', taskIds[0]);
     assert.equal(fs.existsSync(path.join(outputRoot, 'contaminated')), true);
     assert.equal(fs.existsSync(path.join(outputRoot, 'clean')), true);
-    assert.equal(fs.existsSync(path.join(outputRoot, 'implementation')), true);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'implementation')), false);
     assert.equal(fs.existsSync(path.join(outputRoot, 'quarantine')), true);
+    assert.equal(fs.existsSync(path.join(projectRoot, 'implementation')), true);
+
+    const projectMetadata = readJson(path.join(projectRoot, 'clean-room-project.json'));
+    assert.equal(projectMetadata.project_id, projectIds[0]);
+    assert.equal(projectMetadata.project_root, projectRoot);
+    assert.equal(projectMetadata.implementation_root, path.join(projectRoot, 'implementation'));
 
     const metadata = readJson(path.join(outputRoot, 'clean-room-bootstrap.json'));
+    assert.equal(metadata.layout, 'project');
+    assert.equal(metadata.project_id, projectIds[0]);
+    assert.equal(metadata.project_root, projectRoot);
     assert.equal(metadata.task_id, taskIds[0]);
     assert.equal(metadata.target_profile, 'speckit-feature-folder');
-    assert.equal('layout' in metadata, false);
-    assert.equal('project_id' in metadata, false);
     assert.equal(fs.existsSync(path.join(artifactBase, 'clean-room-project.json')), false);
     assert.equal(fs.existsSync(path.join(outputRoot, 'tasks')), false);
     assert.equal(metadata.roots.contaminated_artifacts, path.join(outputRoot, 'contaminated'));
     assert.equal(metadata.roots.clean_artifacts, path.join(outputRoot, 'clean'));
-    assert.equal(metadata.roots.implementation_root, path.join(outputRoot, 'implementation'));
+    assert.equal(metadata.roots.implementation_root, path.join(projectRoot, 'implementation'));
     assert.equal(metadata.roots.quarantine, path.join(outputRoot, 'quarantine'));
 
     const stub = fs.readFileSync(path.join(targetDir, '.clean-room', 'README.md'), 'utf8');
     assert.match(stub, /Clean Room Bootstrap/);
     assert.match(stub, /Default target profile: `speckit-feature-folder`/);
-    assert.match(stub, /`implementation\/`/);
+    assert.match(stub, /shared `implementation\/` clean destination/);
     assert.doesNotMatch(stub, /source roots:/i);
-    assert.match(result.stdout, /implementation root:/);
+    assert.match(result.stdout, /project: proj-[0-9a-f]{8} \(new\)/);
+    assert.match(result.stdout, /project root:/);
+    assert.match(result.stdout, /task root:/);
+    assert.match(result.stdout, /implementation root \(shared\):/);
     assert.match(result.stdout, /Codex:/);
     assert.match(result.stdout, /npx clean-room-skill@latest --codex --global --hooks=safe --yes/);
     assert.match(result.stdout, /start in Codex: invoke the init skill, then clean-room through @ or the skills UI/);
@@ -452,6 +480,40 @@ describe('clean-room-skill installer', () => {
     const codexStartLine = result.stdout.split('\n').find((line) => line.includes('start in Codex:'));
     assert.ok(codexStartLine);
     assert.doesNotMatch(codexStartLine, /\/clean-room/);
+  });
+
+  test('init --single-task creates the legacy flat task layout', () => {
+    const root = tempDir('clean-room-init-single-task');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const result = runInstall([
+      'init',
+      '--target-dir',
+      targetDir,
+      '--artifact-base',
+      artifactBase,
+      '--task-id',
+      'task-single',
+      '--single-task',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const outputRoot = path.join(artifactBase, 'task-single');
+    assert.equal(fs.existsSync(path.join(outputRoot, 'contaminated')), true);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'clean')), true);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'implementation')), true);
+    assert.equal(fs.existsSync(path.join(outputRoot, 'quarantine')), true);
+    assert.equal(fs.existsSync(path.join(artifactBase, 'clean-room-project.json')), false);
+    const metadata = readJson(path.join(outputRoot, 'clean-room-bootstrap.json'));
+    assert.equal('layout' in metadata, false);
+    assert.equal('project_id' in metadata, false);
+    assert.equal(metadata.roots.implementation_root, path.join(outputRoot, 'implementation'));
+    assert.match(result.stdout, /task root:/);
+    assert.doesNotMatch(result.stdout, /project root:/);
+    assert.match(result.stdout, /implementation root:/);
+    assert.doesNotMatch(result.stdout, /implementation root \(shared\):/);
   });
 
   test('init does not overwrite existing repo stub without force', () => {
@@ -494,6 +556,7 @@ describe('clean-room-skill installer', () => {
       artifactBase,
       '--task-id',
       'task-force',
+      '--single-task',
       '--force',
     ]);
 
@@ -519,6 +582,7 @@ describe('clean-room-skill installer', () => {
       artifactBase,
       '--task-id',
       'task-existing',
+      '--single-task',
     ]);
 
     assert.notEqual(result.status, 0);
@@ -662,6 +726,22 @@ describe('clean-room-skill installer', () => {
     ]);
     assert.notEqual(conflicting.status, 0);
     assert.match(conflicting.stderr, /--project and --new-project cannot be combined/);
+    assert.equal(fs.existsSync(artifactBase), false);
+
+    const singleTaskProject = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--single-task',
+    ]);
+    assert.notEqual(singleTaskProject.status, 0);
+    assert.match(singleTaskProject.stderr, /--single-task cannot be combined/);
+    assert.equal(fs.existsSync(artifactBase), false);
+
+    const singleTaskNewProject = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--new-project', '--single-task',
+    ]);
+    assert.notEqual(singleTaskNewProject.status, 0);
+    assert.match(singleTaskNewProject.stderr, /--single-task cannot be combined/);
     assert.equal(fs.existsSync(artifactBase), false);
   });
 
@@ -858,7 +938,7 @@ describe('clean-room-skill installer', () => {
     const taskRoot = path.join(artifactBase, 'task-bootstrap-root');
     fs.mkdirSync(targetDir, { recursive: true });
 
-    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-root']);
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-root', '--single-task']);
     assert.equal(init.status, 0, init.stderr);
 
     const result = runInstall(['preflight', '--template', '--bootstrap', taskRoot]);
@@ -880,7 +960,7 @@ describe('clean-room-skill installer', () => {
     const taskRoot = path.join(artifactBase, 'task-bootstrap-metadata');
     fs.mkdirSync(targetDir, { recursive: true });
 
-    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-metadata']);
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-metadata', '--single-task']);
     assert.equal(init.status, 0, init.stderr);
 
     const result = runInstall([
@@ -905,7 +985,7 @@ describe('clean-room-skill installer', () => {
     const input = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json');
     fs.mkdirSync(targetDir, { recursive: true });
 
-    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-input-mismatch']);
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-input-mismatch', '--single-task']);
     assert.equal(init.status, 0, init.stderr);
 
     const result = runInstall(['preflight', '--input', input, '--bootstrap', taskRoot]);
@@ -929,7 +1009,7 @@ describe('clean-room-skill installer', () => {
     fs.mkdirSync(targetDir, { recursive: true });
     fs.writeFileSync(input, `${JSON.stringify(goal, null, 2)}\n`);
 
-    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-input-match']);
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-input-match', '--single-task']);
     assert.equal(init.status, 0, init.stderr);
 
     const result = runInstall(['preflight', '--input', input, '--bootstrap', taskRoot]);
@@ -1029,7 +1109,7 @@ describe('clean-room-skill installer', () => {
     fs.mkdirSync(targetDir, { recursive: true });
 
     const init = runInstall([
-      'init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-stray-id',
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-stray-id', '--single-task',
     ]);
     assert.equal(init.status, 0, init.stderr);
 
@@ -1052,7 +1132,7 @@ describe('clean-room-skill installer', () => {
     const taskRoot = path.join(artifactBase, 'task-bootstrap-broken');
     fs.mkdirSync(targetDir, { recursive: true });
 
-    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-broken']);
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-broken', '--single-task']);
     assert.equal(init.status, 0, init.stderr);
     fs.rmSync(path.join(taskRoot, 'implementation'), { recursive: true, force: true });
 
@@ -1073,7 +1153,7 @@ describe('clean-room-skill installer', () => {
     fs.mkdirSync(targetDir, { recursive: true });
     fs.mkdirSync(path.dirname(symlinkTaskRoot), { recursive: true });
 
-    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', root, '--task-id', 'real-task-root']);
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', root, '--task-id', 'real-task-root', '--single-task']);
     assert.equal(init.status, 0, init.stderr);
 
     fs.symlinkSync(realTaskRoot, symlinkTaskRoot, 'dir');

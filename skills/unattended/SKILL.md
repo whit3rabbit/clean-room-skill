@@ -24,8 +24,8 @@ Do not assume target language, license policy, dependency policy, exactness poli
 Gather only required setup facts:
 
 - Authorization statement, requester, allowed actions, prohibited actions, and evidence handling.
-- Artifact base root, defaulting to `~/Documents/CleanRoom/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
-- Optional project grouping for multi-task destinations, following the canonical `clean-room` project layout rules: `<base>/<project>/tasks/<task-id>/` with one shared `<base>/<project>/implementation/` root, a neutral project name (random word pair or `proj-` plus 8 lowercase hex, matching `[a-z0-9][a-z0-9-]{0,63}`, never source-derived), and at most one active task per project.
+- Artifact base root, defaulting the task root to `~/Documents/CleanRoom/<project>/tasks/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
+- Project grouping, following the canonical `clean-room` project layout rules: `<base>/<project>/tasks/<task-id>/` with one shared `<base>/<project>/implementation/` root, a neutral project name (`proj-` plus 8 lowercase hex unless the user supplies an approved neutral name, matching `[a-z0-9][a-z0-9-]{0,63}`, never source-derived), and at most one active task per project. Use legacy flat `<base>/<task-id>/` roots only when the user explicitly chooses single-task compatibility.
 - Source roots, contaminated artifact root, clean artifact root, clean implementation root, quarantine root, and optional public or destination reference roots.
 - Target stack, destination constraints, dependency/license policy, exactness policy, feature policy, code hygiene policy, and output policy from `preflight-goal.json`.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.

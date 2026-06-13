@@ -165,6 +165,7 @@ npx clean-room-skill@latest init
 npx clean-room-skill@latest init --target-dir . --target-profile speckit-feature-folder
 npx clean-room-skill@latest init --artifact-base ~/Documents/CleanRoom --task-id task-1234abcd
 npx clean-room-skill@latest init --project amber-meadow --task-id task-1234abcd
+npx clean-room-skill@latest init --single-task --task-id task-1234abcd
 ```
 
 Options:
@@ -174,22 +175,14 @@ Options:
 | `--target-dir <path>` | Repository to initialize; default is current directory. |
 | `--artifact-base <path>` | External CleanRoom base; default is `~/Documents/CleanRoom`. |
 | `--task-id <id>` | Neutral task id; default is generated `task-xxxxxxxx`. |
-| `--project <name>` | Group the task under a clean-room project; joins the project when it already exists. Names must be neutral (`[a-z0-9][a-z0-9-]{0,63}`, never derived from source or workspace folder names). |
-| `--new-project` | Create a project with a generated `proj-xxxxxxxx` name. Cannot be combined with `--project`. |
+| `--project <name>` | Group the task under a named clean-room project; joins the project when it already exists. Names must be neutral (`[a-z0-9][a-z0-9-]{0,63}`, never derived from source or workspace folder names). |
+| `--new-project` | Explicitly create a project with a generated `proj-xxxxxxxx` name. This is the default unless `--single-task` is passed. Cannot be combined with `--project`. |
+| `--single-task` | Use the legacy flat layout under `<artifact-base>/<task-id>`. Cannot be combined with `--project` or `--new-project`. |
 | `--target-profile <name>` | `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`. |
 | `--dry-run` | Print actions without writing files. |
 | `--force` | Overwrite existing bootstrap metadata and repo stub. |
 
-By default, `init` creates a single-task layout under `<artifact-base>/<task-id>/`:
-
-- `contaminated/`
-- `clean/`
-- `implementation/`
-- `quarantine/`
-- `clean-room-bootstrap.json`
-- `.clean-room/README.md` in the target repository
-
-With `--project` or `--new-project`, `init` creates a project layout instead. Tasks live under `<artifact-base>/<project>/tasks/<task-id>/` with per-task `contaminated/`, `clean/`, and `quarantine/`, while every task in the project shares one `<artifact-base>/<project>/implementation/` root:
+By default, `init` creates a project layout. Plain `init` creates a new generated `proj-xxxxxxxx` project; pass `--project <name>` to add a task to an existing project. Tasks live under `<artifact-base>/<project>/tasks/<task-id>/` with per-task `contaminated/`, `clean/`, and `quarantine/`, while every task in the project shares one `<artifact-base>/<project>/implementation/` root:
 
 ```text
 <artifact-base>/<project>/
@@ -202,6 +195,15 @@ With `--project` or `--new-project`, `init` creates a project layout instead. Ta
         ├── quarantine/
         └── clean-room-bootstrap.json
 ```
+
+With `--single-task`, `init` creates the legacy flat layout under `<artifact-base>/<task-id>/`:
+
+- `contaminated/`
+- `clean/`
+- `implementation/`
+- `quarantine/`
+- `clean-room-bootstrap.json`
+- `.clean-room/README.md` in the target repository
 
 Re-running `init --project <name>` with a new task id joins the existing project without `--force`: the project metadata and shared `implementation/` are reused, and only the new task folders must not already exist. Because tasks share the implementation root, run at most one active task per project at a time; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
 
