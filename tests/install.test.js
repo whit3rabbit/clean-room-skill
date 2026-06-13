@@ -681,6 +681,28 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(artifactBase), false);
   });
 
+  test('init rejects project names derived from short workspace names', () => {
+    // Regression: clause-2 threshold was 4; workspace tokens of len 2-3 bypassed the guard.
+    const root = tempDir('clean-room-init-project-neutrality-short');
+    const targetDir = path.join(root, 'xyz');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    // 'xyz' (len 3) contained in 'xyz-feature' (token 'xyzfeature') must be caught.
+    const derived = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--project', 'xyz-feature',
+    ]);
+    assert.notEqual(derived.status, 0);
+    assert.match(derived.stderr, /--project must be a neutral name/);
+
+    // A genuinely neutral name that does not contain 'xyz' must be allowed.
+    const neutral = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--project', 'proj-alpha',
+    ]);
+    assert.equal(neutral.status, 0, neutral.stderr);
+    assert.equal(fs.existsSync(path.join(artifactBase, 'proj-alpha', 'clean-room-project.json')), true);
+  });
+
   test('init rejects existing project root without metadata unless forced', () => {
     const root = tempDir('clean-room-init-project-adopt');
     const targetDir = path.join(root, 'repo');
@@ -704,6 +726,25 @@ describe('clean-room-skill installer', () => {
     assert.equal(forced.status, 0, forced.stderr);
     const projectMetadata = readJson(path.join(projectRoot, 'clean-room-project.json'));
     assert.equal(projectMetadata.project_id, 'amber-meadow');
+  });
+
+  test('init --force warns when adopting a project root that lacks metadata', () => {
+    const root = tempDir('clean-room-init-project-force-warn');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.mkdirSync(projectRoot, { recursive: true });
+
+    const result = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111', '--force',
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /warning:.*--force is adopting project root without clean-room-project\.json/);
+    // Metadata is stamped by the forced write.
+    const written = readJson(path.join(projectRoot, 'clean-room-project.json'));
+    assert.equal(written.project_id, 'amber-meadow');
   });
 
   test('init force rewrite preserves original project created_at', () => {
@@ -772,6 +813,27 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /project: amber-meadow \(new\)/);
     assert.match(result.stdout, /implementation root \(shared\):/);
     assert.equal(fs.existsSync(artifactBase), false);
+    assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
+  });
+
+  test('init project dry run succeeds even when project root exists without metadata', () => {
+    // Regression: assertWritableTargets called resolveExistingProject before the
+    // dryRun guard, causing --dry-run to throw on imperfect existing project roots.
+    const root = tempDir('clean-room-init-project-dry-run-imperfect');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.mkdirSync(projectRoot, { recursive: true }); // no metadata file
+
+    const result = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111', '--dry-run',
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Would create clean-room bootstrap/);
+    // Dry run must not write any files.
+    assert.equal(fs.existsSync(path.join(projectRoot, 'clean-room-project.json')), false);
     assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
   });
 
@@ -953,6 +1015,34 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stderr, /bootstrap scaffold is invalid/);
     assert.match(result.stderr, /project_root must match/);
     assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated', 'preflight-goal.json')), false);
+  });
+
+  test('validateBootstrapScaffold does not treat stray project_id field as project layout', () => {
+    // Regression: layout detection keyed on presence of any of
+    // layout/project_id/project_root; a stray project_id breadcrumb on a flat task
+    // would flip detection and attempt project-layout validation, causing a spurious
+    // "must live under a tasks/ directory" error.
+    const root = tempDir('clean-room-preflight-bootstrap-stray-project-id');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const taskRoot = path.join(artifactBase, 'task-stray-id');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const init = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-stray-id',
+    ]);
+    assert.equal(init.status, 0, init.stderr);
+
+    // Inject a stray project_id without setting layout: 'project'.
+    const metadataPath = path.join(taskRoot, 'clean-room-bootstrap.json');
+    const metadata = readJson(metadataPath);
+    metadata.project_id = 'stray-field';
+    fs.writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+
+    // Must succeed: stray project_id without layout:'project' should not trigger
+    // project-layout validation.
+    const result = runInstall(['preflight', '--template', '--bootstrap', taskRoot]);
+    assert.equal(result.status, 0, result.stderr);
   });
 
   test('preflight rejects broken bootstrap scaffold without writing', () => {
@@ -1598,6 +1688,31 @@ describe('clean-room-skill installer', () => {
 
     assert.throws(() => listFiles(root, { maxDepth: 1 }), /max depth 1/);
     assert.throws(() => listFiles(root, { maxFiles: 1 }), /max files 1/);
+  });
+
+  test('listFiles ignoreNamePrefixes excludes entries whose names start with a prefix', () => {
+    // Regression: stale lock dirs (.clean-room-implementation.lock.stale.<ts>.<pid>)
+    // were not in IMPLEMENTATION_IGNORE_NAMES and leaked into progress scans.
+    const root = tempDir('clean-room-list-files-prefixes');
+    fs.mkdirSync(path.join(root, '.clean-room-implementation.lock'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.clean-room-implementation.lock', 'owner.json'), '{}');
+    fs.mkdirSync(path.join(root, '.clean-room-implementation.lock.stale.20260101T000000000Z.12345'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, '.clean-room-implementation.lock.stale.20260101T000000000Z.12345', 'owner.json'),
+      '{}'
+    );
+    fs.writeFileSync(path.join(root, 'real-file.txt'), 'content\n');
+
+    // Without filtering: the stale dir is visible.
+    const all = listFiles(root, { ignoreNames: ['.clean-room-implementation.lock'] });
+    assert.ok(all.some((f) => f.includes('.stale.')), 'stale dir should appear without prefix filter');
+
+    // With prefix filter: both the exact lock name and the stale dirs are excluded.
+    const filtered = listFiles(root, {
+      ignoreNames: ['.clean-room-implementation.lock'],
+      ignoreNamePrefixes: ['.clean-room-implementation.lock.stale.'],
+    });
+    assert.deepEqual(filtered, ['real-file.txt']);
   });
 
   test('interactive runtime selection accepts multiple values and installed defaults', () => {

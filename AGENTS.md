@@ -34,6 +34,7 @@
 ## Commands
 
 - Search with `st`, not ripgrep or grep.
+- Run a single test file: `node --test tests/install.test.js`.
 - Install deps: `npm ci --ignore-scripts`.
 - Run all Node tests: `npm test`.
 - Run installer tests only: `npm run test:install`.
@@ -116,6 +117,7 @@ Ask before changing:
 - Dependencies or package manager behavior.
 - JSON schemas or artifact compatibility.
 - Hook policy, role boundaries, path checks, leakage checks, or deny-by-default behavior.
+- Bootstrap project layout detection: `metadata.layout === 'project'` is the sole authoritative signal in `validateBootstrapScaffold`. Do not key layout detection off presence of `project_id` or `project_root` fields.
 - Installer conflict handling, backup behavior, uninstall behavior, or runtime layout.
 - Public CLI flags, CLI output, config format, or compatibility behavior.
 - Docker or Podman verification policy, container profiles, network policy, dependency install policy, or clean/container mount behavior.
@@ -132,6 +134,7 @@ Ask before changing:
 - `clean-room-install-manifest.json` uses `phase: "installing"` until hook config mutation succeeds, then `phase: "complete"`. If hook config mutation fails after files are copied, preserve a manifest with `hook_registration.status: "failed"` when possible.
 - Bootstrap `init` must use atomic no-clobber writes unless `--force` is set.
 - `listFiles()` must stay iterative and bounded. Do not remove max depth, max file count, or readdir error handling.
+- `listFiles()` accepts `ignoreNames` (exact Set) and `ignoreNamePrefixes` (startsWith filter). Implementation-root scans must pass both: `IMPLEMENTATION_IGNORE_NAMES` and `[IMPLEMENTATION_LOCK_STALE_PREFIX]`. Stale lock recovery renames dirs to `<lock>.stale.<ts>.<pid>` rather than deleting; only prefix filtering excludes these orphans.
 - Source indexing must enforce per-file and total byte limits after read, record changed-during-read files as skipped, use `os.walk(onerror=...)`, and prune traversal after global limits with one aggregate skipped entry.
 - Visual indexing must enforce non-overlapping visual roots, keep output under contaminated artifact roots, reject output under visual roots, enforce per-file and total byte limits after read, skip outside-root symlinks, record changed-during-read files as skipped, and write `visual-index.json` atomically.
 - Local npm helper installs must hold the cache-local install lock before mutating the shared npm prefix and must preserve the structured JSON contract for prefix creation errors, subprocess timeouts, and subprocess `OSError`s.
@@ -195,6 +198,11 @@ Set these before any clean-room role session:
 Clean roles may read only clean roots, implementation roots, schema roots, and approved public/reference roots. Contaminated roles may read authorized source roots and write only contaminated artifacts. Shell-style tools should be disabled inside role sessions because they can bypass path-aware hooks. Agent 3 and Agent 4 runner exceptions require their explicit `CLEAN_ROOM_ALLOW_AGENT*_SHELL` flags and cwd under implementation roots. Normal repo maintenance commands are allowed outside role sessions.
 
 For visual fallback runs, screenshot or image roots belong in `CLEAN_ROOM_SOURCE_ROOTS` so clean/source-denied read hooks can protect them. `visual-index.json` stays under contaminated artifact roots.
+
+## Testing
+
+- Core helpers in `tests/install.test.js`: `runInstall(argv)` spawns the CLI and returns `{ status, stdout, stderr }`; `readJson(filePath)` reads and parses JSON; `tempDir(name)` creates a unique temp dir and registers cleanup.
+- Use `process.stderr.write()` (not `console.warn`) for warnings the CLI emits to stderr when test assertions check `result.stderr`.
 
 ## Local Artifacts
 

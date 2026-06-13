@@ -62,7 +62,9 @@ To assist in logical unit decomposition, the workflow supports an optional sourc
 
 Runtime installs and uninstalls serialize per target root with `.clean-room-install.lock`. The installer plans desired file changes from manifest hashes, then rechecks each managed file immediately before write or removal. Managed files that changed after planning are backed up before mutation.
 
-The manifest is written with `phase: "installing"` after file copy and before hook config mutation. It is updated to `phase: "complete"` only after hook config succeeds. If hook config mutation fails, the installer records `hook_registration.status: "failed"` in the manifest when possible. A manifest left in `installing` is recoverable by re-running the same installer command. Bootstrap writes use atomic no-clobber creation unless `--force` is set.
+The manifest is written with `phase: "installing"` after file copy and before hook config mutation. It is updated to `phase: "complete"` only after hook config succeeds. If hook config mutation fails, the installer records `hook_registration.status: "failed"` in the manifest when possible. A manifest left in `installing` is recoverable by re-running the same installer command. Bootstrap writes use atomic no-clobber creation unless `--force` is set. When `--force` adopts an existing project root that lacks or has invalid project metadata, the installer emits a warning so operators know they are reusing existing `tasks/` and `implementation/` content.
+
+The implementation lock (`.clean-room-implementation.lock`) uses rename-based stale recovery: when a stale lock directory is detected, it is renamed to `<name>.stale.<ts>.<pid>` rather than deleted so the original can be inspected post-mortem. Implementation-root scans exclude both the active lock name and the stale prefix pattern to prevent orphaned stale lock directories from appearing in progress snapshots or misplaced-artifact checks.
 
 ---
 
