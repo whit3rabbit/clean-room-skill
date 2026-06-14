@@ -49,6 +49,7 @@ Responsibilities:
 - Carry the preflight-derived code hygiene policy into `implementation-plan.json`.
 - Keep `skeleton-manifest.json` valid and current for code-development runs. Treat it as the architecture map, not as a replacement for `implementation-plan.json`.
 - Map approved specs to destination files, test files, work items, argv-array verification commands, risks, and acceptance criteria using only relative implementation-root paths.
+- In clean artifact prose fields, use plain language instead of implementation syntax such as scoped identifiers, dotted module paths, call expressions, exact test function names, or type constructor text. Put paths only in structured path fields and commands only in structured argv arrays.
 - Preserve public contract refs, dependency constraints, test mappings, and open decisions.
 - Do not choose dependencies by copying source manifests. Add or preserve dependencies only when clean artifacts, destination evidence, or preflight policy justify them.
 - Map every exact-public-contract or behavior-compatible public surface obligation to at least one `implementation-plan.json` work item through `public_contract_refs`; do not replace a public command/API inventory with one generic dispatch work item unless every obligation ref is listed.

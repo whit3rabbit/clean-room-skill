@@ -36,6 +36,7 @@ Responsibilities:
 - Review leakage risk using `LEAKAGE-RULES.md`.
 - Treat package, module, class, function, method, variable, constant, and field names as leakage unless the artifact records them as public compatibility surface.
 - Record implementation status, changed relative paths, verification results, blockers, contamination incidents, and required reruns in `CLEAN_ROOM_CLEAN_ROOTS/implementation-report.json`.
+- In implementation and QC report prose fields, use plain language instead of implementation syntax such as scoped identifiers, dotted module paths, call expressions, exact test function names, or type constructor text. Put changed paths in `changed_paths`, test paths in `test_paths`, and commands in `verification_results.command`.
 - Keep `CLEAN_ROOM_CLEAN_ROOTS/qc-report.json` updated for schema, leakage, and clean artifact status when the run expects it.
 - Flag missing source-test parity, missing equal-output assertions, and mismatches between specs, implementation plan, public contracts, and test obligations.
 - Verify public-surface inventory parity item by item. Every required `public_surface:<spec_id>:<kind>:<name>` ref must be covered by tests, mapped to a completed work item, and represented in terminal verification; passing test counts or broad command-dispatch coverage is not enough.

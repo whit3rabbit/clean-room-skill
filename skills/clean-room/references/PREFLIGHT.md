@@ -8,6 +8,7 @@ Ask only enough to fill `preflight-goal.json`:
 
 - End goal: clean reimplementation, behavior-compatible port, API-compatible clone, modernization, partial extraction, or spec/test generation only.
 - Target stack: language, runtime, framework, package manager, and test framework.
+- Intent confirmation: completed and unattended contracts must record that end goal, target stack, and controller mode came from explicit user answers.
 - Exactness: public APIs, CLI behavior, config files, output formats, error codes, UI behavior, or behavior-only.
 - Visual fallback: when no source code is available, confirm what authorized screenshots are meant to accomplish, the target user flow, screenshot coverage, target stack, UI exactness boundary, and whether visible words are public compatibility surface.
 - Forbidden mirroring: internal names, private structure, comments, source file layout, private helper behavior, and dependencies.
@@ -20,7 +21,7 @@ Ask only enough to fill `preflight-goal.json`:
 
 ## Defaults
 
-Record every default as an assumption. Good defaults:
+Record every default as an assumption. Do not default the end goal or target stack from source code. Source language, runtime, framework, package manager, and test framework describe the input, not the user's requested destination. If either the end goal or target stack is unknown, keep a blocking `open_questions` entry and do not mark an unattended contract complete. Good defaults:
 
 - Artifact base: `~/Documents/CleanRoom/<project>/tasks/<task-id>/`.
 - Implementation root: `~/Documents/CleanRoom/<project>/implementation/`.

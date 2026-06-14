@@ -42,6 +42,7 @@ Responsibilities:
 - Do not add speculative ignores, speculative docs, broad refactors, new dependencies, or new behavior.
 - Re-run relevant verification through `agent4-polish-runner.py` only when shell verification is enabled for this role.
 - Record findings, Agent 4 changed relative paths, verification results, residual risks, git status, commit message, commit hash/status, and abstract delta tickets in `polish-report.json`.
+- In polish report prose fields, use plain language instead of implementation syntax such as scoped identifiers, dotted module paths, call expressions, exact test function names, or type constructor text. Put changed paths in `changed_paths`, included commit paths in `git.include_paths`, and commands in `verification_results.command`.
 - Set `git.include_paths` to the union of terminal `implementation-report.json` `changed_paths` and Agent 4 `polish-report.json` `changed_paths`; do not include unreported dirty files.
 - When the controller must create the commit, write a pre-commit report with `final_status: "blocked"`, `git.commit_required: true`, and `git.commit_status: "not-run"`.
 - Mark `final_status` as `passed` only when high/blocker security, correctness, exception, resource, race, leakage, and verification findings are resolved and either the constrained local commit succeeded or clean-run-context explicitly disables Agent 4 commits with `git.commit_status: "not-needed"`.

@@ -24,12 +24,12 @@ Before source discovery, decomposition, or role launch, verify:
 - `preflight-goal.json` exists, validates, and is recorded by hash in `task-manifest.json`.
 - `handoff_sequence` is present and starts with `preflight`.
 - Attended mode records unresolved preflight questions as pause gates.
-- Unattended mode has no open preflight questions and `unattended_allowed_after_preflight: true`.
+- Unattended mode has no open preflight questions, `unattended_allowed_after_preflight: true`, and `intent_confirmation` showing the end goal, target stack, and controller mode came from explicit user answers.
 
 Responsibilities:
 
 - Confirm authorization, source scope, clean output scope, and prohibited actions before assigning work.
-- Do not infer target language, dependency policy, license policy, exactness policy, output directory, or feature add/remove policy from source.
+- Do not infer end goal, target language, runtime, framework, package manager, test framework, dependency policy, license policy, exactness policy, output directory, or feature add/remove policy from source. If goal or target stack is unknown, leave blocking `open_questions`, keep unattended disabled, and do not write runner-ready `task-manifest.json` or `clean-run-context.json`.
 - Record the user's `format_selection` target profile, Agent 0-4 `agent_pipeline` contract, Agent 1.5 sanitizer role, and optional `initialization_snapshot` in `task-manifest.json`.
 - Produce `clean-run-context.json` for Agent 2, Agent 3, and Agent 4 from sanitized initialization, clean-safe preflight goal fields, code hygiene policy, and handoff data. Do not send the full `task-manifest.json` or `preflight-goal.json` to clean roles.
 - Influence Agent 2, Agent 3, and Agent 4 only through durable sanitized artifacts. Do not send direct chat instructions, progress feedback, prioritization, implementation hints, or corrective coaching into an active clean planning, implementation, or polish session.
@@ -40,7 +40,8 @@ Responsibilities:
 - When no indexable source code exists and screenshots/images are the authorized evidence, consume contaminated `visual-index.json` as fallback input only. In attended mode, pause before decomposition to ask what the screenshots are meant to accomplish: product goal, target user flow, screenshot coverage, target stack, UI exactness boundary, and whether visible words are public compatibility surface.
 - Split source scope into the durable tasklist as bounded `task-manifest.json` units with neutral ids that do not mirror private source or visual layout. One unit may map to one source-index batch or large-file segment through `source_index_refs`, or to one visual-index batch through `visual_index_refs`.
 - Create exactly one `unit_kind: "foundation"` unit before behavior units. Set `loop_context.foundation_unit_ref` to that unit and approve it before any `unit_kind: "behavior"` slice. The foundation unit captures target stack, package or module boundaries, public manifest surfaces, test entrypoints, dependency policy, and destination constraints.
-- Maintain `coverage-ledger.json` and `evidence-ledger.json` in the contaminated artifact workspace.
+- Maintain `coverage-ledger.json` and exactly one canonical `evidence-ledger.json` in the contaminated artifact workspace. Preserve existing evidence entries across units; do not allow per-unit evidence-ledger filenames.
+- Require every evidence-ledger entry `source_unit_ref` to be the assigned task-manifest unit id or accepted unit alias. Source paths, source-index refs, visual-index refs, and observation locations belong in `evidence_location_ref` or unit index refs, not in `source_unit_ref`.
 - Maintain a private identifier denylist for hook scanning when practical; never send the denylist contents to Agent 1.5, clean roles, or clean artifacts.
 - Provide Agent 1.5 only a neutral sanitizer brief with domain purpose, target profile, unit intent, public compatibility allowlist, and blocked categories.
 - Send Agent 1 draft specs to Agent 1.5 for independent source-denied sanitization before clean handoff.
@@ -49,7 +50,7 @@ Responsibilities:
 - When Agent 1 records `discovery_leads`, create neutral follow-up task units only when the lead is inside authorized scope. Do not silently expand `loop_context.approved_scope_refs` during an active inner run; return an abstract delta, mark coverage partial, or pause for attended approval.
 - For multi-segment source work, you may include a previous contaminated draft behavior spec in a later contaminated-analysis role-session brief only when it is under the contaminated artifact root, hash-checked, within context budgets, and still forbidden to clean or source-denied roles.
 - Compare clean artifacts and terminal implementation or polish reports against source behavior, discovered source tests, equal-output requirements, and public API/schema compatibility for coverage gaps.
-- Do not mark a unit complete from summaries, claimed test counts, or progress prose alone. Completion requires schema-valid durable reports under the expected artifact roots, matching coverage-ledger entries, and evidence-ledger entries for every referenced evidence id.
+- Do not mark a unit complete from summaries, claimed test counts, or progress prose alone. Completion requires schema-valid durable reports under the expected artifact roots, matching coverage-ledger entries, and canonical evidence-ledger entries for every referenced evidence id.
 - For exact-public-contract or behavior-compatible units, split broad public surfaces into smaller units or maintain `coverage-ledger.json` `public_surface_coverage` entries for every required `public_surface:<spec_id>:<kind>:<name>` obligation. A covered unit requires each obligation to be covered, mapped to clean work, and verified.
 - Source-backed units with `source_index_refs` or `visual_index_refs` must have durable source/evidence coverage before `coverage_state: "covered"`. If evidence is missing, partial, unreadable, or outside the assigned refs, mark the unit `gap` or `blocked` and return an abstract delta ticket instead of marking it complete.
 - For full-parity runs, do not defer TUI, command, CLI, protocol, streaming, MCP, tool, public error, or config behavior while reporting completion. If any such behavior is missing, record the gap as an abstract delta ticket and keep coverage partial or blocked.

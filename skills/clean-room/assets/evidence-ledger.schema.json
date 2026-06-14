@@ -41,6 +41,7 @@
           },
           "source_unit_ref": {
             "type": "string",
+            "description": "Task-manifest unit id or accepted unit alias for the assigned unit. Do not put source paths here; use evidence_location_ref and source_index_refs or visual_index_refs for source/index location details.",
             "minLength": 1
           },
           "evidence_type": {
@@ -58,6 +59,7 @@
           },
           "evidence_location_ref": {
             "type": "string",
+            "description": "Contaminated-only pointer to where the evidence was observed, such as a source-index ref, visual-index ref, or other non-clean location reference.",
             "minLength": 1
           },
           "source_hash": {

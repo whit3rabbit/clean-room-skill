@@ -24,7 +24,7 @@ const SECOND_SPEC_ID = 'spec-second-flow';
 const SECOND_SPEC_FILE = 'second-behavior-spec.json';
 const TEST_TIMEOUT_MS = 30_000;
 const RUN_TEST_DEBUG = process.env.CLEAN_ROOM_RUN_TEST_DEBUG === '1';
-const RUN_CLI_EXPECTED_COUNT = 83;
+const RUN_CLI_EXPECTED_COUNT = 87;
 const TMP_DIRS = [];
 let runCliCounter = 0;
 let runCliCompleted = 0;
@@ -203,7 +203,13 @@ function baseWorkspace(name) {
     approved_public_reference_roots: [dirs.allowed],
   };
   const manifestPath = path.join(dirs.contaminated, 'task-manifest.json');
-  fs.copyFileSync(PREFLIGHT_FIXTURE, path.join(dirs.contaminated, 'preflight-goal.json'));
+  const preflightPath = path.join(dirs.contaminated, 'preflight-goal.json');
+  const preflightGoal = readJson(PREFLIGHT_FIXTURE);
+  preflightGoal.controller_policy.mode = 'unattended';
+  preflightGoal.controller_policy.unattended_allowed_after_preflight = true;
+  preflightGoal.controller_policy.max_iterations = 2;
+  writeJson(preflightPath, preflightGoal);
+  manifest.preflight_goal_sha256 = fileSha256(preflightPath);
   writeJson(manifestPath, manifest);
   writeCoverage(dirs.contaminated, 'gap');
   writeFoundationCleanArtifacts({ clean: dirs.clean });
@@ -1305,6 +1311,44 @@ describe('clean-room run command', () => {
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
   });
 
+  test('rejects unattended preflight goals without explicit intent confirmation', () => {
+    const workspace = baseWorkspace('clean-room-run-preflight-no-confirmation');
+    const preflightPath = path.join(workspace.contaminated, 'preflight-goal.json');
+    const preflightGoal = readJson(preflightPath);
+    delete preflightGoal.intent_confirmation;
+    writeJson(preflightPath, preflightGoal);
+    const manifest = readJson(workspace.manifestPath);
+    manifest.preflight_goal_sha256 = fileSha256(preflightPath);
+    writeJson(workspace.manifestPath, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preflight goal is not runner-ready/);
+    assert.match(result.stderr, /intent_confirmation/);
+    assert.match(result.stderr, /explicit user-confirmed end goal and target stack/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
+  test('rejects preflight goals whose controller mode mismatches the task manifest', () => {
+    const workspace = baseWorkspace('clean-room-run-preflight-mode-mismatch');
+    const preflightPath = path.join(workspace.contaminated, 'preflight-goal.json');
+    const preflightGoal = readJson(preflightPath);
+    preflightGoal.controller_policy.mode = 'attended';
+    preflightGoal.controller_policy.unattended_allowed_after_preflight = false;
+    writeJson(preflightPath, preflightGoal);
+    const manifest = readJson(workspace.manifestPath);
+    manifest.preflight_goal_sha256 = fileSha256(preflightPath);
+    writeJson(workspace.manifestPath, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preflight goal is not runner-ready/);
+    assert.match(result.stderr, /controller_policy\.mode must match task-manifest controller_policy\.mode/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
   test('missing root-level manifest suggests contaminated manifest path', () => {
     const workspace = baseWorkspace('clean-room-run-root-manifest-hint');
     const rootManifest = path.join(workspace.root, 'task-manifest.json');
@@ -1402,7 +1446,51 @@ describe('clean-room run command', () => {
     const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
 
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /coverage-ledger references missing evidence-ledger item/);
+    assert.match(result.stderr, /coverage-ledger references missing evidence-ledger item in canonical evidence-ledger\.json/);
+  });
+
+  test('rejects coverage evidence refs when canonical evidence ledger is missing', () => {
+    const workspace = baseWorkspace('clean-room-run-coverage-missing-evidence-ledger');
+    writeCoverage(workspace.contaminated, 'covered');
+    fs.rmSync(path.join(workspace.contaminated, 'evidence-ledger.json'));
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /canonical evidence-ledger\.json is missing/);
+    assert.match(result.stderr, /do not use per-unit evidence-ledger filenames/);
+  });
+
+  test('rejects path-like evidence source_unit_ref with redacted actionable guidance', () => {
+    const workspace = baseWorkspace('clean-room-run-coverage-path-like-evidence-unit');
+    writeCoverage(workspace.contaminated, 'covered');
+    writeEvidenceLedger(workspace.contaminated, [
+      {
+        evidence_id: 'item-foundation',
+        source_unit_ref: FOUNDATION_UNIT_ID,
+        evidence_type: 'source-observation',
+        description: 'Neutral test evidence that the foundation unit was source-verified.',
+        evidence_location_ref: 'contaminated-only:unit-foundation:item-foundation',
+        retained_in_contaminated_domain: true,
+      },
+      {
+        evidence_id: 'item-001',
+        source_unit_ref: 'types/ids.ts',
+        evidence_type: 'source-observation',
+        description: 'Neutral test evidence that the unit was source-verified.',
+        evidence_location_ref: 'source-index:batch-0001:types/ids.ts',
+        retained_in_contaminated_domain: true,
+      },
+    ]);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /evidence source_unit_ref was rejected; value not shown/);
+    assert.doesNotMatch(result.stderr, /types\/ids\.ts/);
+    assert.match(result.stderr, /coverage unit_id=unit-example-flow/);
+    assert.match(result.stderr, /source_unit_ref must be the task-manifest unit id or accepted unit alias/);
+    assert.match(result.stderr, /source paths belong in evidence_location_ref or source_index_refs\/visual_index_refs/);
   });
 
   test('rejects covered coverage ledger entries with unresolved coverage gaps', () => {

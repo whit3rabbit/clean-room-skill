@@ -118,7 +118,7 @@ Contaminated manager/verifier:
 
 - Confirm authorization and source scope.
 - Create or validate `preflight-goal.json` before source discovery and record its ref/hash in `task-manifest.json`.
-- Do not infer target language, dependency policy, license policy, exactness policy, output directory, or feature add/remove policy from source.
+- Do not infer end goal, target language, runtime, framework, package manager, test framework, dependency policy, license policy, exactness policy, output directory, or feature add/remove policy from source. Completed and unattended preflight contracts require explicit user intent confirmation.
 - Create or update controller-side `init-config.json` when the user invokes initialization, then snapshot effective preferences into `task-manifest.json`.
 - Produce sanitized `clean-run-context.json` for Agent 2, Agent 3, and Agent 4. Include clean artifact paths, implementation root environment references, target profile, clean-safe goal contract fields, code hygiene policy, approved public refs, clean-safe rules, clean-side model preferences, and artifact-only coordination policy only.
 - Record optional `context_management` budgets in `task-manifest.json` and `clean-run-context.json` when low-context handoffs are enabled.

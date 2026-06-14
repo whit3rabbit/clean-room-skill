@@ -1,0 +1,27 @@
+{
+  "schema_kind": "preflight-goal",
+  "base": "preflight-goal.json",
+  "description": "Unattended preflight requires explicit user intent confirmation.",
+  "remove": [
+    [
+      "intent_confirmation"
+    ]
+  ],
+  "set": [
+    {
+      "path": [
+        "controller_policy",
+        "mode"
+      ],
+      "value": "unattended"
+    },
+    {
+      "path": [
+        "controller_policy",
+        "unattended_allowed_after_preflight"
+      ],
+      "value": true
+    }
+  ],
+  "expected_error": "'intent_confirmation' is a required property"
+}

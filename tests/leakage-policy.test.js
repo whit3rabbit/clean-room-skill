@@ -251,6 +251,27 @@ describe('clean-room leakage hook policy', () => {
     }
   });
 
+  test('leakage scanner reports JSON paths and classes without echoing matched values', () => {
+    const root = tempDir('clean-room-leakage-redacted-diagnostics');
+    const env = policyEnv(root, 'clean-architect');
+    const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'nested-artifact-summary.json');
+    fs.writeFileSync(filePath, JSON.stringify({
+      findings: [
+        {
+          summary: 'Call PrivateType( and module::item after setup.',
+        },
+      ],
+    }));
+
+    const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /source_like_call at \$\.findings\[0\]\.summary/);
+    assert.match(result.stderr, /source_like_scoped_identifier at \$\.findings\[0\]\.summary/);
+    assert.doesNotMatch(result.stderr, /PrivateType/);
+    assert.doesNotMatch(result.stderr, /module::item/);
+  });
+
   test('sanitizer staged artifacts are leakage-scanned while analyst drafts are not', () => {
     const root = tempDir('clean-room-sanitizer-leakage');
     const env = policyEnv(root, 'contaminated-handoff-sanitizer');

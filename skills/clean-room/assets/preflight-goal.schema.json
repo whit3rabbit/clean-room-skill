@@ -26,6 +26,41 @@
       "type": "string",
       "format": "date-time"
     },
+    "intent_confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confirmed_at",
+        "end_goal_source",
+        "target_stack_source",
+        "controller_mode_source",
+        "user_goal_summary",
+        "user_target_stack_summary"
+      ],
+      "properties": {
+        "confirmed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end_goal_source": {
+          "const": "explicit-user-answer"
+        },
+        "target_stack_source": {
+          "const": "explicit-user-answer"
+        },
+        "controller_mode_source": {
+          "const": "explicit-user-answer"
+        },
+        "user_goal_summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_target_stack_summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "end_goal": {
       "type": "object",
       "additionalProperties": false,
@@ -371,6 +406,9 @@
         ]
       },
       "then": {
+        "required": [
+          "intent_confirmation"
+        ],
         "properties": {
           "controller_policy": {
             "properties": {

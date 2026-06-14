@@ -25,9 +25,10 @@ Record these decisions:
 - Code hygiene policy: file line caps, max files per iteration, split strategy, exceptions, and forbidden patterns.
 - Output policy: artifact base root, implementation root, assumed output directory, and write mode.
 - Controller policy: attended or unattended, iteration cap, and whether unattended is allowed after preflight.
+- Intent confirmation: `intent_confirmation` with explicit-user-answer sources for end goal, target stack, and controller mode, plus user-facing summaries of the goal and target stack.
 - Open questions, with blocking questions clearly marked.
 
-The artifact must use the canonical `preflight-goal.schema.json` shape. Required top-level keys are `goal_id`, `created_at`, `end_goal`, `target_stack`, `license_policy`, `dependency_policy`, `compatibility_policy`, `feature_policy`, `code_hygiene_policy`, `output_policy`, `controller_policy`, and `open_questions`.
+The artifact must use the canonical `preflight-goal.schema.json` shape. Required top-level keys are `goal_id`, `created_at`, `end_goal`, `target_stack`, `license_policy`, `dependency_policy`, `compatibility_policy`, `feature_policy`, `code_hygiene_policy`, `output_policy`, `controller_policy`, and `open_questions`. Completed preflight inputs and unattended contracts also require `intent_confirmation`.
 
 Reject non-canonical or legacy-shaped preflight artifacts instead of treating them as complete. Do not accept invented fields such as `version`, `created`, `source`, `destination`, `exactness_policy`, `output_policy.artifact_base`, `output_policy.contaminated_root`, `output_policy.clean_root`, or `output_policy.quarantine_root` as substitutes for canonical fields. Report the missing or invalid canonical fields and stop for review.
 
@@ -40,9 +41,10 @@ Unattended runs require a complete `preflight-goal.json` with:
 - `controller_policy.mode: "unattended"`
 - `controller_policy.unattended_allowed_after_preflight: true`
 - finite `controller_policy.max_iterations`
+- `intent_confirmation` showing the end goal, target stack, and controller mode came from explicit user answers
 - empty `open_questions`
 
-Do not infer target language, license, dependency policy, exactness policy, output directory, or feature add/remove policy from source code.
+Do not infer end goal, target language, runtime, framework, package manager, test framework, license, dependency policy, exactness policy, output directory, or feature add/remove policy from source code. If the user's end goal or target stack is unknown, leave blocking `open_questions`, keep unattended disabled, and do not write runner-ready `task-manifest.json` or `clean-run-context.json`.
 
 ## CLI Helper
 

@@ -49,6 +49,8 @@ Responsibilities:
 - Treat discovered source tests as behavioral evidence and convert them into clean `test_scenarios` that validate the same observable outputs.
 - Record equal-output expectations for public return values, serialized data, CLI or API responses, errors, state changes, ordering, and compatibility-relevant side effects.
 - Use `evidence_refs` that point to contaminated-side ledger entries instead of including source text.
+- Maintain exactly one canonical contaminated-side `evidence-ledger.json`. Preserve existing entries and append or update entries by stable `evidence_id`; do not create per-unit evidence-ledger filenames.
+- Set each evidence entry `source_unit_ref` to the assigned task-manifest unit id or accepted unit alias, preferably `CLEAN_ROOM_SELECTED_UNIT_ID` when set. Put source file paths, source-index refs, visual-index refs, and observation locations in `evidence_location_ref`, not in `source_unit_ref`.
 - Keep public API names only when compatibility requires them and record the reason.
 - Capture public API, protocol, config, and data/schema compatibility using existing behavior spec fields.
 - Do not mirror source dependency lists, package manifests, or private module layout. Mention a dependency only when it is public compatibility surface, destination evidence, or explicitly allowed by preflight policy.

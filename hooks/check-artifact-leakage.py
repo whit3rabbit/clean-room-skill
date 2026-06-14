@@ -126,6 +126,45 @@ SCAN_LIGHT_JSON_STRING_KEYS = {
     "action",
     "formatting_rules",
 }
+JSON_PATH_KEY_ALLOWLIST = NEVER_SCAN_JSON_STRING_KEYS | DENYLIST_ONLY_JSON_STRING_KEYS | SCAN_LIGHT_JSON_STRING_KEYS | {
+    "acceptance_criteria",
+    "architecture_findings",
+    "architecture_summary",
+    "claim",
+    "constraints",
+    "dependency_constraints",
+    "description",
+    "expected_result",
+    "findings",
+    "formatting_rules",
+    "implementation_forbidden_material",
+    "invariants",
+    "leakage_review",
+    "leakage_scan_summary",
+    "local_patterns",
+    "name",
+    "negative_behaviors",
+    "notes",
+    "observable_behaviors",
+    "observable_surface",
+    "open_decisions",
+    "open_questions",
+    "output_summary",
+    "outputs",
+    "purpose",
+    "reason",
+    "requirements",
+    "residual_risks",
+    "responsibilities",
+    "risks",
+    "scenario",
+    "state_transitions",
+    "summary",
+    "target_constraints",
+    "test_obligations",
+    "test_scenarios",
+    "timing_or_ordering",
+}
 IMPLEMENTATION_METADATA_MANIFESTS = {
     "Cargo.toml",
     "go.mod",
@@ -344,14 +383,43 @@ def strip_allowed_text(text: str, allowed_names: set[str]) -> str:
     return stripped
 
 
+def json_path(path: tuple[str | int, ...]) -> str:
+    if not path:
+        return "$"
+    rendered = "$"
+    for item in path:
+        if isinstance(item, int):
+            rendered += f"[{item}]"
+        elif item in JSON_PATH_KEY_ALLOWLIST:
+            rendered += f".{item}"
+        else:
+            rendered += ".<field>"
+    return rendered
+
+
+def format_finding_details(details: list[tuple[str, str]]) -> str:
+    grouped: dict[str, set[str]] = {}
+    for name, location in details:
+        grouped.setdefault(name, set()).add(location)
+    parts: list[str] = []
+    for name in sorted(grouped):
+        locations = sorted(grouped[name])
+        shown = locations[:3]
+        suffix = f" at {', '.join(shown)}"
+        if len(locations) > len(shown):
+            suffix += f", +{len(locations) - len(shown)} more"
+        parts.append(f"{name}{suffix}")
+    return ", ".join(parts)
+
+
 def json_scan_strings(
     value: object,
     allowed_names: set[str],
     path: tuple[str | int, ...] = (),
-) -> tuple[list[str], list[str], list[str]]:
-    full_scan: list[str] = []
-    light_scan: list[str] = []
-    denylist_scan: list[str] = []
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
+    full_scan: list[tuple[str, str]] = []
+    light_scan: list[tuple[str, str]] = []
+    denylist_scan: list[tuple[str, str]] = []
     if isinstance(value, dict):
         for key, item in value.items():
             child_full, child_light, child_denylist = json_scan_strings(item, allowed_names, path + (key,))
@@ -369,62 +437,69 @@ def json_scan_strings(
         if leaf_key in NEVER_SCAN_JSON_STRING_KEYS:
             return full_scan, light_scan, denylist_scan
         stripped = strip_allowed_text(value, allowed_names)
+        location = json_path(path)
         if leaf_key in DENYLIST_ONLY_JSON_STRING_KEYS:
-            denylist_scan.append(stripped)
+            denylist_scan.append((location, stripped))
         elif leaf_key in SCAN_LIGHT_JSON_STRING_KEYS:
-            light_scan.append(stripped)
+            light_scan.append((location, stripped))
         else:
-            full_scan.append(stripped)
+            full_scan.append((location, stripped))
     return full_scan, light_scan, denylist_scan
 
 
-def scan_private_identifier_denylist(texts: list[str], private_patterns: list[tuple[str, re.Pattern[str]]]) -> list[str]:
-    findings: set[str] = set()
-    for text in texts:
+def scan_private_identifier_denylist(
+    texts: list[tuple[str, str]],
+    private_patterns: list[tuple[str, re.Pattern[str]]],
+) -> list[tuple[str, str]]:
+    findings: set[tuple[str, str]] = set()
+    for location, text in texts:
         for _term, pattern in private_patterns:
             if pattern.search(text):
-                findings.add("private_identifier_denylist")
+                findings.add(("private_identifier_denylist", location))
                 break
     return sorted(findings)
 
 
-def scan_source_derived_names(texts: list[str], source_patterns: list[tuple[str, re.Pattern[str]]]) -> list[str]:
-    findings: set[str] = set()
-    for text in texts:
+def scan_source_derived_names(
+    texts: list[tuple[str, str]],
+    source_patterns: list[tuple[str, re.Pattern[str]]],
+) -> list[tuple[str, str]]:
+    findings: set[tuple[str, str]] = set()
+    for location, text in texts:
         for _term, pattern in source_patterns:
             if pattern.search(text):
-                findings.add("source_derived_name")
+                findings.add(("source_derived_name", location))
                 break
     return sorted(findings)
 
 
 def scan_identifier_patterns(
-    texts: list[str],
+    texts: list[tuple[str, str]],
     private_patterns: list[tuple[str, re.Pattern[str]]],
     skipped_patterns: set[str] | None = None,
-) -> list[str]:
-    findings: set[str] = set()
+) -> list[tuple[str, str]]:
+    findings: set[tuple[str, str]] = set()
     skipped_patterns = skipped_patterns or set()
-    for text in texts:
+    for location, text in texts:
         for _term, pattern in private_patterns:
             if pattern.search(text):
-                findings.add("private_identifier_denylist")
+                findings.add(("private_identifier_denylist", location))
                 break
         for name, pattern in IDENTIFIER_PATTERNS.items():
             if name in skipped_patterns:
                 continue
             if any(identifier_match_is_finding(name, text, match) for match in pattern.finditer(text)):
-                findings.add(name)
+                findings.add((name, location))
     return sorted(findings)
 
 
-def identifier_scan_texts(path: Path, text: str) -> tuple[list[str], list[str], list[str]]:
+def identifier_scan_texts(path: Path, text: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
     if path.suffix.lower() != ".json":
-        return [strip_allowed_text(text, set())], [], []
+        return [("$", strip_allowed_text(text, set()))], [], []
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        return [strip_allowed_text(text, set())], [], []
+        return [("$", strip_allowed_text(text, set()))], [], []
     allowed_names = public_names(data)
     return json_scan_strings(data, allowed_names)
 
@@ -465,7 +540,7 @@ def main() -> int:
             print(f"clean-room leakage scan failed: {redact_text(read_error)}", file=sys.stderr)
             return 1
         text = data.decode("utf-8", errors="replace")
-        findings = [name for name, pattern in BLOCKED_PATTERNS.items() if pattern.search(text)]
+        findings = [(name, "$") for name, pattern in BLOCKED_PATTERNS.items() if pattern.search(text)]
         full_scan_texts, light_scan_texts, denylist_scan_texts = identifier_scan_texts(path, text)
         findings.extend(scan_identifier_patterns(full_scan_texts, private_patterns))
         findings.extend(
@@ -484,7 +559,8 @@ def main() -> int:
         )
         if findings:
             print(
-                f"clean-room leakage scan failed for {describe_path(path)}: {', '.join(sorted(set(findings)))}",
+                f"clean-room leakage scan failed for {describe_path(path)}: "
+                f"{format_finding_details(sorted(set(findings)))}",
                 file=sys.stderr,
             )
             return 1

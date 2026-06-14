@@ -928,6 +928,7 @@ describe('clean-room-skill installer', () => {
     assert.equal(goal.controller_policy.mode, 'attended');
     assert.equal(goal.controller_policy.unattended_allowed_after_preflight, false);
     assert.equal(goal.open_questions.some((question) => question.blocking === true), true);
+    assert.equal(goal.intent_confirmation, undefined);
     assert.match(result.stdout, /Wrote preflight goal/);
   });
 
@@ -1206,6 +1207,40 @@ describe('clean-room-skill installer', () => {
     const goal = readJson(output);
     assert.equal(goal.goal_id, 'goal-task-example');
     assert.equal(goal.open_questions.length, 0);
+    assert.equal(goal.intent_confirmation.end_goal_source, 'explicit-user-answer');
+  });
+
+  test('preflight input rejects completed contracts without intent confirmation', () => {
+    const root = tempDir('clean-room-preflight-input-no-confirmation');
+    const input = path.join(root, 'preflight-goal.json');
+    const output = path.join(root, 'normalized-preflight-goal.json');
+    const goal = readJson(path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json'));
+    delete goal.intent_confirmation;
+    fs.writeFileSync(input, `${JSON.stringify(goal, null, 2)}\n`);
+
+    const result = runInstall(['preflight', '--input', input, '--output', output]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /completed preflight input requires intent_confirmation/);
+    assert.match(result.stderr, /explicit user-confirmed end goal and target stack/);
+    assert.equal(fs.existsSync(output), false);
+  });
+
+  test('preflight input rejects placeholder goal and target stack values', () => {
+    const root = tempDir('clean-room-preflight-input-placeholder');
+    const input = path.join(root, 'preflight-goal.json');
+    const output = path.join(root, 'normalized-preflight-goal.json');
+    const goal = readJson(path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json'));
+    goal.end_goal.success_definition = 'TBD: decide what this should become.';
+    goal.target_stack.language = 'TBD';
+    fs.writeFileSync(input, `${JSON.stringify(goal, null, 2)}\n`);
+
+    const result = runInstall(['preflight', '--input', input, '--output', output]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /end_goal\.success_definition/);
+    assert.match(result.stderr, /target_stack\.language/);
+    assert.equal(fs.existsSync(output), false);
   });
 
   test('preflight refuses overwrite without force and allows force', () => {
