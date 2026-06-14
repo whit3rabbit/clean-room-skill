@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.1] - 2026-06-14
+
+### Fixed
+
+- Visual index generation now accounts for bytes read from invalid image files when enforcing the total byte cap.
+- Clean artifact leakage scanning now catches source-root path disclosures across structured artifacts, preflight outputs, and run coverage state.
+
 ## [0.4.0] - 2026-06-13
 
 ### Added
