@@ -77,53 +77,55 @@ The following diagram illustrates how the agents, workspace roots, and guardrail
 ```mermaid
 flowchart LR
   subgraph contaminated["Contaminated domain"]
-    source["Authorized source roots<br/>CLEAN_ROOM_SOURCE_ROOTS"]
-    manager["Agent 0: contaminated-manager-verifier<br/>Scope, decompose, track coverage, verify"]
-    analyst["Agent 1: contaminated-source-analyst<br/>Read source, write draft specs"]
-    sanitizer["Agent 1.5: contaminated-handoff-sanitizer<br/>Source-denied, scrub identifying material"]
-    brief["Neutral sanitizer brief<br/>domain, target profile, unit intent,<br/>public allowlist, blocked categories"]
-    preflight["preflight-goal.json<br/>goal, stack, policy, hygiene"]
-    ledgers["Contaminated artifacts<br/>CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS<br/>init-config.json<br/>source-index.json<br/>visual-index.json<br/>task-manifest.json<br/>coverage-ledger.json<br/>evidence-ledger.json"]
-    drafts["Agent 1 draft specs<br/>assigned paths only for Agent 1.5"]
-    staged["Sanitized handoff candidates<br/>Agent 1.5-reviewed behavior-spec.json"]
+    source["Authorized source roots"]
+    preflight["preflight-goal.json"]
+    manager["Agent 0 manager verifier"]
+    analyst["Agent 1 source analyst"]
+    sanitizer["Agent 1.5 handoff sanitizer"]
+    ledgers["Contaminated artifacts"]
+    drafts["Draft behavior specs"]
+    staged["Sanitized handoff candidates"]
   end
 
   subgraph wall["Clean-room wall"]
-    handoff["Approved handoff only<br/>clean-run-context.json with clean-safe goal_contract<br/>handoff-package.json<br/>Agent 1.5-passed behavior-spec.json"]
-    blocked["Blocked from crossing<br/>source excerpts, raw diffs, copied comments,<br/>private identifiers, source-shaped pseudocode"]
+    handoff["Approved clean handoff"]
+    blocked["Blocked material"]
   end
 
-  subgraph clean["Clean domain: source-denied"]
-    cleanroots["Clean artifact roots<br/>CLEAN_ROOM_CLEAN_ROOTS"]
-    implroots["Clean implementation roots<br/>CLEAN_ROOM_IMPLEMENTATION_ROOTS"]
-    publicrefs["Allowed public refs<br/>CLEAN_ROOM_ALLOWED_READ_ROOTS"]
-    architect["Agent 2: clean-architect<br/>Plan implementation from clean specs and foundation"]
-    qa["Agent 3: clean-qa-editor<br/>Implement, record verification, terminal report"]
-    polish["Agent 4: clean-polish-reviewer<br/>Final code polish, repo hygiene, local commit"]
-    outputs["Clean artifacts<br/>implementation-plan.json<br/>implementation-report.json<br/>qc-report.json<br/>polish-report.json<br/>test plan notes"]
-    imploutputs["Implementation outputs<br/>code, tests, fixtures, AGENTS.md, .gitignore"]
+  subgraph clean["Clean domain"]
+    cleanroots["Clean artifact roots"]
+    implroots["Clean implementation roots"]
+    publicrefs["Approved public references"]
+    architect["Agent 2 clean architect"]
+    qa["Agent 3 clean implementer verifier"]
+    polish["Agent 4 polish reviewer"]
+    outputs["Clean plans and reports"]
+    imploutputs["Destination code and tests"]
   end
 
   subgraph guardrails["Guardrails and audit"]
     env["require-clean-room-env.py"]
     denyread["deny-clean-source-read.py"]
-    denywrite["deny-contaminated-clean-write.py<br/>write root policy"]
+    denywrite["deny-contaminated-clean-write.py"]
     denyshell["deny-clean-room-shell.py"]
-    scan["check-artifact-leakage.py<br/>validate-json-schema.py"]
+    scan["schema and leakage checks"]
   end
 
   preflight --> manager
   source --> manager
   manager --> analyst
-  manager --> brief
   manager --> ledgers
   analyst --> ledgers
   analyst --> drafts
-  brief --> sanitizer
+  manager --> sanitizer
   drafts --> sanitizer
   sanitizer --> staged
   sanitizer --> ledgers
   staged --> handoff
+  source -.-> blocked
+  drafts -.-> blocked
+  blocked -.-> ledgers
+
   handoff --> cleanroots
   cleanroots --> architect
   implroots --> architect
@@ -137,28 +139,27 @@ flowchart LR
   imploutputs --> polish
   outputs --> polish
   polish --> imploutputs
-  polish -. terminal polish report only<br/>abstract delta tickets .-> manager
-  qa -. terminal report only<br/>abstract delta tickets .-> manager
+  qa -.-> manager
+  polish -.-> manager
 
-  blocked -. quarantine do not hand off .-> ledgers
-  env -. required for every role session .-> manager
-  env -. required for every role session .-> architect
-  denyread -. clean and source-denied roles cannot read source roots .-> cleanroots
-  denyread -. clean roles may read implementation roots .-> implroots
-  denyread -. Agent 1.5 cannot read source/visual roots, clean roots, implementation roots, source-index.json, visual-index.json, or preflight-goal.json .-> sanitizer
-  denywrite -. contaminated writes only to contaminated artifact roots .-> ledgers
-  denywrite -. Agent 2 writes clean artifacts; Agents 3 and 4 write clean reports .-> cleanroots
-  denywrite -. Agents 3 and 4 write destination files only here; no clean-room artifact JSON .-> implroots
-  denyshell -. no shell-style tools in role sessions .-> manager
-  denyshell -. no shell for Agent 2; explicit Agent 3 and Agent 4 runners only .-> architect
-  scan -. post-write checks .-> outputs
-  scan -. Agent 1.5 staged-output checks .-> staged
+  env -.-> manager
+  env -.-> architect
+  denyread -.-> sanitizer
+  denyread -.-> cleanroots
+  denyread -.-> implroots
+  denywrite -.-> ledgers
+  denywrite -.-> cleanroots
+  denywrite -.-> implroots
+  denyshell -.-> manager
+  denyshell -.-> architect
+  scan -.-> staged
+  scan -.-> outputs
 
   classDef contaminatedDomain fill:#fff7ed,stroke:#c2410c,color:#111827;
   classDef cleanDomain fill:#ecfeff,stroke:#0e7490,color:#111827;
   classDef wallClass fill:#f8fafc,stroke:#475569,color:#111827;
   classDef guardClass fill:#f0fdf4,stroke:#15803d,color:#111827;
-  class source,preflight,manager,analyst,sanitizer,brief,ledgers,drafts,staged contaminatedDomain;
+  class source,preflight,manager,analyst,sanitizer,ledgers,drafts,staged contaminatedDomain;
   class cleanroots,implroots,publicrefs,architect,qa,polish,outputs,imploutputs cleanDomain;
   class handoff,blocked wallClass;
   class env,denyread,denywrite,denyshell,scan guardClass;

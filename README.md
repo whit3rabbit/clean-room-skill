@@ -25,38 +25,41 @@ Core boundary:
 - Clean implementation code is written only under the clean implementation root.
 - Raw source, raw screenshots, source or visual paths, private identifiers, raw diffs, copied comments, copied UI text, and source-shaped pseudocode must not cross into clean handoff artifacts.
 
+![Clean Room Architecture](assets/clean-room-arch.svg)
+
 For the full boundary model, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). For CLI and troubleshooting details, see [docs/REFERENCE.md](docs/REFERENCE.md).
 
-## How To Install
+## Install
 
 Requires Node.js `>=22`.
 
-You can either install the CLI globally on your system, or run the commands on-demand using `npx`.
-
-### Global Installation (npm)
-
-To install the `clean-room-skill` executable globally:
+Recommended path:
 
 ```bash
 npm install -g clean-room-skill
+clean-room-skill
 ```
 
-### Direct On-Demand Execution (npx)
+The first command installs the CLI. The second command starts the interactive installer for runtime files, skills, agents, and hooks.
 
-Preferred interactive install/onboarding flow:
+For a direct global runtime install, pass the runtime flag:
 
 ```bash
-npx clean-room-skill@latest
+clean-room-skill --claude --global --yes
+clean-room-skill --codex --global --yes
+clean-room-skill --opencode --global --yes
+clean-room-skill --all --global --yes
 ```
 
-Non-interactive installs:
+If you do not want the CLI installed globally, run the same installer once through `npx`:
 
 ```bash
-npx clean-room-skill@latest --codex --global --yes
 npx clean-room-skill@latest --claude --global --yes
-npx clean-room-skill@latest --pi --global --yes
+npx clean-room-skill@latest --codex --global --yes
 npx clean-room-skill@latest --all --global --yes
 ```
+
+Those `npx` commands install the selected runtime files globally. You do not need to keep running `npx` to use the installed Claude Code, Pi, Codex, or other runtime entry points.
 
 For edge cases such as ccsilo variants or modified Claude directories, add `--config-dir <path-to-claude-config-root>` to target that Claude config root explicitly. If Claude is launched through a wrapper, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper`; the installer runs that exact executable and rejects relative, cwd-local, and `node_modules/.bin` paths.
 
@@ -89,7 +92,6 @@ Pi:
 
 ```bash
 pi install npm:clean-room-skill@latest
-pi install https://github.com/whit3rabbit/clean-room-skill
 npx clean-room-skill@latest --pi --global --yes
 ```
 
@@ -97,124 +99,44 @@ Pi-native package install is preferred. This package declares `pi.skills: ["./sk
 
 Both Pi install paths load bundled skills as `/skill:<name>`, for example `/skill:clean-room`. Pi installs do not currently register clean-room hooks. Installer-managed Pi layouts copy the hook scripts to `hooks/clean-room/` for inspection and future bridge work, but those files are not active enforcement in Pi.
 
-Pi hook enforcement would need a Pi extension, not a `settings.json` edit. Pi extensions can subscribe to tool events such as `tool_call` and `tool_result`, block or mutate tool calls, and are declared with `pi.extensions` in `package.json`; see the [Pi extension docs](https://pi.dev/docs/latest/extensions). This package does not ship that extension yet, so clean-room safety in Pi still depends on role separation, path isolation, schema validation, and any supported hook runtime used for enforcement.
+Pi hook enforcement would need a Pi extension, not a `settings.json` edit. This package does not ship that extension yet, so clean-room safety in Pi still depends on role separation, path isolation, schema validation, and any supported hook runtime used for enforcement.
 
-## How To Run
+## Workflow
 
-Optionally create neutral external run folders and a clean-safe repository stub:
+1. Initialize or bootstrap the run.
+   Use `clean-room-skill init`, `/clean-room:init`, or `/skill:init` to create neutral external run folders and record run preferences. The active `init-config.json` stays out of the clean implementation repository.
 
-```bash
-npx clean-room-skill@latest init
-```
+2. Record the goal contract.
+   Use `/clean-room:preflight` or `/skill:preflight` for the conversational flow, or `clean-room-skill preflight` for artifact-first CLI setup. This creates or validates `preflight-goal.json` on the contaminated/controller side before source discovery, attended mode, or unattended mode.
 
-By default this creates a neutral clean-room project. The default task root is `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with per-task `contaminated/`, `clean/`, and `quarantine/` children, plus one shared `~/Documents/CleanRoom/<project>/implementation/` root. Use `init --single-task` only when you need the legacy flat `~/Documents/CleanRoom/<task-id>/` layout.
+3. Start the controller.
+   Use `/clean-room:attended` or `/skill:attended` for human review gates. Use `/clean-room:unattended` or `/skill:unattended` only after preflight allows bounded unattended work with finite iteration limits and no open questions.
 
-To add another task to the same destination project, pass `init --project <name>` with the existing neutral project name. Plain `init` creates a new generated `proj-xxxxxxxx` project. Project names must stay neutral, like task IDs: a random word pair such as `amber-meadow` or a generated `proj-xxxxxxxx`, never derived from source folder names. Run at most one active task per project at a time because tasks share the implementation root; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
+4. Refocus when state is unclear.
+   Use `/clean-room:refocus` or `/skill:refocus` to audit durable artifacts, compare them to declared scope, and route the run back to missed gates without adding scope.
 
-In Claude Code, invoke skills with the plugin namespace:
+Use `/clean-room` or `/skill:clean-room` when you want the skill to talk through setup, inspect where the run is, and decide whether to continue, refocus, resume, or start over.
 
-```text
-/clean-room:init
-/clean-room:preflight
-/clean-room
-/clean-room:attended
-/clean-room:unattended
-/clean-room:resume-cr
-/clean-room:start-over
-/clean-room:refocus
-```
-
-In Codex, invoke the `clean-room` plugin or bundled skills through `@` or the skills UI. Do not rely on Claude-style slash namespacing in Codex.
-
-In Pi, invoke package skills with `/skill:<name>`:
-
-```text
-/skill:init
-/skill:preflight
-/skill:clean-room
-/skill:attended
-/skill:unattended
-/skill:resume-cr
-/skill:start-over
-/skill:refocus
-```
-
-For unattended inner-loop execution from durable artifacts:
+The CLI also has a bounded inner-loop runner for already approved unattended spec slices:
 
 ```bash
-npx clean-room-skill@latest run \
+clean-room-skill run \
   --task-manifest ~/Documents/CleanRoom/task-1234abcd/contaminated/task-manifest.json \
   --agent-runtime claude \
   --max-iterations 3
 ```
 
-The `run` command executes one bounded inner clean-room loop for an already approved spec slice. It does not replace the outer spec-development workflow.
+The `run` command is not the normal starting point. It executes one bounded inner clean-room loop after the outer controller has created approved durable artifacts.
 
-Use `--agent-commands ./agent-commands.json` only for a custom non-Claude role-session adapter.
+Claude Code skills use `/clean-room:<name>`. Pi skills use `/skill:<name>`. In Codex, invoke the `clean-room` plugin or bundled skills through `@` or the skills UI.
 
-In strict context-management mode, every `agent-commands.json` stage must set `context.fresh_session: true` and `context.brief_path`; see the runner adapter example in `docs/REFERENCE.md`.
+Useful maintenance commands:
 
-## Typical Workflow
-
-![Clean Room Architecture](assets/clean-room-arch.svg)
-
-1. Initialize or bootstrap the run.
-   Use `npx clean-room-skill@latest init` to create neutral external run folders and a clean-safe repository stub, or use `/clean-room:init` in Claude Code or `/skill:init` in Pi for skill-driven run preferences. The active `init-config.json` stays out of the clean implementation repository.
-
-2. Record the goal contract.
-   Use `npx clean-room-skill@latest preflight` or `/clean-room:preflight` before source discovery, attended mode, or unattended mode. This creates or validates `preflight-goal.json` on the contaminated/controller side.
-
-3. Start the controller.
-   Use `/clean-room` or `/clean-room:attended` in Claude Code, or `/skill:clean-room` or `/skill:attended` in Pi, for human review gates. Use unattended entry points only after preflight allows bounded unattended work with finite iteration limits and no open questions.
-
-4. Analyze and sanitize.
-   Source-reading roles produce neutral draft behavior specs and record contaminated-only `discovery_leads` when authorized related surfaces are detected but not analyzed in the assigned unit. A source-denied sanitizer reviews handoff candidates before anything enters the clean domain.
-
-5. Plan, implement, and polish.
-   Clean roles read only approved clean artifacts and the clean destination foundation. The first approved code-development slice is the foundation unit; behavior slices wait until that unit is covered. Agent 2 writes `implementation-plan.json`; Agent 3 writes code/tests under the implementation root and reports under clean artifacts. Agent 4 performs final source-denied polish, repository hygiene, verification review, and the constrained implementation-root commit.
-
-6. Verify and return.
-   Agent 0 performs contaminated-side coverage verification after Agent 3 reaches a terminal state and any configured Agent 4 polish review passes, rejects covered units with unresolved high-priority discovery leads, then writes `clean-room-result.json`.
-
-Use recovery skills instead of chat history:
-
-- `/clean-room:resume-cr`: continue from durable artifacts.
-- `/clean-room:start-over`: archive or quarantine current artifacts without deletion, then restart with a fresh neutral task id.
-- `/clean-room:refocus`: audit current artifacts against declared scope without expanding scope.
-
-## Workflow Entry Points
-
-| Order | Entry point | Type | Use it for |
-| --- | --- | --- | --- |
-| 1 | `npx clean-room-skill@latest init` | CLI command | Create neutral external run folders and a clean-safe `.clean-room/README.md` stub. |
-| 1 | `/clean-room:init` | Skill | Record run preferences, separated roots, schema profile, and model policy. |
-| 1 | `/skill:init` | Pi skill | Record run preferences, separated roots, schema profile, and model policy. |
-| 2 | `npx clean-room-skill@latest preflight` | CLI command | Create or validate the Stage 0 goal contract. |
-| 2 | `/clean-room:preflight` | Skill | Record the required goal, policy, output, and controller-mode contract. |
-| 2 | `/skill:preflight` | Pi skill | Record the required goal, policy, output, and controller-mode contract. |
-| 3 | `/clean-room` | Skill | Start the setup wizard for authorized clean-room work. |
-| 3 | `/clean-room:attended` | Skill | Start the wizard in attended mode with human review gates. |
-| 3 | `/clean-room:unattended` | Skill | Start the wizard in bounded unattended mode with finite loop limits. |
-| 3 | `/skill:clean-room` | Pi skill | Start the setup wizard for authorized clean-room work. |
-| 3 | `/skill:attended` | Pi skill | Start the wizard in attended mode with human review gates. |
-| 3 | `/skill:unattended` | Pi skill | Start the wizard in bounded unattended mode with finite loop limits. |
-| 4 | `npx clean-room-skill@latest run` | CLI command | Execute the bounded inner clean-room runner for one approved spec slice. |
-
-### Maintenance CLI Commands
-
-| Command | Use it for |
-| --- | --- |
-| `npx clean-room-skill@latest doctor` | Smoke test generated Codex, Claude, or OpenCode hook registration. |
-| `npx clean-room-skill@latest status` | Report installed runtime version, drift, and hook state. |
-| `npx clean-room-skill@latest update` | Refresh installed runtime files without onboarding. |
-
-### Recovery Skills
-
-| Skill | Use it for |
-| --- | --- |
-| `/clean-room:resume-cr` | Continue an existing run from durable artifacts. |
-| `/clean-room:start-over` | Non-destructively archive or quarantine current artifacts and restart. |
-| `/clean-room:refocus` | Audit a run and route it back to missed gates without adding scope. |
+```bash
+clean-room-skill doctor --runtime codex --hooks=safe
+clean-room-skill status --global
+clean-room-skill update --global --yes
+```
 
 Reference files:
 
