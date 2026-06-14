@@ -260,7 +260,7 @@ def collect_images(
     ignore_dirs = set(DEFAULT_IGNORE_DIRS) | set(args.ignore_dir)
     images: list[dict[str, Any]] = []
     skipped_entries: list[dict[str, str]] = []
-    counters = {"skipped_count": 0, "total_bytes": 0}
+    counters = {"skipped_count": 0, "total_bytes": 0, "attempted_total_bytes": 0}
     next_image_id = 1
 
     for root in roots:
@@ -270,7 +270,7 @@ def collect_images(
         def limit_reached_reason() -> str | None:
             if len(images) >= args.max_files:
                 return "file-count-limit"
-            if counters["total_bytes"] >= args.max_total_bytes:
+            if counters["attempted_total_bytes"] >= args.max_total_bytes:
                 return "total-byte-limit"
             return None
 
@@ -347,7 +347,7 @@ def collect_images(
                 if stat.st_size > args.max_file_bytes:
                     add_skipped(skipped_entries, counters, rel, "file-byte-limit", "file")
                     continue
-                if counters["total_bytes"] + stat.st_size > args.max_total_bytes:
+                if counters["attempted_total_bytes"] + stat.st_size > args.max_total_bytes:
                     add_skipped(skipped_entries, counters, rel, "total-byte-limit", "file")
                     continue
 
@@ -367,9 +367,10 @@ def collect_images(
                 if len(data) > args.max_file_bytes:
                     add_skipped(skipped_entries, counters, rel, "file-byte-limit-after-read", "file")
                     continue
-                if counters["total_bytes"] + len(data) > args.max_total_bytes:
+                counters["attempted_total_bytes"] += len(data)
+                if counters["attempted_total_bytes"] > args.max_total_bytes:
                     add_skipped(skipped_entries, counters, rel, "total-byte-limit-after-read", "file")
-                    continue
+                    break
 
                 metadata = image_metadata(data, suffix)
                 if metadata is None:
