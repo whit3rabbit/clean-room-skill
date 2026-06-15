@@ -14,7 +14,7 @@ It installs:
 - Role-agent prompts for contaminated analysis, clean planning, clean implementation, and final polish.
 - JSON schemas and examples for durable workflow artifacts.
 - Hook guardrails that help keep source material out of clean artifacts.
-- A small CLI for runtime installation, bootstrap folders, preflight contracts, hook smoke tests, and the bounded inner clean-room runner.
+- A small CLI for runtime installation, bootstrap folders, preflight contracts, canonical artifact templating and validation, hook smoke tests, and the bounded inner clean-room runner.
 
 The workflow creates clean behavioral spec packages and clean implementation outputs. It does not generate replacement code directly from source.
 
@@ -121,12 +121,22 @@ The CLI also has a bounded inner-loop runner for already approved unattended spe
 
 ```bash
 clean-room-skill run \
-  --task-manifest ~/Documents/CleanRoom/task-1234abcd/contaminated/task-manifest.json \
+  --task-manifest ~/Documents/CleanRoom/amber-meadow/tasks/task-1234abcd/contaminated/task-manifest.json \
   --agent-runtime claude \
   --max-iterations 3
 ```
 
 The `run` command is not the normal starting point. It executes one bounded inner clean-room loop after the outer controller has created approved durable artifacts.
+
+You can also list, template, and validate canonical workflow artifacts directly:
+
+```bash
+clean-room-skill artifact kinds
+clean-room-skill artifact template --kind behavior-spec --output ./behavior-spec.json
+clean-room-skill artifact validate --path ./behavior-spec.json
+```
+
+`artifact validate` checks JSON schema conformance; pass `--task-manifest <path> --role <role>` to also run leakage and handoff checks under the matching root and role policy.
 
 Claude Code skills use `/clean-room:<name>`. Pi skills use `/skill:<name>`. In Codex, invoke the `clean-room` plugin or bundled skills through `@` or the skills UI.
 
