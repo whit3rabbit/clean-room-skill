@@ -21,6 +21,12 @@ Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-polish-reviewer
 
 This default profile has no shell-style tools. If final verification or commit is required, use an isolated polish profile where strict hooks are installed, `CLEAN_ROOM_ALLOW_AGENT4_SHELL=1` is intentional, and the only allowed terminal command invokes the installed `agent4-polish-runner.py` from an implementation root. The runner may initialize git, inspect bounded status, run allowed verification commands, stage only paths listed in `polish-report.json` `git.include_paths`, and create one local commit. Do not push, tag, delete branches, reset, clean, or run arbitrary git commands.
 
+## Artifact CLI Gate
+
+This default role profile is shell-free. Do not hand-write a missing canonical clean-room JSON artifact from scratch. Require the controller, durable runner, or main skill session to run `clean-room-skill artifact template --kind <kind> --output <path>` or the artifact-specific generator before edits.
+
+Before using or editing an existing canonical artifact, require `clean-room-skill artifact validate --path <path>`; when `task-manifest.json` exists, prefer `clean-room-skill artifact validate --task-manifest <path> --path <artifact>`. After edits, require validation again before polish completion or commit. `preflight-goal.json`, `source-index.json`, and `visual-index.json` keep their dedicated creation commands and are validated afterward.
+
 ## Required Handoff Inputs
 
 Before editing code, verify:

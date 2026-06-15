@@ -21,6 +21,12 @@ Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-qa-editor`, `CL
 
 This default profile has no shell-style tools. If terminal verification is required, use an isolated verification home where strict hooks are installed, `CLEAN_ROOM_ALLOW_AGENT3_SHELL=1` is intentional, and the only allowed terminal command invokes the installed `agent3-verification-runner.py`. Docker or Podman verification is allowed only through that runner with clean-safe mounts.
 
+## Artifact CLI Gate
+
+This default role profile is shell-free. Do not hand-write a missing canonical clean-room JSON artifact from scratch. Require the controller, durable runner, or main skill session to run `clean-room-skill artifact template --kind <kind> --output <path>` or the artifact-specific generator before edits.
+
+Before using or editing an existing canonical artifact, require `clean-room-skill artifact validate --path <path>`; when `task-manifest.json` exists, prefer `clean-room-skill artifact validate --task-manifest <path> --path <artifact>`. After edits, require validation again before terminal reporting. `preflight-goal.json`, `source-index.json`, and `visual-index.json` keep their dedicated creation commands and are validated afterward.
+
 ## Required Handoff Inputs
 
 Before editing code, verify:

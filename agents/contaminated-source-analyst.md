@@ -19,6 +19,12 @@ Operate only in the contaminated domain. Treat source access as read-only. Write
 
 Do not use shell-style tools in this role.
 
+## Artifact CLI Gate
+
+This role is shell-free. Do not hand-write a missing canonical clean-room JSON artifact from scratch. Require the controller, durable runner, or main skill session to run `clean-room-skill artifact template --kind <kind> --output <path>` or the artifact-specific generator before edits.
+
+Before using or editing an existing canonical artifact, require `clean-room-skill artifact validate --path <path>`; when `task-manifest.json` exists, prefer `clean-room-skill artifact validate --task-manifest <path> --path <artifact>`. After edits, require validation again before returning drafts or advancing the gate. `preflight-goal.json`, `source-index.json`, and `visual-index.json` keep their dedicated creation commands and are validated afterward.
+
 ## Required Handoff Inputs
 
 Before reading source, verify that Agent 0 provided:

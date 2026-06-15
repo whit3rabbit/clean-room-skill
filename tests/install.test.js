@@ -11,6 +11,7 @@ const {
   planInstall,
   planUninstall,
 } = require('../lib/install-plan.cjs');
+const { ARTIFACT_KINDS } = require('../lib/artifact.cjs');
 const {
   parseRuntimeSelection,
   runtimeInstallStatus,
@@ -43,6 +44,22 @@ function spawnSync(command, args, options) {
     return nodeSpawnSync(command, { timeout: TEST_TIMEOUT_MS, ...(args || {}) });
   }
   return nodeSpawnSync(command, args, { timeout: TEST_TIMEOUT_MS, ...(options || {}) });
+}
+
+function writeJson(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function fileSha256(filePath) {
+  return sha256Bytes(fs.readFileSync(filePath));
+}
+
+function canonicalSchemaKinds() {
+  return fs.readdirSync(path.join(ROOT, 'skills', 'clean-room', 'assets'))
+    .filter((fileName) => fileName.endsWith('.schema.json'))
+    .map((fileName) => fileName.slice(0, -'.schema.json'.length))
+    .sort();
 }
 
 function managedHookCommands(value) {
@@ -455,15 +472,36 @@ describe('clean-room-skill installer', () => {
     assert.equal(metadata.roots.implementation_root, path.join(projectRoot, 'implementation'));
     assert.equal(metadata.roots.quarantine, path.join(outputRoot, 'quarantine'));
 
+    const localState = readJson(path.join(targetDir, '.clean-room', 'local-state.json'));
+    assert.equal(localState.schema, 1);
+    assert.equal(localState.package, 'clean-room-skill');
+    assert.equal(localState.layout, 'project');
+    assert.equal(localState.artifact_base_root, artifactBase);
+    assert.equal(localState.project_id, projectIds[0]);
+    assert.equal(localState.project_root, projectRoot);
+    assert.equal(localState.tasks_dir, path.join(projectRoot, 'tasks'));
+    assert.equal(localState.implementation_root, path.join(projectRoot, 'implementation'));
+    assert.equal(localState.latest_task_id, taskIds[0]);
+    assert.equal(localState.latest_task_root, outputRoot);
+    assert.equal(localState.target_profile, 'speckit-feature-folder');
+    assert.equal(
+      fs.readFileSync(path.join(targetDir, '.clean-room', '.gitignore'), 'utf8'),
+      '*\n!.gitignore\n!README.md\n',
+    );
+
     const stub = fs.readFileSync(path.join(targetDir, '.clean-room', 'README.md'), 'utf8');
     assert.match(stub, /Clean Room Bootstrap/);
     assert.match(stub, /Default target profile: `speckit-feature-folder`/);
     assert.match(stub, /shared `implementation\/` clean destination/);
     assert.doesNotMatch(stub, /source roots:/i);
+    assert.doesNotMatch(stub, new RegExp(escapeRegExp(artifactBase)));
+    assert.doesNotMatch(stub, new RegExp(escapeRegExp(projectRoot)));
+    assert.doesNotMatch(stub, new RegExp(escapeRegExp(outputRoot)));
     assert.match(result.stdout, /project: proj-[0-9a-f]{8} \(new\)/);
     assert.match(result.stdout, /project root:/);
     assert.match(result.stdout, /task root:/);
     assert.match(result.stdout, /implementation root \(shared\):/);
+    assert.match(result.stdout, /local state:/);
     assert.match(result.stdout, /Codex:/);
     assert.match(result.stdout, /npx clean-room-skill@latest --codex --global --hooks=safe --yes/);
     assert.match(result.stdout, /start in Codex: invoke the init skill, then clean-room through @ or the skills UI/);
@@ -510,6 +548,15 @@ describe('clean-room-skill installer', () => {
     assert.equal('layout' in metadata, false);
     assert.equal('project_id' in metadata, false);
     assert.equal(metadata.roots.implementation_root, path.join(outputRoot, 'implementation'));
+    const localState = readJson(path.join(targetDir, '.clean-room', 'local-state.json'));
+    assert.equal(localState.layout, 'single-task');
+    assert.equal(localState.latest_task_id, 'task-single');
+    assert.equal(localState.latest_task_root, outputRoot);
+    assert.equal(localState.implementation_root, path.join(outputRoot, 'implementation'));
+    assert.equal(
+      fs.readFileSync(path.join(targetDir, '.clean-room', '.gitignore'), 'utf8'),
+      '*\n!.gitignore\n!README.md\n',
+    );
     assert.match(result.stdout, /task root:/);
     assert.doesNotMatch(result.stdout, /project root:/);
     assert.match(result.stdout, /implementation root:/);
@@ -687,6 +734,129 @@ describe('clean-room-skill installer', () => {
     );
     const metadata = readJson(path.join(projectRoot, 'tasks', 'task-bbbb2222', 'clean-room-bootstrap.json'));
     assert.equal(metadata.roots.implementation_root, path.join(projectRoot, 'implementation'));
+  });
+
+  test('init joins project from repo local state by default', () => {
+    const root = tempDir('clean-room-init-project-local-state');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    const projectRoot = path.join(artifactBase, 'amber-meadow');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const first = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.equal(first.status, 0, first.stderr);
+
+    const second = runInstall([
+      'init', '--target-dir', targetDir, '--task-id', 'task-bbbb2222',
+    ]);
+
+    assert.equal(second.status, 0, second.stderr);
+    assert.match(second.stdout, /project: amber-meadow \(existing\)/);
+    const taskRoot = path.join(projectRoot, 'tasks', 'task-bbbb2222');
+    assert.equal(fs.existsSync(path.join(taskRoot, 'contaminated')), true);
+    const localState = readJson(path.join(targetDir, '.clean-room', 'local-state.json'));
+    assert.equal(localState.project_id, 'amber-meadow');
+    assert.equal(localState.project_root, projectRoot);
+    assert.equal(localState.latest_task_id, 'task-bbbb2222');
+    assert.equal(localState.latest_task_root, taskRoot);
+  });
+
+  test('init warns when a new project pointer replaces a recorded one', () => {
+    const root = tempDir('clean-room-init-pointer-replace');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const first = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--project', 'amber-meadow', '--task-id', 'task-aaaa1111',
+    ]);
+    assert.equal(first.status, 0, first.stderr);
+
+    // A different/single-task layout in the same repo requires --force (the repo
+    // stub conflict guards the non-force path); the warning fires on that overwrite.
+    const switched = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--task-id', 'task-bbbb2222', '--single-task', '--force',
+    ]);
+    assert.equal(switched.status, 0, switched.stderr);
+    assert.match(switched.stderr, /replacing the recorded clean-room project pointer \(amber-meadow\)/);
+    const localState = readJson(path.join(targetDir, '.clean-room', 'local-state.json'));
+    assert.equal(localState.layout, 'single-task');
+  });
+
+  test('init --force ignores a corrupt repo local state instead of dead-ending', () => {
+    const root = tempDir('clean-room-init-force-corrupt-state');
+    const targetDir = path.join(root, 'repo');
+    const artifactBase = path.join(root, 'artifacts');
+    fs.mkdirSync(path.join(targetDir, '.clean-room'), { recursive: true });
+    fs.writeFileSync(path.join(targetDir, '.clean-room', 'local-state.json'), '{ not valid json');
+
+    const blocked = runInstall(['init', '--target-dir', targetDir, '--task-id', 'task-aaaa1111']);
+    assert.notEqual(blocked.status, 0);
+    assert.match(blocked.stderr, /local-state\.json is invalid/);
+    assert.match(blocked.stderr, /pass --new-project or --single-task/);
+
+    const forced = runInstall([
+      'init', '--target-dir', targetDir, '--artifact-base', artifactBase,
+      '--task-id', 'task-bbbb2222', '--force',
+    ]);
+    assert.equal(forced.status, 0, forced.stderr);
+    assert.match(forced.stderr, /--force ignoring invalid/);
+    const localState = readJson(path.join(targetDir, '.clean-room', 'local-state.json'));
+    assert.equal(localState.schema, 1);
+  });
+
+  test('init rejects invalid repo local state instead of creating a disconnected project', () => {
+    const root = tempDir('clean-room-init-project-local-state-invalid');
+    const targetDir = path.join(root, 'repo');
+    const missingArtifactBase = path.join(root, 'missing-artifacts');
+    fs.mkdirSync(path.join(targetDir, '.clean-room'), { recursive: true });
+    fs.writeFileSync(path.join(targetDir, '.clean-room', 'local-state.json'), `${JSON.stringify({
+      schema: 1,
+      package: 'clean-room-skill',
+      layout: 'project',
+      project_id: 'amber-meadow',
+      artifact_base_root: missingArtifactBase,
+      project_root: path.join(missingArtifactBase, 'amber-meadow'),
+      tasks_dir: path.join(missingArtifactBase, 'amber-meadow', 'tasks'),
+      implementation_root: path.join(missingArtifactBase, 'amber-meadow', 'implementation'),
+      latest_task_id: 'task-aaaa1111',
+      latest_task_root: path.join(missingArtifactBase, 'amber-meadow', 'tasks', 'task-aaaa1111'),
+      target_profile: 'speckit-feature-folder',
+      updated_at: new Date().toISOString(),
+    }, null, 2)}\n`);
+
+    const result = runInstall(['init', '--target-dir', targetDir, '--task-id', 'task-bbbb2222']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /local-state\.json is invalid/);
+    assert.match(result.stderr, /project root missing/);
+    assert.equal(fs.existsSync(missingArtifactBase), false);
+
+    const freshArtifactBase = path.join(root, 'fresh-artifacts');
+    const ignored = runInstall([
+      'init',
+      '--target-dir',
+      targetDir,
+      '--artifact-base',
+      freshArtifactBase,
+      '--task-id',
+      'task-cccc3333',
+      '--new-project',
+    ]);
+
+    assert.equal(ignored.status, 0, ignored.stderr);
+    assert.match(ignored.stdout, /project: proj-[0-9a-f]{8} \(new\)/);
+    const projectIds = fs.readdirSync(freshArtifactBase);
+    assert.equal(projectIds.length, 1);
+    assert.equal(
+      fs.existsSync(path.join(freshArtifactBase, projectIds[0], 'tasks', 'task-cccc3333', 'clean-room-bootstrap.json')),
+      true,
+    );
   });
 
   test('init new-project generates a neutral project id', () => {
@@ -917,6 +1087,209 @@ describe('clean-room-skill installer', () => {
     assert.equal(fs.existsSync(path.join(targetDir, '.clean-room')), false);
   });
 
+  test('artifact kinds lists every canonical artifact kind', () => {
+    const result = runInstall(['artifact', 'kinds']);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual([...ARTIFACT_KINDS].sort(), canonicalSchemaKinds());
+    for (const kind of ARTIFACT_KINDS) {
+      assert.match(result.stdout, new RegExp(`- ${escapeRegExp(kind)}:`), kind);
+    }
+    assert.match(result.stdout, /preflight --template or --input/);
+    assert.match(result.stdout, /build_source_index\.py/);
+    assert.match(result.stdout, /build_visual_index\.py/);
+  });
+
+  test('artifact template writes dry-runs refuses overwrite and rejects unsupported kinds', () => {
+    const root = tempDir('clean-room-artifact-template');
+    const output = path.join(root, 'behavior-spec.json');
+
+    let result = runInstall(['artifact', 'template', '--kind', 'behavior-spec', '--output', output, '--dry-run']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Would write behavior-spec artifact template/);
+    assert.equal(fs.existsSync(output), false);
+
+    result = runInstall(['artifact', 'template', '--kind', 'behavior-spec', '--output', output]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readJson(output).spec_id, 'spec-example-flow');
+
+    result = runInstall(['artifact', 'template', '--kind', 'behavior-spec', '--output', output]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /artifact output already exists/);
+
+    result = runInstall(['artifact', 'template', '--kind', 'behavior-spec', '--output', output, '--force']);
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runInstall(['artifact', 'template', '--kind', 'missing-kind', '--output', path.join(root, 'missing.json')]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unknown artifact kind: missing-kind/);
+
+    result = runInstall(['artifact', 'template', '--kind', 'preflight-goal', '--output', path.join(root, 'preflight-goal.json')]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /preflight-goal\.json uses an artifact-specific generator/);
+  });
+
+  test('artifact validate without manifest accepts valid examples and rejects schema errors', () => {
+    const valid = path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'behavior-spec.json');
+    const invalid = path.join(ROOT, 'tests', 'fixtures', 'jsonschema-negative', 'preflight-goal-missing-end-goal.json');
+
+    let result = runInstall(['artifact', 'validate', '--path', valid]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Validated 1 artifact/);
+
+    result = runInstall(['artifact', 'validate', '--path', invalid]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /clean-room schema check failed/);
+  });
+
+  test('artifact validate with task manifest derives roots and runs full validation', () => {
+    const root = tempDir('clean-room-artifact-validate-manifest');
+    const dirs = {
+      source: path.join(root, 'source'),
+      contaminated: path.join(root, 'contaminated'),
+      clean: path.join(root, 'clean'),
+      implementation: path.join(root, 'implementation'),
+      allowed: path.join(root, 'allowed'),
+      quarantine: path.join(root, 'quarantine'),
+    };
+    for (const dir of Object.values(dirs)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    const preflightPath = path.join(dirs.contaminated, 'preflight-goal.json');
+    fs.copyFileSync(
+      path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json'),
+      preflightPath,
+    );
+    const manifest = readJson(path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'task-manifest.json'));
+    manifest.artifact_paths = {
+      contaminated_artifacts: dirs.contaminated,
+      contaminated_artifact_roots: [dirs.contaminated],
+      clean_artifacts: dirs.clean,
+      implementation_roots: [dirs.implementation],
+      quarantine: dirs.quarantine,
+    };
+    manifest.initialization_snapshot.effective_roots = {
+      source_roots: [dirs.source],
+      contaminated_artifact_roots: [dirs.contaminated],
+      clean_root: dirs.clean,
+      implementation_roots: [dirs.implementation],
+      quarantine_root: dirs.quarantine,
+      approved_public_reference_roots: [dirs.allowed],
+    };
+    manifest.preflight_goal_ref = 'preflight-goal.json';
+    manifest.preflight_goal_sha256 = fileSha256(preflightPath);
+    const manifestPath = path.join(dirs.contaminated, 'task-manifest.json');
+    writeJson(manifestPath, manifest);
+
+    const cleanSpec = path.join(dirs.clean, 'behavior-spec.json');
+    fs.copyFileSync(path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'behavior-spec.json'), cleanSpec);
+
+    let result = runInstall([
+      'artifact',
+      'validate',
+      '--task-manifest',
+      manifestPath,
+      '--role',
+      'clean-architect',
+      '--path',
+      cleanSpec,
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Validated 1 artifact/);
+
+    result = runInstall([
+      'artifact',
+      'validate',
+      '--task-manifest',
+      manifestPath,
+      '--role',
+      'not-a-role',
+      '--path',
+      cleanSpec,
+    ]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unknown clean-room role: not-a-role/);
+
+    const misplacedSourceIndex = path.join(dirs.clean, 'source-index.json');
+    fs.copyFileSync(path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'source-index.json'), misplacedSourceIndex);
+    result = runInstall([
+      'artifact',
+      'validate',
+      '--task-manifest',
+      manifestPath,
+      '--role',
+      'clean-architect',
+      '--path',
+      misplacedSourceIndex,
+    ]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /not a clean-role artifact/);
+
+    const outsidePath = path.join(root, 'behavior-spec.json');
+    fs.copyFileSync(path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'behavior-spec.json'), outsidePath);
+    result = runInstall([
+      'artifact',
+      'validate',
+      '--task-manifest',
+      manifestPath,
+      '--role',
+      'clean-architect',
+      '--path',
+      outsidePath,
+    ]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /outside the task manifest roots/);
+
+    const contaminatedHandoff = path.join(dirs.contaminated, 'handoff-package.json');
+    fs.copyFileSync(path.join(ROOT, 'skills', 'clean-room', 'examples', 'valid-handoff-package', 'handoff-package.json'), contaminatedHandoff);
+    result = runInstall([
+      'artifact',
+      'validate',
+      '--task-manifest',
+      manifestPath,
+      '--path',
+      contaminatedHandoff,
+    ]);
+    // Default (manager) role cannot leakage-scan a contaminated-root handoff
+    // package; the command must say so rather than silently skip the scan.
+    assert.match(result.stderr, /leakage scanning of a contaminated-root handoff-package\.json requires --role contaminated-handoff-sanitizer/);
+  });
+
+  test('artifact validate fails closed for files that map to no canonical kind', () => {
+    const root = tempDir('clean-room-artifact-unknown-kind');
+    const garbage = path.join(root, 'notes.json');
+    fs.writeFileSync(garbage, `${JSON.stringify({ hello: 'world' }, null, 2)}\n`);
+
+    const result = runInstall(['artifact', 'validate', '--path', garbage]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /unrecognized clean-room JSON artifact/);
+  });
+
+  test('artifact validate rejects --role without a task manifest', () => {
+    const valid = path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'behavior-spec.json');
+    const result = runInstall(['artifact', 'validate', '--path', valid, '--role', 'clean-architect']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /--role requires --task-manifest/);
+  });
+
+  test('artifact validate reports invalid schema-dir with bundled schema guidance', () => {
+    const root = tempDir('clean-room-artifact-invalid-schema-dir');
+    const valid = path.join(ROOT, 'skills', 'clean-room', 'examples', 'minimal-spec-package', 'behavior-spec.json');
+    const result = runInstall([
+      'artifact',
+      'validate',
+      '--path',
+      valid,
+      '--schema-dir',
+      path.join(root, 'missing-schemas'),
+    ]);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /schema directory not found/);
+    assert.match(result.stderr, /Omit --schema-dir to use bundled schemas/);
+  });
+
   test('preflight template writes an attended draft with blocking questions', () => {
     const root = tempDir('clean-room-preflight-template');
     const output = path.join(root, 'preflight-goal.json');
@@ -927,6 +1300,8 @@ describe('clean-room-skill installer', () => {
     const goal = readJson(output);
     assert.equal(goal.controller_policy.mode, 'attended');
     assert.equal(goal.controller_policy.unattended_allowed_after_preflight, false);
+    assert.equal(goal.output_policy.artifact_base_root, '~/Documents/CleanRoom/<project>/tasks/<task-id>/');
+    assert.equal(goal.output_policy.implementation_root, '~/Documents/CleanRoom/<project>/implementation/');
     assert.equal(goal.open_questions.some((question) => question.blocking === true), true);
     assert.equal(goal.intent_confirmation, undefined);
     assert.match(result.stdout, /Wrote preflight goal/);
@@ -1558,6 +1933,31 @@ describe('clean-room-skill installer', () => {
     }
   });
 
+  test('clean-room skills discover repo local state before declaring no artifacts', () => {
+    const cleanRoom = fs.readFileSync(path.join(ROOT, 'skills', 'clean-room', 'SKILL.md'), 'utf8');
+    assert.match(cleanRoom, /\.clean-room\/local-state\.json/);
+    assert.match(cleanRoom, /target-repository `\.clean-room\/tasks\/` as noncanonical/);
+    assert.match(cleanRoom, /Invalid, legacy-shaped, or schema-incompatible `task-manifest\.json`/);
+    assert.match(cleanRoom, /Project with only completed task directories/);
+
+    const resume = fs.readFileSync(path.join(ROOT, 'skills', 'resume-cr', 'SKILL.md'), 'utf8');
+    assert.match(resume, /Discovery Before Load/);
+    assert.match(resume, /\.clean-room\/local-state\.json/);
+    assert.match(resume, /If a candidate `task-manifest\.json` is present but invalid/);
+    assert.match(resume, /Do not say no artifacts exist/);
+
+    for (const relPath of ['skills/attended/SKILL.md', 'skills/unattended/SKILL.md']) {
+      const content = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
+      assert.match(content, /current-repo `\.clean-room\/local-state\.json`/, relPath);
+      assert.match(content, /target-repo `\.clean-room\/tasks\/` as noncanonical/, relPath);
+      assert.match(content, /create the next task in that project by default/, relPath);
+    }
+
+    const init = fs.readFileSync(path.join(ROOT, 'skills', 'init', 'SKILL.md'), 'utf8');
+    assert.match(init, /\.clean-room\/local-state\.json/);
+    assert.match(init, /joins that project by default unless `--new-project` or `--single-task`/);
+  });
+
   test('role agents document Claude Code tool parameter contract', () => {
     const relPaths = [
       'agents/clean-architect.md',
@@ -1573,6 +1973,32 @@ describe('clean-room-skill installer', () => {
       assert.match(content, /`Read` uses `file_path`/, relPath);
       assert.match(content, /`Write` uses `file_path` and `content`/, relPath);
       assert.match(content, /`Bash` uses `command` only/, relPath);
+    }
+  });
+
+  test('role prompts require CLI artifact template and validation gates', () => {
+    const claudeRelPaths = [
+      'agents/clean-architect.md',
+      'agents/clean-implementer-verifier-shell.md',
+      'agents/clean-polish-reviewer.md',
+      'agents/clean-qa-editor.md',
+      'agents/contaminated-handoff-sanitizer.md',
+      'agents/contaminated-manager-verifier.md',
+      'agents/contaminated-source-analyst.md',
+    ];
+    for (const relPath of claudeRelPaths) {
+      const content = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
+      assert.match(content, /clean-room-skill artifact template --kind <kind> --output <path>/, relPath);
+      assert.match(content, /clean-room-skill artifact validate --path <path>/, relPath);
+      assert.match(content, /Do not hand-write a missing canonical clean-room JSON artifact from scratch/, relPath);
+    }
+
+    const codexDir = path.join(ROOT, 'examples', 'codex', '.codex', 'agents');
+    for (const fileName of fs.readdirSync(codexDir).filter((name) => name.endsWith('.toml'))) {
+      const content = fs.readFileSync(path.join(codexDir, fileName), 'utf8');
+      assert.match(content, /clean-room-skill artifact template --kind <kind> --output <path>/, fileName);
+      assert.match(content, /clean-room-skill artifact validate --path <path>/, fileName);
+      assert.match(content, /Do not hand-write missing canonical JSON artifacts from scratch/, fileName);
     }
   });
 

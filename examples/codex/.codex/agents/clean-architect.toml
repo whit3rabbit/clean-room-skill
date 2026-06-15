@@ -11,6 +11,7 @@ Before tool use, require CLEAN_ROOM_ROLE=clean-architect, CLEAN_ROOM_CLEAN_ROOTS
 Read approved clean artifacts, CLEAN_ROOM_IMPLEMENTATION_ROOTS, and explicitly configured public or destination constraint roots only.
 Write only under CLEAN_ROOM_CLEAN_ROOTS. Do not write code.
 Do not read source workspaces, visual roots, raw screenshots, visual indexes, contaminated ledgers, contaminated chat history, or the full task-manifest.json.
+Do not hand-write missing canonical JSON artifacts from scratch. Require the controller, durable runner, or main skill session to run clean-room-skill artifact template --kind <kind> --output <path> or the artifact-specific generator first; require clean-room-skill artifact validate --path <path>, preferably with --task-manifest when available, before using existing artifacts and again after edits.
 Stop if only a full task-manifest.json is provided as run context.
 Before planning, require valid clean-run-context.json with clean-safe goal_contract fields and code_hygiene_policy, approved handoff-package.json, approved behavior specs, and an implementation root through CLEAN_ROOM_IMPLEMENTATION_ROOTS. For behavior slices, require the approved clean artifacts to include the completed foundation spec or equivalent clean-run-context constraints.
 When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allowed artifact refs named there, plus destination foundation reads permitted by this role.

@@ -20,7 +20,7 @@ Use separate locations for each trust domain:
 
 Clean, contaminated, and implementation paths must remain neutral. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters and use it under `~/Documents/CleanRoom/`.
 
-Multiple tasks targeting the same destination may be grouped under an optional clean-room project: `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with one shared `<project>/implementation/` root. Project names follow the same neutrality rules as task IDs: a random neutral word pair (such as `amber-meadow`) or `proj-` plus 8 lowercase hex characters, matching `[a-z0-9][a-z0-9-]{0,63}`. Because the shared implementation root serves every task in the project, run at most one active task per project at a time; root-separation checks for one task cannot see a sibling task's concurrent clean implementation session. `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root, but manually launched role sessions outside the runner must still respect the rule.
+Tasks targeting the same destination default to a clean-room project: `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with one shared `<project>/implementation/` root. Project names follow the same neutrality rules as task IDs: a random neutral word pair (such as `amber-meadow`) or `proj-` plus 8 lowercase hex characters, matching `[a-z0-9][a-z0-9-]{0,63}`. Because the shared implementation root serves every task in the project, run at most one active task per project at a time; root-separation checks for one task cannot see a sibling task's concurrent clean implementation session. `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root, but manually launched role sessions outside the runner must still respect the rule. Use the legacy flat `~/Documents/CleanRoom/<task-id>/` layout only when explicitly running single-task compatibility mode.
 
 Do not derive task IDs, project names, clean roots, contaminated artifact roots, or implementation roots from source folder names. The initialization wizard and environment preflight reject artifact paths that contain a source root basename or meaningful non-generic tokens from that basename.
 
@@ -72,6 +72,18 @@ Run `scripts/build_visual_index.py` only when no indexable source code exists an
 Use `scripts/clean_room_tool_manager.py --status` when the controller needs to inspect optional AST/indexing helpers before indexing. It checks env overrides, `~/.cache/re-skills/clean-room-tools/`, skill-local tools, system PATH roots, and user toolchain PATH roots. It does not install anything unless the user explicitly runs `--install-local` with a strict SemVer version. Local npm-backed installs hold a cache-local lock before mutating the shared npm prefix and return structured JSON error facts for prefix creation failures, subprocess timeouts, and subprocess launch errors. Target-project `.local/bin`, `.bin`, and `node_modules/.bin` stay untrusted unless `--allow-working-project-tools` or `RE_SKILLS_TRUST_PROJECT_TOOLS=1` is set. Tools discovered under `/opt/homebrew` or `/usr/local` remain stat-only during `--probe-tools` unless `--allow-user-toolchain-probes` is also set.
 
 Post-write hooks fail closed on filesystem races. Schema validation, leakage scanning, and handoff integrity checks should report redacted validation failures when an artifact cannot be statted, read, parsed, scanned, or hashed, rather than surfacing raw Python exceptions or absolute source-derived paths.
+
+## Artifact Creation And Validation
+
+The controller, durable runner, or main skill session runs artifact CLI commands. Shell-free role agents must not hand-write missing canonical JSON artifacts from scratch.
+
+Use this sequence for every canonical clean-room JSON artifact:
+
+- New artifact: `clean-room-skill artifact template --kind <kind> --output <path>` or the artifact-specific generator, then edit, then `clean-room-skill artifact validate --path <path>`.
+- Existing artifact: `clean-room-skill artifact validate --path <path>` before reuse or edits, then validate again after edits.
+- Manifest-backed run: prefer `clean-room-skill artifact validate --task-manifest <task-manifest.json> --path <artifact>` so root policy, leakage checks, and handoff checks match runner behavior.
+
+Creation exceptions stay explicit: `preflight-goal.json` uses `clean-room-skill preflight --template` or `--input`; `source-index.json` uses `scripts/build_source_index.py`; `visual-index.json` uses `scripts/build_visual_index.py`. Validate all three after generation with `clean-room-skill artifact validate`.
 
 Do not treat skill frontmatter or allowed tool lists as a complete enforcement boundary.
 
@@ -213,8 +225,8 @@ Clean polish reviewer:
    - Stop before source discovery if authorization, scope, output roots, or blocking product intent are unclear.
 2. Initialization gate:
    - Record reusable preferences in `init-config.json` when requested.
-   - Default the artifact base root to `~/Documents/CleanRoom/<task-id>/` unless the user selects another separated location. Generate a neutral `task-` plus 8 lowercase hex characters when the user does not provide an explicitly approved neutral task ID.
-   - When grouping tasks under a project, place the task root at `~/Documents/CleanRoom/<project>/tasks/<task-id>/`, share the project-level `implementation/` root, and record `project_id` and `project_root` in `init-config.json` and the manifest `initialization_snapshot`.
+   - Default the task root to `~/Documents/CleanRoom/<project>/tasks/<task-id>/` unless the user selects another separated location. Generate a neutral `task-` plus 8 lowercase hex characters when the user does not provide an explicitly approved neutral task ID.
+   - Use the project recorded by `.clean-room/local-state.json` when adding work to an existing destination project; otherwise create or record a neutral project, share the project-level `implementation/` root, and record `project_id` and `project_root` in `init-config.json` and the manifest `initialization_snapshot`.
    - Reject clean, contaminated, or implementation roots that mirror source root basenames or meaningful non-generic source-name tokens.
    - Record model preferences as a default model plus optional domain or role overrides.
    - Split user rules into clean-safe and contaminated-only rules.

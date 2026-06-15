@@ -31,9 +31,9 @@ Optional Docker or Podman support is limited to Agent 3 verification containers.
 
 ### Path Naming Guards
 
-Artifact roots must not disclose private source names. New runs default to `~/Documents/CleanRoom/<task-id>/`; when no explicitly approved neutral task ID is provided, the controller generates `task-` plus 8 lowercase hex characters instead of using the source folder name.
+Artifact roots must not disclose private source names. New runs default to the project layout at `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with one shared `<project>/implementation/` root. When no explicitly approved neutral task ID is provided, the controller generates `task-` plus 8 lowercase hex characters instead of using the source folder name.
 
-Multiple tasks targeting the same destination may be grouped under an optional clean-room project: `~/Documents/CleanRoom/<project>/tasks/<task-id>/` with one shared `<project>/implementation/` root. Project names follow the same neutrality rule as task IDs: a random neutral word pair (such as `amber-meadow`) or a generated `proj-` plus 8 lowercase hex characters, matching `[a-z0-9][a-z0-9-]{0,63}` and never derived from source folder names. Because the implementation root is shared, run at most one active task per project at a time; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
+Project names follow the same neutrality rule as task IDs: a random neutral word pair (such as `amber-meadow`) or a generated `proj-` plus 8 lowercase hex characters, matching `[a-z0-9][a-z0-9-]{0,63}` and never derived from source folder names. The target repository may contain an ignored `.clean-room/local-state.json` pointer to the external project for later discovery; active artifacts remain under the external project task root. Because the implementation root is shared, run at most one active task per project at a time; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
 
 ![Artifact Roots](assets/2.png)
 

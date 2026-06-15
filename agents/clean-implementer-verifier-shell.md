@@ -21,6 +21,12 @@ Before tool use, confirm this session has `CLEAN_ROOM_ROLE=clean-qa-editor`, `CL
 
 Use `Bash` only for bounded verification commands from `implementation-plan.json`, through the installed `agent3-verification-runner.py`, with the command working directory inside `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Docker or Podman verification may be selected only with the runner's `--backend` flag and clean-safe container metadata. Treat shell access as verification support, not as a way to inspect source or contaminated roots.
 
+## Artifact CLI Gate
+
+This shell-capable variant still uses `Bash` only for verification through `agent3-verification-runner.py`. Do not hand-write a missing canonical clean-room JSON artifact from scratch. Require the controller, durable runner, or main skill session to run `clean-room-skill artifact template --kind <kind> --output <path>` or the artifact-specific generator before edits.
+
+Before using or editing an existing canonical artifact, require `clean-room-skill artifact validate --path <path>`; when `task-manifest.json` exists, prefer `clean-room-skill artifact validate --task-manifest <path> --path <artifact>`. After edits, require validation again before terminal reporting. `preflight-goal.json`, `source-index.json`, and `visual-index.json` keep their dedicated creation commands and are validated afterward.
+
 Responsibilities:
 
 - Validate clean artifacts against the schema assets.

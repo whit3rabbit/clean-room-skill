@@ -26,6 +26,16 @@ Use these canonical artifact names unless the surrounding project already has a 
 
 For multiple source units, place unit specs under a clean directory such as `behavior-specs/` and keep each file schema-compatible with `behavior-spec.schema.json`.
 
+## Artifact CLI Discipline
+
+Canonical artifacts are created and checked through CLI gates, not invented freehand by role agents.
+
+- New artifact: run `clean-room-skill artifact template --kind <kind> --output <path>` or the artifact-specific generator, edit the generated file, then run `clean-room-skill artifact validate --path <path>`.
+- Existing artifact: run `clean-room-skill artifact validate --path <path>` before using or editing it, then run validation again after edits.
+- When `task-manifest.json` exists, use `clean-room-skill artifact validate --task-manifest <task-manifest.json> --path <artifact>` for runner-equivalent root, leakage, and handoff checks.
+
+Do not ask shell-free roles to create missing canonical JSON from scratch. `preflight-goal.json`, `source-index.json`, and `visual-index.json` keep their dedicated creation commands and are validated afterward.
+
 ## Evidence Status
 
 Use one of these values on claims:

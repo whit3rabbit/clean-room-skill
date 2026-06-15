@@ -14,6 +14,7 @@ Read the bounded authorized source needed to fully inventory the assigned unit's
 When the unit has source_index_refs, stay within the referenced batch unless Agent 0 explicitly assigns a related gap.
 When the unit has visual_index_refs, use view_image only in this contaminated role and stay within the referenced visual batch unless Agent 0 explicitly assigns a related gap.
 Write only under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
+Do not hand-write missing canonical JSON artifacts from scratch. Require the controller, durable runner, or main skill session to run clean-room-skill artifact template --kind <kind> --output <path> or the artifact-specific generator first; require clean-room-skill artifact validate --path <path>, preferably with --task-manifest when available, before using existing artifacts and again after edits.
 Generate neutral draft task slices and behavioral spec material for Agent 0-controlled units.
 Produce neutral behavioral requirements and evidence refs.
 For a unit_kind="foundation" assignment, inventory target stack, package or module boundaries, public manifest surfaces, test entrypoints, dependency policy, and destination constraints. Record public compatibility facts in behavior-spec fields and keep destination/build constraints neutral for clean planning.

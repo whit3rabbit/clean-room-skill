@@ -374,7 +374,7 @@ describe('clean-room schema hook policy', () => {
 
     let result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: arbitrary } }, env);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /unrecognized clean JSON artifact/);
+    assert.match(result.stderr, /unrecognized clean-room JSON artifact/);
 
     const taskManifest = copyExample('task-manifest.json', clean);
     result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: taskManifest } }, env);

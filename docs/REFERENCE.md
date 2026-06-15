@@ -176,13 +176,13 @@ Options:
 | `--artifact-base <path>` | External CleanRoom base; default is `~/Documents/CleanRoom`. |
 | `--task-id <id>` | Neutral task id; default is generated `task-xxxxxxxx`. |
 | `--project <name>` | Group the task under a named clean-room project; joins the project when it already exists. Names must be neutral (`[a-z0-9][a-z0-9-]{0,63}`, never derived from source or workspace folder names). |
-| `--new-project` | Explicitly create a project with a generated `proj-xxxxxxxx` name. This is the default unless `--single-task` is passed. Cannot be combined with `--project`. |
+| `--new-project` | Explicitly create a project with a generated `proj-xxxxxxxx` name. This is the default only when the target repo has no valid `.clean-room/local-state.json` project pointer and `--single-task` is not passed. Cannot be combined with `--project`. |
 | `--single-task` | Use the legacy flat layout under `<artifact-base>/<task-id>`. Cannot be combined with `--project` or `--new-project`. |
 | `--target-profile <name>` | `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`. |
 | `--dry-run` | Print actions without writing files. |
 | `--force` | Overwrite existing bootstrap metadata and repo stub. |
 
-By default, `init` creates a project layout. Plain `init` creates a new generated `proj-xxxxxxxx` project; pass `--project <name>` to add a task to an existing project. Tasks live under `<artifact-base>/<project>/tasks/<task-id>/` with per-task `contaminated/`, `clean/`, and `quarantine/`, while every task in the project shares one `<artifact-base>/<project>/implementation/` root:
+By default, `init` creates a project layout. Plain `init` joins the valid project recorded by target repo `.clean-room/local-state.json` when one exists; otherwise it creates a new generated `proj-xxxxxxxx` project. Pass `--project <name>` to add a task to a specific existing project, or `--new-project` to ignore the local pointer and start a fresh project. Tasks live under `<artifact-base>/<project>/tasks/<task-id>/` with per-task `contaminated/`, `clean/`, and `quarantine/`, while every task in the project shares one `<artifact-base>/<project>/implementation/` root:
 
 ```text
 <artifact-base>/<project>/
@@ -204,8 +204,9 @@ With `--single-task`, `init` creates the legacy flat layout under `<artifact-bas
 - `quarantine/`
 - `clean-room-bootstrap.json`
 - `.clean-room/README.md` in the target repository
+- ignored `.clean-room/local-state.json` and `.clean-room/.gitignore` in the target repository
 
-Re-running `init --project <name>` with a new task id joins the existing project without `--force`: the project metadata and shared `implementation/` are reused, and only the new task folders must not already exist. Because tasks share the implementation root, run at most one active task per project at a time; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
+Re-running `init` with a target repo local pointer, or `init --project <name>` with a new task id, joins the existing project without `--force`: the project metadata and shared `implementation/` are reused, and only the new task folders must not already exist. The `.clean-room/README.md` stub is clean-safe and committable; `.clean-room/local-state.json` contains absolute external artifact paths and is ignored. Because tasks share the implementation root, run at most one active task per project at a time; `clean-room-skill run` enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
 
 Do not commit source roots, contaminated artifact paths, private identifiers, source-derived names, `preflight-goal.json`, `init-config.json`, `task-manifest.json`, `controller-status.json`, `role-session-brief.json`, or `clean-run-context.json` into the clean implementation repository.
 
@@ -216,8 +217,8 @@ Do not commit source roots, contaminated artifact paths, private identifiers, so
 Usage:
 
 ```bash
-npx clean-room-skill@latest preflight --template --output ~/Documents/CleanRoom/task-1234abcd/contaminated/preflight-goal.json
-npx clean-room-skill@latest preflight --input ./preflight-goal.json --output ~/Documents/CleanRoom/task-1234abcd/contaminated/preflight-goal.json
+npx clean-room-skill@latest preflight --template --output ~/Documents/CleanRoom/amber-meadow/tasks/task-1234abcd/contaminated/preflight-goal.json
+npx clean-room-skill@latest preflight --input ./preflight-goal.json --output ~/Documents/CleanRoom/amber-meadow/tasks/task-1234abcd/contaminated/preflight-goal.json
 npx clean-room-skill@latest preflight --template --bootstrap ~/Documents/CleanRoom/task-1234abcd
 npx clean-room-skill@latest preflight --template --bootstrap ~/Documents/CleanRoom/amber-meadow/tasks/task-1234abcd
 ```

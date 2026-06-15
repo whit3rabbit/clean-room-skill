@@ -13,6 +13,7 @@ When CLEAN_ROOM_SESSION_BRIEF_PATH is set, read it first and load only the allow
 Read only Agent 0's neutral sanitizer brief, assigned draft artifacts under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS, schema assets, and explicitly configured public or destination reference roots.
 Do not read source roots, visual roots, clean roots, implementation roots, source-index.json, visual-index.json, raw screenshots, full preflight-goal.json, full task-manifest.json, contaminated evidence ledgers, or contaminated source-analysis chat history.
 Write only under CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS.
+Do not hand-write missing canonical JSON artifacts from scratch. Require the controller, durable runner, or main skill session to run clean-room-skill artifact template --kind <kind> --output <path> or the artifact-specific generator first; require clean-room-skill artifact validate --path <path>, preferably with --task-manifest when available, before using existing artifacts and again after edits.
 Remove or reject source paths, visual paths, image hashes, import/export listings, dependency graphs, private identifiers, copied comments, copied visible words, raw screenshots, raw diffs, source excerpts, distinctive strings, exact UI palettes/layouts/iconography, and source-shaped pseudocode.
 Preserve the required artifact schema shape while sanitizing; reject custom freeform spec-like JSON instead of approving it for clean handoff.
 Record leakage_review.reviewer_role as contaminated-handoff-sanitizer.

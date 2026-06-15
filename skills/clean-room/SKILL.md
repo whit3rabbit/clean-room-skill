@@ -40,6 +40,18 @@ Use these roles conceptually. If the host supports subagents, map each role to a
 
 Read `references/PREFLIGHT.md` before collecting the goal contract. Read `references/PROCESS.md` before running the workflow. Read `references/CONTROLLER-LOOP.md` before running attended, unattended, or resume controller work. Read `references/LEAKAGE-RULES.md` before writing or reviewing any artifact that crosses from contaminated to clean work. Read `references/SPEC-SCHEMA.md` when creating or validating artifact contents. Read `references/TARGET-LANGUAGE-GUIDE.md` when a destination language, framework, or public compatibility target is part of the request.
 
+## Artifact CLI Discipline
+
+The controller, durable runner, or main skill session owns artifact CLI execution. Role agents remain shell-free unless they are using the explicit Agent 3 or Agent 4 verification runners.
+
+For every canonical clean-room JSON artifact:
+
+- New artifact: run `clean-room-skill artifact template --kind <kind> --output <path>` or the artifact-specific generator first, then edit the generated file, then run `clean-room-skill artifact validate --path <path>` before the next gate.
+- Existing artifact: run `clean-room-skill artifact validate --path <path>` before using or editing it, edit only after it validates or the controller accepts the repair target, then run validation again after edits.
+- When a `task-manifest.json` exists, prefer `clean-room-skill artifact validate --task-manifest <path> --path <artifact>` so validation uses the same roots and hook checks as the runner.
+
+Do not let shell-free role agents hand-write missing canonical artifacts from scratch. If an artifact is missing, invalid, or stale, the role must stop and require the controller, runner, or main skill session to create or validate it. `preflight-goal.json` still uses `clean-room-skill preflight --template` or `--input`; `source-index.json` and `visual-index.json` still use their dedicated indexer scripts before artifact validation.
+
 Agent zero/controller must set and pass the clean-room environment block into every role session before tool use. Do not assume a new agent session inherits prior values. Required values are `CLEAN_ROOM_ROLE`, `CLEAN_ROOM_SOURCE_ROOTS`, `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, `CLEAN_ROOM_SCHEMA_DIR`, and, for clean or source-denied roles, `CLEAN_ROOM_ALLOWED_READ_ROOTS`.
 
 When `context_management.mode` is `role-session-briefs`, every role session starts from `CLEAN_ROOM_SESSION_BRIEF_PATH` plus the environment block. In `strict` enforcement, the controller must start a fresh model session, profile, or thread for each role, pass `CLEAN_ROOM_FRESH_CONTEXT_REQUIRED=1`, and keep the stage prompt, session brief, artifact ref count, and referenced artifact bytes inside the recorded budgets. Do not clear or delete durable artifacts to save tokens. Clear only model/chat context between roles.
@@ -79,17 +91,22 @@ Before asking preflight questions, perform read-only run-state discovery. Do not
 Discovery order:
 
 1. Resolve explicit user-provided paths first. Accept a task root, `task-manifest.json`, `preflight-goal.json`, or `clean-room-bootstrap.json`.
-2. Inspect configured clean-room roots from the current request or environment, including `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, and `CLEAN_ROOM_IMPLEMENTATION_ROOTS` when present.
-3. Scan `~/Documents/CleanRoom/task-*` (legacy single-task layout) and `~/Documents/CleanRoom/*/clean-room-project.json` plus `~/Documents/CleanRoom/*/tasks/task-*` (project layout) as a bounded fallback. Inspect only immediate project directories, their `tasks/` children, and expected artifact names.
+2. Inspect the current working directory and its ancestors for `.clean-room/local-state.json`. If present, read it as a repo-local pointer to the external clean-room project; resolve `project_root`, `tasks_dir`, `implementation_root`, `latest_task_root`, and expected artifact names from that pointer before any global scan.
+3. Inspect configured clean-room roots from the current request or environment, including `CLEAN_ROOM_CONTAMINATED_ARTIFACT_ROOTS`, `CLEAN_ROOM_CLEAN_ROOTS`, and `CLEAN_ROOM_IMPLEMENTATION_ROOTS` when present.
+4. Scan `~/Documents/CleanRoom/task-*` (legacy single-task layout) and `~/Documents/CleanRoom/*/clean-room-project.json` plus `~/Documents/CleanRoom/*/tasks/task-*` (project layout) as a bounded fallback. Inspect only immediate project directories, their `tasks/` children, and expected artifact names.
+
+Treat target-repository `.clean-room/tasks/` as noncanonical unless the user explicitly provides that path or the repo-local pointer identifies it as the external task root. Active artifacts belong under the external task root recorded by `clean-room-bootstrap.json`, `clean-room-project.json`, or `.clean-room/local-state.json`, not under the target repo stub.
 
 If more than one candidate run is found without an explicit user path, list the candidate task roots grouped by project and stop for explicit selection. Do not choose the newest candidate automatically.
 
 Classify the selected candidate before starting the wizard:
 
 - Valid `task-manifest.json`: route to `resume-cr` and continue from the earliest incomplete gate.
+- Invalid, legacy-shaped, or schema-incompatible `task-manifest.json`: stop, report the exact path and validation errors, and do not say no artifacts exist.
 - Valid canonical `preflight-goal.json` without `task-manifest.json`: continue at source/destination discovery and manifest creation. Do not ask the preflight wizard again.
 - `clean-room-bootstrap.json` only: run preflight using the bootstrap roots.
 - `clean-room-project.json` with no task directories under `tasks/`: treat as an empty project and offer to create its first task inside that project.
+- Project with only completed task directories: when the user asks to add more work, create the next task inside the same project and shared `implementation/` root by default.
 - Invalid `preflight-goal.json`: stop, report canonical schema or required-field errors, and do not create a replacement preflight.
 - No artifacts found: start the normal preflight wizard.
 
@@ -99,7 +116,7 @@ Gather only the setup facts needed to decide whether the workflow may start, or 
 
 - Authorization statement, requester, allowed actions, prohibited actions, and evidence handling.
 - Artifact base root. Default the task root to `~/Documents/CleanRoom/<project>/tasks/<task-id>/`. If the user does not provide an explicitly approved neutral task ID, generate one as `task-` plus 8 lowercase hex characters. Do not derive task IDs or output directory names from source folder names.
-- Project grouping. Default to the clean-room project layout: `<base>/<project>/tasks/<task-id>/` with one shared `<base>/<project>/implementation/` root for every task in the project. When the user does not supply an approved neutral project name, generate `proj-` plus 8 lowercase hex characters; it must match `[a-z0-9][a-z0-9-]{0,63}`, must never be derived from source or destination folder basenames or meaningful source-name tokens, and appears in paths clean roles can see. Use the legacy flat `<base>/<task-id>/` layout only when the user explicitly chooses single-task compatibility. Only one task per project may run at a time because tasks share the implementation root; the durable runner enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
+- Project grouping. Default to the clean-room project layout: `<base>/<project>/tasks/<task-id>/` with one shared `<base>/<project>/implementation/` root for every task in the project. If `.clean-room/local-state.json` points at a valid existing project, add new tasks to that project by default. When no existing project is detected and the user does not supply an approved neutral project name, generate `proj-` plus 8 lowercase hex characters; it must match `[a-z0-9][a-z0-9-]{0,63}`, must never be derived from source or destination folder basenames or meaningful source-name tokens, and appears in paths clean roles can see. Use the legacy flat `<base>/<task-id>/` layout only when the user explicitly chooses single-task compatibility. Only one task per project may run at a time because tasks share the implementation root; the durable runner enforces this with an advisory `.clean-room-implementation.lock` in each implementation root.
 - Source roots or fallback visual evidence roots, contaminated artifact root, clean artifact root, clean implementation root, quarantine root, and optional public or destination reference roots.
 - Explicit user-confirmed end goal, target stack, and destination constraints from `preflight-goal.json`.
 - Target schema profile: `openspec-delta`, `gsd-planning-package`, `speckit-feature-folder`, or `kiro-spec-folder`.

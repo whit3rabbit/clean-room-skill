@@ -505,7 +505,7 @@ describe('clean-room access hook policy', () => {
 
     const result = runHook('validate-json-schema.py', { tool_name: 'Write', tool_input: { file_path: unknown } }, env);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /unrecognized clean JSON artifact/);
+    assert.match(result.stderr, /unrecognized clean-room JSON artifact/);
   });
 
   test('auxiliary JSON allowlist entries must stay under clean roots', () => {

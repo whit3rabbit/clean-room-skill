@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-06-15
+
+### Added
+
+- `clean-room-skill artifact` subcommand to list canonical artifact kinds (`kinds`), write schema-shaped starters (`template`), and validate artifact JSON (`validate`).
+- `clean-room-skill init` now records a repo-local `.clean-room/local-state.json` pointer and joins the recorded project by default on re-run; pass `--new-project` or `--single-task` to opt out.
+
+### Changed
+
+- Preflight template defaults now reflect the project layout (`<project>/tasks/<task-id>/` and `<project>/implementation/`).
+- Role prompts and docs require using the `artifact` CLI to template and validate canonical artifacts rather than hand-writing them.
+
+### Fixed
+
+- `artifact validate` fails closed when a file maps to no canonical artifact kind (via `CLEAN_ROOM_REQUIRE_ARTIFACT_KIND`), requires `--path` files to live under the task-manifest roots, and rejects `--role` without `--task-manifest`.
+- `artifact validate` warns when a contaminated-root `handoff-package.json` is validated under a non-sanitizer role, where the leakage scan would otherwise be silently skipped.
+- `clean-room-skill init` surfaces an actionable error for a corrupt or invalid `.clean-room/local-state.json` (and `--force` now bypasses it), validates single-task local state, and warns when a run replaces a recorded project pointer.
+- `clean-room-skill init` no longer aborts with a raw `EISDIR` when `.clean-room/.gitignore` is a directory, and no longer leaks a raw JSON parse error when recorded project metadata is unreadable.
+
 ## [0.4.1] - 2026-06-14
 
 ### Fixed

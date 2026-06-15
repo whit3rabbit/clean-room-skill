@@ -1022,6 +1022,10 @@ def main() -> int:
             print(f"clean-room schema check failed: {redact_text(error)}", file=sys.stderr)
         return 1
     run_completion_guard = completion_guard_enabled(payload)
+    # Opt-in strict mode used by `clean-room-skill artifact validate`: a file that
+    # cannot be mapped to a canonical artifact kind must fail closed rather than
+    # pass vacuously, so the CLI never reports "Validated" for a non-artifact file.
+    require_artifact_kind = os.environ.get("CLEAN_ROOM_REQUIRE_ARTIFACT_KIND") == "1"
     for path in paths:
         if path.suffix.lower() != ".json" or not path.is_file():
             continue
@@ -1037,7 +1041,7 @@ def main() -> int:
             print_repair_hint()
             return 1
         if not isinstance(data, dict):
-            if in_clean_root:
+            if in_clean_root or require_artifact_kind:
                 print(
                     f"clean-room schema check failed for {describe_path(path)}: clean JSON artifact must be an object",
                     file=sys.stderr,
@@ -1052,9 +1056,9 @@ def main() -> int:
                 for error in allowlist_errors:
                     print(f"clean-room schema check failed: {redact_text(error)}", file=sys.stderr)
                 return 1
-            if in_clean_root and not allowed:
+            if (in_clean_root or require_artifact_kind) and not allowed:
                 print(
-                    f"clean-room schema check failed for {describe_path(path)}: unrecognized clean JSON artifact",
+                    f"clean-room schema check failed for {describe_path(path)}: unrecognized clean-room JSON artifact (no schema kind could be inferred)",
                     file=sys.stderr,
                 )
                 print_repair_hint()

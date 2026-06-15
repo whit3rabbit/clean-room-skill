@@ -50,6 +50,7 @@
 - Dry-run inner-loop unit selection: `node bin/install.js run --task-manifest <path> --dry-run`.
 - Run inner-loop with adapter commands: `node bin/install.js run --task-manifest <path> --agent-commands <path>`.
 - Run inner-loop with built-in Claude role-agent dispatch: `node bin/install.js run --task-manifest <path> --agent-runtime claude [--agent-config-dir <path>]`.
+- Create or validate canonical artifacts: `node bin/install.js artifact <kinds|template|validate> ...` (`lib/artifact.cjs`, `lib/artifact-cli.cjs`).
 - Build source index help: `python3 skills/clean-room/scripts/build_source_index.py --help`.
 - Build visual index help: `python3 skills/clean-room/scripts/build_visual_index.py --help`.
 - Build optional Docker verification profiles: `docker compose -f templates/docker/compose.clean-room.yml build`.
@@ -149,6 +150,7 @@ Ask before changing:
 - Post-write hooks must fail closed without Python tracebacks when artifact `stat`, `read_text`, `read_bytes`, or referenced-artifact hashing raises `OSError`.
 - Hook error output must use redacted path labels through `describe_path()` / `redact_text()` for clean and source-denied roles.
 - `validate-json-schema.py` artifact kind inference is intentionally conservative. Ambiguous clean-root JSON should fail closed unless allowlisted.
+- `validate-json-schema.py` is fail-open when no kind is inferred outside clean roots; `CLEAN_ROOM_REQUIRE_ARTIFACT_KIND=1` (set only by `artifact validate`) makes it fail closed.
 - `clean-room-skill doctor` is a smoke test for Codex, Claude Code, and OpenCode hook wiring. It should assert expected failure reasons and include spawn status, signal/error, stdout, and stderr snippets when a hook command fails.
 - `doctor --coverage` reports generated matcher/check coverage, but it does not prove host event coverage or full runtime isolation.
 
@@ -206,6 +208,7 @@ For visual fallback runs, screenshot or image roots belong in `CLEAN_ROOM_SOURCE
 
 - Core helpers in `tests/install.test.js`: `runInstall(argv)` spawns the CLI and returns `{ status, stdout, stderr }`; `readJson(filePath)` reads and parses JSON; `tempDir(name)` creates a unique temp dir and registers cleanup.
 - Use `process.stderr.write()` (not `console.warn`) for warnings the CLI emits to stderr when test assertions check `result.stderr`.
+- Hook policy tests assert exact `hooks/*.py` stderr substrings (`tests/hook-schema-policy.test.js`, `tests/hook-access-policy.test.js`); changing a hook message requires updating those regexes.
 
 ## Local Artifacts
 
