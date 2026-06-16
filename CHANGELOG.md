@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] - 2026-06-16
+
+### Changed
+
+- Clarified clean-room init and preflight guidance so new runs use the `clean-room-skill init` CLI bootstrap path, project task layout, and CLI-derived hook environment instead of hand-created folders.
+- Updated README and architecture docs to align artifact CLI usage with project-layout and repo-local state details.
+
+### Fixed
+
+- Claude Code plugin installation now retries transient marketplace clone failures before failing the install.
+
 ## [0.5.0] - 2026-06-15
 
 ### Added
