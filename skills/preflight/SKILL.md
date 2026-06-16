@@ -48,7 +48,9 @@ Do not infer end goal, target language, runtime, framework, package manager, tes
 
 ## CLI Helper
 
-Use the CLI (`clean-room-skill` if installed, or `npx clean-room-skill@latest` as fallback) only for template creation or validation/copying:
+Use `clean-room-skill init` or `npx clean-room-skill@latest init` to create bootstrap scaffolds before this step. Project layout is canonical: `~/Documents/CleanRoom/<project>/tasks/<task-id>/` holds per-task `contaminated/`, `clean/`, and `quarantine/`, while `~/Documents/CleanRoom/<project>/implementation/` is shared by every task in that project. Do not accept hand-created folders as a bootstrap substitute.
+
+Use the preflight CLI (`clean-room-skill` if installed, or `npx clean-room-skill@latest` as fallback) only for template creation or validation/copying:
 
 ```bash
 clean-room-skill preflight --template --output ~/Documents/CleanRoom/task-xxxxxxxx/contaminated/preflight-goal.json

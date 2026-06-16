@@ -256,6 +256,17 @@ if (fail && args.join(' ').includes(fail)) {
   process.exit(42);
 }
 
+const failOnce = process.env.CLEAN_ROOM_CLAUDE_STUB_FAIL_ONCE;
+if (failOnce && args.join(' ').includes(failOnce)) {
+  state.fail_once_seen = state.fail_once_seen || {};
+  if (!state.fail_once_seen[failOnce]) {
+    state.fail_once_seen[failOnce] = true;
+    writeState(state);
+    console.error('Failed to clone marketplace repository: error: git-submodule died of signal 9');
+    process.exit(42);
+  }
+}
+
 if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'list' && args.includes('--json')) {
   console.log(JSON.stringify((state.marketplaces || []).map((name) => ({
     name,
@@ -1757,9 +1768,29 @@ describe('clean-room-skill installer', () => {
       'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
     ]);
     assert.match(postWriteHookCommand(settings), /--check validate-handoff-package\.py/);
+    assert.ok(readClaudeStubCalls(stub).includes(`plugin marketplace add ${claudePluginSource()} --scope user`));
     assert.deepEqual(readClaudeStubCalls(stub).filter((call) => call.includes('plugin install')), [
       `plugin install ${CLAUDE_PLUGIN_ID} --scope user`,
     ]);
+  });
+
+  test('Claude marketplace add retries transient clone failures', () => {
+    const root = tempDir('clean-room-claude-marketplace-retry');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+
+    const result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+      CLEAN_ROOM_CLAUDE_STUB_FAIL_ONCE: 'plugin marketplace add',
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      readClaudeStubCalls(stub).filter((call) => call.startsWith('plugin marketplace add ')).length,
+      2
+    );
+    assert.ok(readClaudeStubCalls(stub).includes(`plugin install ${CLAUDE_PLUGIN_ID} --scope user`));
   });
 
   test('Claude plugin executable override supports wrappers and ignores PATH hijacks', () => {
@@ -1939,6 +1970,9 @@ describe('clean-room-skill installer', () => {
     assert.match(cleanRoom, /target-repository `\.clean-room\/tasks\/` as noncanonical/);
     assert.match(cleanRoom, /Invalid, legacy-shaped, or schema-incompatible `task-manifest\.json`/);
     assert.match(cleanRoom, /Project with only completed task directories/);
+    assert.match(cleanRoom, /For new runs, call `clean-room-skill init` or `npx clean-room-skill@latest init`/);
+    assert.match(cleanRoom, /pass `--new-project` when no valid local project pointer exists/);
+    assert.match(cleanRoom, /Do not manually create task folders/);
 
     const resume = fs.readFileSync(path.join(ROOT, 'skills', 'resume-cr', 'SKILL.md'), 'utf8');
     assert.match(resume, /Discovery Before Load/);
@@ -1955,7 +1989,23 @@ describe('clean-room-skill installer', () => {
 
     const init = fs.readFileSync(path.join(ROOT, 'skills', 'init', 'SKILL.md'), 'utf8');
     assert.match(init, /\.clean-room\/local-state\.json/);
+    assert.match(init, /For new clean-room runs, create bootstrap paths with the binary first/);
+    assert.match(init, /pass `--project <name>`/);
+    assert.match(init, /pass `--new-project`/);
+    assert.match(init, /Use `--single-task` only when the user explicitly asks/);
+    assert.match(init, /Do not create project or task folders with manual `mkdir`/);
+    assert.match(init, /project root at `~\/Documents\/CleanRoom\/<project>\/`/);
+    assert.match(init, /task root at `~\/Documents\/CleanRoom\/<project>\/tasks\/<task-id>\/`/);
+    assert.match(init, /shared implementation root at `~\/Documents\/CleanRoom\/<project>\/implementation\/`/);
+    assert.match(init, /derived from the CLI-generated bootstrap metadata/);
+    assert.match(init, /`init` does not install runtime hooks/);
+    assert.match(init, /`clean-room-skill status --global`/);
     assert.match(init, /joins that project by default unless `--new-project` or `--single-task`/);
+
+    const preflight = fs.readFileSync(path.join(ROOT, 'skills', 'preflight', 'SKILL.md'), 'utf8');
+    assert.match(preflight, /Use `clean-room-skill init` or `npx clean-room-skill@latest init` to create bootstrap scaffolds/);
+    assert.match(preflight, /Project layout is canonical/);
+    assert.match(preflight, /Do not accept hand-created folders as a bootstrap substitute/);
   });
 
   test('role agents document Claude Code tool parameter contract', () => {
