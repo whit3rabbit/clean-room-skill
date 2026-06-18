@@ -184,6 +184,10 @@ function createClaudeStub(root, initial = {}) {
   fs.writeFileSync(statePath, `${JSON.stringify({
     marketplaces: initial.marketplaces ? [CLAUDE_MARKETPLACE_NAME] : [],
     plugins: initial.plugins ? [CLAUDE_PLUGIN_ID] : [],
+    pluginVersions: initial.pluginVersion ? { [CLAUDE_PLUGIN_ID]: initial.pluginVersion } : {},
+    pluginInstallPathVersions: initial.pluginInstallPathVersion ? { [CLAUDE_PLUGIN_ID]: initial.pluginInstallPathVersion } : {},
+    pluginEnabled: initial.pluginEnabled === false ? { [CLAUDE_PLUGIN_ID]: false } : {},
+    freezePluginEntry: initial.freezePluginEntry === true,
     calls: [],
   }, null, 2)}\n`);
 
@@ -211,8 +215,24 @@ const agentFiles = ${JSON.stringify([
 ])};
 const args = process.argv.slice(2);
 
+function pluginInstallPathForVersion(pluginVersion) {
+  return path.join(configDir, 'plugins', 'cache', marketplaceName, 'clean-room', pluginVersion);
+}
+
+function pluginEntry(id, state) {
+  const pluginVersion = state.pluginVersions?.[id] || version;
+  const installVersion = state.pluginInstallPathVersions?.[id] || pluginVersion;
+  return {
+    id,
+    version: pluginVersion,
+    scope: 'user',
+    enabled: state.pluginEnabled?.[id] !== false,
+    installPath: pluginInstallPathForVersion(installVersion),
+  };
+}
+
 function pluginInstallPath() {
-  return path.join(configDir, 'plugins', 'cache', marketplaceName, 'clean-room', version);
+  return pluginInstallPathForVersion(version);
 }
 
 function writePluginFiles() {
@@ -240,6 +260,13 @@ function readState() {
 function writeState(state) {
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\\n');
+  const registryPath = path.join(configDir, 'plugins', 'installed_plugins.json');
+  const plugins = {};
+  for (const id of state.plugins || []) {
+    plugins[id] = [pluginEntry(id, state)];
+  }
+  fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+  fs.writeFileSync(registryPath, JSON.stringify({ version: 2, plugins }, null, 2) + '\\n');
 }
 
 function has(value, list) {
@@ -301,19 +328,18 @@ if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'update') {
 
 if (args[0] === 'plugin' && args[1] === 'list' && args.includes('--json')) {
   if (has(pluginId, state.plugins)) writePluginFiles();
-  console.log(JSON.stringify((state.plugins || []).map((id) => ({
-    id,
-    version,
-    scope: 'user',
-    enabled: true,
-    installPath: pluginInstallPath(),
-  }))));
+  console.log(JSON.stringify((state.plugins || []).map((id) => pluginEntry(id, state))));
   writeState(state);
   process.exit(0);
 }
 
 if (args[0] === 'plugin' && args[1] === 'install') {
   if (!has(pluginId, state.plugins)) state.plugins.push(pluginId);
+  if (!state.freezePluginEntry) {
+    state.pluginVersions = { ...(state.pluginVersions || {}), [pluginId]: version };
+    state.pluginInstallPathVersions = { ...(state.pluginInstallPathVersions || {}), [pluginId]: version };
+    state.pluginEnabled = { ...(state.pluginEnabled || {}), [pluginId]: true };
+  }
   writePluginFiles();
   console.log('stub plugin installed');
   writeState(state);
@@ -321,7 +347,14 @@ if (args[0] === 'plugin' && args[1] === 'install') {
 }
 
 if (args[0] === 'plugin' && args[1] === 'update') {
-  if (has(pluginId, state.plugins)) writePluginFiles();
+  if (has(pluginId, state.plugins)) {
+    if (!state.freezePluginEntry) {
+      state.pluginVersions = { ...(state.pluginVersions || {}), [pluginId]: version };
+      state.pluginInstallPathVersions = { ...(state.pluginInstallPathVersions || {}), [pluginId]: version };
+      state.pluginEnabled = { ...(state.pluginEnabled || {}), [pluginId]: true };
+    }
+    writePluginFiles();
+  }
   console.log('stub plugin updated');
   writeState(state);
   process.exit(0);
@@ -379,6 +412,25 @@ exec "${targetPath}" "$@"
 `);
   fs.chmodSync(wrapperPath, 0o755);
   return wrapperPath;
+}
+
+function writeCcsiloVariant(root, name, stub, overrides = {}) {
+  const variantRoot = path.join(root, 'Library', 'Application Support', 'ccsilo', 'variants', name);
+  const configDir = overrides.configDir || path.join(variantRoot, 'config');
+  const wrapper = overrides.wrapper || writeClaudeWrapper(path.join(variantRoot, 'bin', name), stub.executable);
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.mkdirSync(path.dirname(wrapper), { recursive: true });
+  writeJson(path.join(variantRoot, 'variant.json'), {
+    schemaVersion: 1,
+    id: name,
+    paths: {
+      root: variantRoot,
+      configDir,
+      wrapper,
+      ...(overrides.paths || {}),
+    },
+  });
+  return { variantRoot, configDir, wrapper };
 }
 
 function writeLegacyClaudeStandaloneInstall(claudeHome) {
@@ -1815,6 +1867,42 @@ describe('clean-room-skill installer', () => {
     assert.ok(readClaudeStubCalls(stub).includes(`plugin install ${CLAUDE_PLUGIN_ID} --scope user`));
   });
 
+  test('--ccsilo variant installs Claude using ccsilo variant config and wrapper', () => {
+    const root = tempDir('clean-room-ccsilo-install');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    const variant = writeCcsiloVariant(stub.homeDir, 'openrouter', stub);
+
+    const result = runInstall(['--ccsilo', 'openrouter', '--hooks=copy-only', '--yes'], {
+      HOME: stub.homeDir,
+      PATH: '',
+      CLEAN_ROOM_CLAUDE_STUB_STATE: stub.statePath,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, new RegExp(`Installing claude to ${escapeRegExp(variant.configDir)}`));
+    assert.ok(readClaudeStubCalls(stub).includes(`plugin install ${CLAUDE_PLUGIN_ID} --scope user`));
+    assert.ok(fs.existsSync(path.join(variant.configDir, 'clean-room-install-manifest.json')));
+    const callConfigDirs = readJson(stub.statePath).calls.map((call) => call.configDir);
+    assert.ok(callConfigDirs.every((configDir) => configDir === variant.configDir));
+  });
+
+  test('--ccsilo auto-detects the variant from CLAUDE_CONFIG_DIR', () => {
+    const root = tempDir('clean-room-ccsilo-autodetect');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    const variant = writeCcsiloVariant(stub.homeDir, 'openrouter', stub);
+
+    const result = runInstall(['--ccsilo', '--hooks=copy-only', '--yes'], {
+      HOME: stub.homeDir,
+      PATH: '',
+      CLEAN_ROOM_CLAUDE_STUB_STATE: stub.statePath,
+      CLAUDE_CONFIG_DIR: variant.configDir,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(readClaudeStubCalls(stub).includes(`plugin install ${CLAUDE_PLUGIN_ID} --scope user`));
+    assert.ok(fs.existsSync(path.join(variant.configDir, 'clean-room-install-manifest.json')));
+  });
+
   test('Claude plugin PATH discovery skips unsafe local entries', () => {
     const root = tempDir('clean-room-claude-path-skip');
     const cases = [
@@ -1973,6 +2061,10 @@ describe('clean-room-skill installer', () => {
     assert.match(cleanRoom, /For new runs, call `clean-room-skill init` or `npx clean-room-skill@latest init`/);
     assert.match(cleanRoom, /pass `--new-project` when no valid local project pointer exists/);
     assert.match(cleanRoom, /Do not manually create task folders/);
+    assert.match(cleanRoom, /clean-room-skill --ccsilo \[variant\]/);
+    assert.match(cleanRoom, /CLAUDE_CONFIG_DIR` under a ccsilo/);
+    assert.match(cleanRoom, /other wrapper\/API-key harnesses/);
+    assert.match(cleanRoom, /Claude `\/login` applies only to OAuth-backed Claude sessions/);
 
     const resume = fs.readFileSync(path.join(ROOT, 'skills', 'resume-cr', 'SKILL.md'), 'utf8');
     assert.match(resume, /Discovery Before Load/);
@@ -2399,6 +2491,76 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /Claude role-agent dispatch unavailable/);
   });
 
+  test('status reports stale active Claude plugin registry state', () => {
+    const root = tempDir('clean-room-status-claude-stale-plugin');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+
+    let result = runInstall(['--claude', '--global', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    const registryPath = path.join(claudeHome, 'plugins', 'installed_plugins.json');
+    const registry = readJson(registryPath);
+    registry.plugins[CLAUDE_PLUGIN_ID][0].version = '0.2.1';
+    registry.plugins[CLAUDE_PLUGIN_ID][0].installPath = path.join(
+      claudeHome,
+      'plugins',
+      'cache',
+      CLAUDE_MARKETPLACE_NAME,
+      'clean-room',
+      '0.2.1'
+    );
+    writeJson(registryPath, registry);
+
+    result = runInstall(['status', '--claude', '--global'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /claude \(global\) update-available/);
+    assert.match(result.stdout, /active Claude plugin version is 0\.2\.1/);
+    assert.match(result.stdout, /active Claude plugin install path mismatch/);
+  });
+
+  test('status and update accept ccsilo variant shorthand', () => {
+    const root = tempDir('clean-room-ccsilo-status-update');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    const variant = writeCcsiloVariant(stub.homeDir, 'openrouter', stub);
+
+    let result = runInstall(['--ccsilo', 'openrouter', '--hooks=copy-only', '--yes'], {
+      HOME: stub.homeDir,
+      PATH: '',
+      CLEAN_ROOM_CLAUDE_STUB_STATE: stub.statePath,
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    result = runInstall(['status', '--ccsilo', 'openrouter'], {
+      HOME: stub.homeDir,
+      PATH: '',
+      CLEAN_ROOM_CLAUDE_STUB_STATE: stub.statePath,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /claude \(global\) installed/);
+    assert.match(result.stdout, new RegExp(`target: ${escapeRegExp(variant.configDir)}`));
+
+    const manifestPath = path.join(variant.configDir, 'clean-room-install-manifest.json');
+    const manifest = readJson(manifestPath);
+    manifest.version = '0.5.0';
+    writeJson(manifestPath, manifest);
+
+    result = runInstall(['update', '--ccsilo', 'openrouter', '--yes'], {
+      HOME: stub.homeDir,
+      PATH: '',
+      CLEAN_ROOM_CLAUDE_STUB_STATE: stub.statePath,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Updating claude/);
+    assert.ok(readClaudeStubCalls(stub).includes(`plugin update ${CLAUDE_PLUGIN_ID}`));
+  });
+
   test('update refreshes an installed runtime without rerunning onboarding', () => {
     const root = tempDir('clean-room-update-command');
     const claudeHome = path.join(root, 'config');
@@ -2431,6 +2593,37 @@ describe('clean-room-skill installer', () => {
     assert.equal(readJson(manifestPath).hooks_mode, 'copy-only');
     assert.equal(fs.existsSync(path.join(claudeHome, 'settings.json')), false);
     assert.ok(readClaudeStubCalls(stub).includes(`plugin update ${CLAUDE_PLUGIN_ID}`));
+  });
+
+  test('update fails before completing manifest when Claude plugin update remains stale', () => {
+    const root = tempDir('clean-room-update-claude-stale-plugin');
+    const claudeHome = path.join(root, 'config');
+    const stub = createClaudeStub(path.join(root, 'stub'));
+    const manifestPath = path.join(claudeHome, 'clean-room-install-manifest.json');
+
+    let result = runInstall(['--claude', '--global', '--hooks=copy-only', '--yes'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    const state = readJson(stub.statePath);
+    state.pluginVersions[CLAUDE_PLUGIN_ID] = '0.2.1';
+    state.pluginInstallPathVersions[CLAUDE_PLUGIN_ID] = '0.2.1';
+    state.freezePluginEntry = true;
+    writeJson(stub.statePath, state);
+
+    const manifest = readJson(manifestPath);
+    manifest.version = '0.5.0';
+    writeJson(manifestPath, manifest);
+
+    result = runInstall(['update', '--claude', '--global'], {
+      ...stub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /active Claude plugin version is 0\.2\.1/);
+    assert.equal(readJson(manifestPath).version, '0.5.0');
   });
 
   test('Claude global install migrates managed standalone skills after plugin install succeeds', () => {
@@ -2674,6 +2867,22 @@ describe('clean-room-skill installer', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /clean-room Claude plugin agent coverage:/);
 
+    const ccsiloStub = createClaudeStub(path.join(root, 'ccsilo-stub'));
+    const variant = writeCcsiloVariant(ccsiloStub.homeDir, 'openrouter', ccsiloStub);
+    result = runInstall(['--ccsilo', 'openrouter', '--hooks=strict', '--yes'], {
+      HOME: ccsiloStub.homeDir,
+      PATH: process.env.PATH || '',
+      CLEAN_ROOM_CLAUDE_STUB_STATE: ccsiloStub.statePath,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    result = runInstall(['doctor', '--ccsilo', 'openrouter', '--hooks=strict', '--coverage'], {
+      HOME: ccsiloStub.homeDir,
+      PATH: process.env.PATH || '',
+      CLEAN_ROOM_CLAUDE_STUB_STATE: ccsiloStub.statePath,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, new RegExp(`hooks config: ${escapeRegExp(path.join(variant.configDir, 'settings.json'))}`));
+
     result = runInstall(['--opencode', '--global', '--hooks=strict', '--yes'], {
       OPENCODE_CONFIG_DIR: opencodeHome,
     });
@@ -2702,6 +2911,35 @@ describe('clean-room-skill installer', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Claude role-agent dispatch unavailable/);
     assert.match(result.stderr, /clean-architect\.md/);
+  });
+
+  test('doctor rejects stale active Claude plugin registry state', () => {
+    const root = tempDir('clean-room-doctor-claude-stale-plugin');
+    const claudeHome = path.join(root, 'claude');
+    const claudeStub = createClaudeStub(path.join(root, 'claude-stub'));
+    let result = runInstall(['--claude', '--global', '--hooks=strict', '--yes'], {
+      ...claudeStub.env,
+      CLAUDE_CONFIG_DIR: claudeHome,
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    const registryPath = path.join(claudeHome, 'plugins', 'installed_plugins.json');
+    const registry = readJson(registryPath);
+    registry.plugins[CLAUDE_PLUGIN_ID][0].version = '0.2.1';
+    registry.plugins[CLAUDE_PLUGIN_ID][0].installPath = path.join(
+      claudeHome,
+      'plugins',
+      'cache',
+      CLAUDE_MARKETPLACE_NAME,
+      'clean-room',
+      '0.2.1'
+    );
+    writeJson(registryPath, registry);
+
+    result = runInstall(['doctor', '--runtime=claude', '--hooks=strict', '--config-dir', claudeHome]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /active Claude plugin version is 0\.2\.1/);
+    assert.match(result.stderr, /active Claude plugin install path mismatch/);
   });
 
   test('doctor rejects managed hook commands with shell suffixes', () => {

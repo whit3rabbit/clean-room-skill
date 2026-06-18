@@ -61,7 +61,7 @@ npx clean-room-skill@latest --all --global --yes
 
 Those `npx` commands install the selected runtime files globally. You do not need to keep running `npx` to use the installed Claude Code, Pi, Codex, or other runtime entry points.
 
-For edge cases such as ccsilo variants or modified Claude directories, add `--config-dir <path-to-claude-config-root>` to target that Claude config root explicitly. If Claude is launched through a wrapper, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper`; the installer runs that exact executable and rejects relative, cwd-local, and `node_modules/.bin` paths.
+For ccsilo variants, use the collapsed ccsilo shortcut below. For other modified Claude directories, add `--config-dir <path-to-claude-config-root>` to target that Claude config root explicitly. If Claude is launched through a non-ccsilo wrapper, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper`; the installer runs that exact executable and rejects relative, cwd-local, and `node_modules/.bin` paths.
 
 Claude global installs use Claude's plugin system for skills and agents, so entry points are namespaced as `/clean-room:init`, `/clean-room:preflight`, and `/clean-room`. The installer still manages hook files and migrates older standalone Claude skill copies out of the config root on reinstall or update.
 
@@ -75,17 +75,17 @@ Verified runtimes are Codex, Claude Code, and OpenCode. OpenCode support uses na
 
 Marketplace install is also supported.
 
-Codex:
-
-```bash
-codex plugin marketplace add https://github.com/whit3rabbit/clean-room-skill.git
-```
-
 Claude Code:
 
 ```text
 /plugin marketplace add https://github.com/whit3rabbit/clean-room-skill.git
 /plugin install clean-room@clean-room-skill
+```
+
+Codex:
+
+```bash
+codex plugin marketplace add https://github.com/whit3rabbit/clean-room-skill.git
 ```
 
 Pi:
@@ -100,6 +100,25 @@ Pi-native package install is preferred. This package declares `pi.skills: ["./sk
 Both Pi install paths load bundled skills as `/skill:<name>`, for example `/skill:clean-room`. Pi installs do not currently register clean-room hooks. Installer-managed Pi layouts copy the hook scripts to `hooks/clean-room/` for inspection and future bridge work, but those files are not active enforcement in Pi.
 
 Pi hook enforcement would need a Pi extension, not a `settings.json` edit. This package does not ship that extension yet, so clean-room safety in Pi still depends on role separation, path isolation, schema validation, and any supported hook runtime used for enforcement.
+
+<details>
+<summary>ccsilo Claude silos</summary>
+
+For a ccsilo OpenRouter silo, use the silo wrapper and the silo `configDir` from its `variant.json`:
+
+```bash
+SILO=openrouter
+
+clean-room-skill --ccsilo "$SILO" --hooks=safe --yes
+
+clean-room-skill status --ccsilo "$SILO"
+clean-room-skill update --ccsilo "$SILO" --yes
+clean-room-skill doctor --ccsilo "$SILO" --hooks=safe --coverage
+```
+
+When running inside a ccsilo-launched Claude session, `--ccsilo` can auto-detect the variant from `CLAUDE_CONFIG_DIR`, so the variant name can be omitted. The shortcut reads `variant.json`, resolves the silo config and wrapper, and installs Claude support there. If `status` reports an active plugin version or path mismatch, run `clean-room-skill update --ccsilo "$SILO" --yes` before manually deleting old plugin cache folders.
+
+</details>
 
 ## Workflow
 
@@ -125,6 +144,8 @@ clean-room-skill run \
   --agent-runtime claude \
   --max-iterations 3
 ```
+
+For ccsilo or other Claude wrappers, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper` and pass the wrapper config with `--agent-config-dir`. For example, an OpenRouter silo uses the `openrouter` wrapper path, not a separate `claude` command.
 
 The `run` command is not the normal starting point. It executes one bounded inner clean-room loop after the outer controller has created approved durable artifacts.
 

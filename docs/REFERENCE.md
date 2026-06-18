@@ -42,6 +42,7 @@ Scope and options:
 | `--hooks=<mode>` | `safe`, `strict`, or `copy-only`; default is `safe`. |
 | `--no-hooks` | Alias for `--hooks=copy-only`. |
 | `--config-dir <path>` | Override the target root for one runtime. |
+| `--ccsilo [variant]` | Shortcut for Claude Code ccsilo variants. Reads `variant.json`, resolves the silo config and wrapper, and implies `--claude --global`. |
 | `--dry-run` | Print planned actions without writing files. |
 | `--yes` | Non-interactive mode; unknown conflicts still abort. |
 | `--uninstall` | Remove manifest-managed files and clean-room hook entries. |
@@ -58,6 +59,16 @@ npx clean-room-skill@latest update --codex --global --yes
 The installer serializes install and uninstall per target root with `.clean-room-install.lock`. Reinstalling replaces only manifest-managed files automatically. Unknown existing files are not overwritten in non-interactive mode.
 
 Claude global installs call the Claude CLI for plugin marketplace and plugin operations. To use a silo wrapper or non-standard Claude executable, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper`. The path must be absolute, executable, outside the current working directory, and outside `node_modules/.bin`. When the variable is unset, the installer searches a sanitized `PATH` and fails closed if more than one `claude` executable remains.
+
+For ccsilo, prefer the shortcut:
+
+```bash
+clean-room-skill --ccsilo openrouter --hooks=safe --yes
+clean-room-skill status --ccsilo openrouter
+clean-room-skill update --ccsilo openrouter --yes
+```
+
+When `CLAUDE_CONFIG_DIR` points at a ccsilo variant config directory, the variant name may be omitted. `--ccsilo` conflicts with `--config-dir`, non-Claude runtimes, and local installs.
 
 ## Runtime Support
 
@@ -145,10 +156,11 @@ Smoke test generated hook registration:
 clean-room-skill doctor --runtime codex --hooks=safe
 clean-room-skill doctor --runtime codex --hooks=strict
 clean-room-skill doctor --runtime codex --hooks=strict --coverage
+clean-room-skill doctor --ccsilo openrouter --hooks=safe --coverage
 clean-room-skill doctor --runtime opencode --hooks=strict --coverage
 ```
 
-Use `--runtime claude` for Claude Code, and add `--config-dir <path>` when testing an alternate config root.
+Use `--runtime claude` for Claude Code, and add `--config-dir <path>` when testing an alternate non-ccsilo config root. For ccsilo variants, prefer `doctor --ccsilo [variant]`.
 
 `doctor` checks that Codex or Claude hook config exists, or that the OpenCode local plugin exists. It verifies generated clean-room hooks or plugin wiring, absolute wrapper paths, the requested safe or strict mode, and smoke payload failures for missing environment, source reads, source writes, shell use, and malformed post-write JSON. Safe mode also verifies no-op behavior without clean-room env.
 
@@ -263,6 +275,8 @@ Options:
 | `--dry-run` | Validate and print the selected unit without writing or spawning agents. |
 | `--schema-dir <path>` | Override bundled schema directory. |
 | `--python <path>` | Python executable for validation hooks; default is `python3`. |
+
+For ccsilo or other Claude wrappers, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper` before `clean-room-skill run`. Pair it with `--agent-config-dir <path>` so the built-in Claude adapter uses the same silo config; for example, an OpenRouter silo should point at the `openrouter` wrapper command.
 
 The task manifest must already include preflight references, the required handoff sequence, unattended controller policy, finite iteration bounds, `loop_context.foundation_unit_ref`, and `loop_context.approved_scope_refs`.
 

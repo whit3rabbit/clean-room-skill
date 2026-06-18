@@ -373,6 +373,19 @@ function noOpStage(phase, role, cwd) {
   };
 }
 
+function failingStageWithOutput(phase, role, cwd, output) {
+  return {
+    phase,
+    role,
+    cwd,
+    argv: [
+      process.execPath,
+      '-e',
+      `process.stdout.write(${JSON.stringify(output)}); process.exit(1);`,
+    ],
+  };
+}
+
 function coverageStage(cwd, script) {
   return {
     phase: 'contaminated-coverage-verify',
@@ -1918,6 +1931,51 @@ describe('clean-room run command', () => {
     const ledger = readJson(path.join(workspace.contaminated, 'controller-run-ledger.json'));
     assert.equal(ledger.iterations.length, 1);
     assert.equal(ledger.iterations[0].stop_reason, 'no-progress-detected');
+  });
+
+  test('classified stage failures produce sanitized diagnostics', () => {
+    const cases = [
+      {
+        name: 'auth',
+        output: 'Not logged in · Please run /login\n',
+        expected: /Claude auth is unavailable for the configured agent harness/,
+        forbidden: /Run \/login/,
+      },
+      {
+        name: 'rate-limit',
+        output: '429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"openrouter/owl-alpha is temporarily rate-limited upstream. Please retry shortly."}}}\n',
+        expected: /Claude provider returned 429/,
+      },
+      {
+        name: 'malformed-200',
+        output: 'API Error: API returned an empty or malformed response (HTTP 200), check for a proxy or gateway intercepting the request\n',
+        expected: /Claude provider returned an empty or malformed HTTP 200 response/,
+      },
+    ];
+
+    for (const item of cases) {
+      const workspace = baseWorkspace(`clean-room-run-classified-${item.name}`);
+      const config = commandConfig(path.join(workspace.root, 'commands.json'), [
+        failingStageWithOutput(
+          'contaminated-manager-prepare',
+          'contaminated-manager-verifier',
+          workspace.contaminated,
+          item.output
+        ),
+        noOpStage('contaminated-coverage-verify', 'contaminated-manager-verifier', workspace.contaminated),
+      ]);
+
+      const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--agent-commands', config, '--once']);
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /contaminated-manager-prepare failed:/);
+      assert.match(result.stdout, item.expected);
+      if (item.forbidden) assert.doesNotMatch(result.stdout, item.forbidden);
+      const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
+      assert.equal(runResult.result, 'spec-slice-blocked');
+      assert.match(runResult.abstract_delta_tickets[0].summary, item.expected);
+      if (item.forbidden) assert.doesNotMatch(runResult.abstract_delta_tickets[0].summary, item.forbidden);
+    }
   });
 
   test('continues across approved units until coverage is complete', () => {

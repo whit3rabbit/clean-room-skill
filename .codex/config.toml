@@ -1,3 +1,24 @@
 [mcp_servers.synrepo]
 command = "synrepo"
 args = ["mcp", "--repo", "."]
+
+[mcp_servers.synrepo.tools.synrepo_orient]
+approval_mode = "approve"
+
+[mcp_servers.synrepo.tools.synrepo_find]
+approval_mode = "approve"
+
+[mcp_servers.synrepo.tools.synrepo_tests]
+approval_mode = "approve"
+
+[mcp_servers.synrepo.tools.synrepo_changed]
+approval_mode = "approve"
+
+[mcp_servers.synrepo.tools.synrepo_search]
+approval_mode = "approve"
+
+[mcp_servers.synrepo.tools.synrepo_impact]
+approval_mode = "approve"
+
+[mcp_servers.synrepo.tools.synrepo_change_risk]
+approval_mode = "approve"
