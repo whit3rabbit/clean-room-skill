@@ -68,6 +68,7 @@ plugins/*/skills/*/tools/
 .syntext/
 repomix-output.xml
 .synrepo/
+skills/clean-room-workspace/fixtures/draft-behavior-spec.json
 .codex-plugin/
 .claude-plugin/
 .agents/

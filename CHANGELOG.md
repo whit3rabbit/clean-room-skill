@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.1] - 2026-06-18
+
+### Changed
+
+- Removed per-tool synrepo approval stanzas from repo-local `.codex/config.toml`.
+- Ignored generated `skills/clean-room-workspace/fixtures/draft-behavior-spec.json` eval fixture.
+
 ## [0.6.0] - 2026-06-16
 
 ### Changed
