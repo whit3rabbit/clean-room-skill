@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.2] - 2026-06-21
+
+### Added
+
+- Added `clean-room-skill run --ccsilo [variant]` so the built-in Claude role-agent runtime can launch through ccsilo wrappers such as the OpenRouter variant while preserving only the required wrapper auth environment.
+
+### Changed
+
+- Clarified init, preflight, unattended, resume, and role-agent guidance so canonical artifacts start from generated CLI schemas/templates, and so runner-ready unattended work stays in the durable runner instead of main-chat role execution.
+- Updated clean architect prompts to require every planned implementation path, including root package and build config files, to be covered by a referenced skeleton architecture area.
+
+### Fixed
+
+- Report schema validation now infers canonical artifact kind from exact or suffixed filenames before body heuristics, avoiding misleading `implementation-report` versus `qc-report` errors.
+- Clean artifact leakage scanning now honors public API names referenced through `public_contract_refs` and avoids treating prose parentheticals as source-like calls.
+- `clean-room-skill run` now fails closed when a root-level `task-manifest.json` conflicts with the active contaminated artifact manifest.
+- OpenRouter wrapper failures now surface as credential diagnostics without leaking keys, and dry-run output identifies the bundled generated CLI schema source.
+
 ## [0.6.1] - 2026-06-18
 
 ### Changed
