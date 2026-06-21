@@ -102,7 +102,9 @@ Both Pi install paths load bundled skills as `/skill:<name>`, for example `/skil
 Pi hook enforcement would need a Pi extension, not a `settings.json` edit. This package does not ship that extension yet, so clean-room safety in Pi still depends on role separation, path isolation, schema validation, and any supported hook runtime used for enforcement.
 
 <details>
-<summary>ccsilo Claude silos</summary>
+<summary>CCSILO Claude silos</summary>
+
+CCSILO is an optional Claude Code silo wrapper convention, not a standard agent runtime. It is useful when you keep a separate Claude Code home and wrapper for providers such as OpenRouter.
 
 For a ccsilo OpenRouter silo, use the silo wrapper and the silo `configDir` from its `variant.json`:
 
@@ -117,6 +119,27 @@ clean-room-skill doctor --ccsilo "$SILO" --hooks=safe --coverage
 ```
 
 When running inside a ccsilo-launched Claude session, `--ccsilo` can auto-detect the variant from `CLAUDE_CONFIG_DIR`, so the variant name can be omitted. The shortcut reads `variant.json`, resolves the silo config and wrapper, and installs Claude support there. If `status` reports an active plugin version or path mismatch, run `clean-room-skill update --ccsilo "$SILO" --yes` before manually deleting old plugin cache folders.
+
+If you want the agent to use the OpenRouter ccsilo path from the start, paste this at the beginning of the session:
+
+```text
+Use the ccsilo OpenRouter Claude variant for this clean-room run. Prefer the durable runner, not main-chat role work.
+
+First verify/update the silo:
+clean-room-skill status --ccsilo openrouter
+clean-room-skill doctor --ccsilo openrouter --hooks=safe --coverage
+
+When running unattended/resume, launch:
+clean-room-skill run --task-manifest <task-root>/contaminated/task-manifest.json --ccsilo openrouter
+
+Do not use plain claude, do not search plugin cache paths, and do not pass --schema-dir. Use bundled generated CLI schemas.
+```
+
+If the agent is already running inside that ccsilo session, the run command may omit the variant name:
+
+```bash
+clean-room-skill run --task-manifest <task-root>/contaminated/task-manifest.json --ccsilo
+```
 
 </details>
 
@@ -145,7 +168,7 @@ clean-room-skill run \
   --max-iterations 3
 ```
 
-For ccsilo or other Claude wrappers, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper` and pass the wrapper config with `--agent-config-dir`. For example, an OpenRouter silo uses the `openrouter` wrapper path, not a separate `claude` command.
+For CCSILO, prefer the `--ccsilo [variant]` shortcut from the collapsible section above. For other Claude wrappers, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper` and pass the wrapper config with `--agent-config-dir`. For example, an OpenRouter silo uses the `openrouter` wrapper path, not a separate `claude` command.
 
 The `run` command is not the normal starting point. It executes one bounded inner clean-room loop after the outer controller has created approved durable artifacts.
 
