@@ -182,7 +182,7 @@ BLOCKED_PATTERNS = {
 }
 IDENTIFIER_PATTERNS = {
     "package_or_module_identifier": re.compile(r"\b[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){2,}\b"),
-    "source_like_call": re.compile(r"\b[A-Za-z_][A-Za-z0-9_]{2,}\s*\("),
+    "source_like_call": re.compile(r"\b[A-Za-z_][A-Za-z0-9_]{2,}\("),
     "source_like_scoped_identifier": re.compile(
         r"\b[A-Za-z_][A-Za-z0-9_]{1,}(?:(?:->|::|#)[A-Za-z_][A-Za-z0-9_]{1,}|(?:\.[A-Za-z_][A-Za-z0-9_]{1,}){2,})\b"
     ),
@@ -367,10 +367,24 @@ def public_names(value: object, path: tuple[str | int, ...] = ()) -> set[str]:
         if is_public_record:
             names.add(value["name"])
         for key, item in value.items():
+            if key == "public_contract_refs":
+                names.update(public_ref_names(item))
             names.update(public_names(item, path + (key,)))
     elif isinstance(value, list):
         for index, item in enumerate(value):
             names.update(public_names(item, path + (index,)))
+    return names
+
+
+def public_ref_names(value: object) -> set[str]:
+    names: set[str] = set()
+    if isinstance(value, str) and value.strip():
+        names.add(value)
+        if value.startswith("public_surface:"):
+            names.add(value.rsplit(":", 1)[-1])
+    elif isinstance(value, list):
+        for item in value:
+            names.update(public_ref_names(item))
     return names
 
 
@@ -379,7 +393,7 @@ def strip_allowed_text(text: str, allowed_names: set[str]) -> str:
     for name in sorted(allowed_names, key=len, reverse=True):
         if not name:
             continue
-        stripped = re.sub(rf"(?<![\w.]){re.escape(name)}(?![\w]|\.[A-Za-z_])", " ", stripped)
+        stripped = re.sub(rf"(?<![\w.]){re.escape(name)}(?![\w])", " ", stripped)
     return stripped
 
 

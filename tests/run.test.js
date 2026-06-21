@@ -456,12 +456,46 @@ fs.appendFileSync(${JSON.stringify(capturePath)}, JSON.stringify({
     CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
     CLEAN_ROOM_ROLE: process.env.CLEAN_ROOM_ROLE,
     CLEAN_ROOM_CONTROLLER_PHASE: process.env.CLEAN_ROOM_CONTROLLER_PHASE,
-    CLEAN_ROOM_SELECTED_UNIT_ID: process.env.CLEAN_ROOM_SELECTED_UNIT_ID
+    CLEAN_ROOM_SELECTED_UNIT_ID: process.env.CLEAN_ROOM_SELECTED_UNIT_ID,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
+    ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
+    ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    SECRET_SHOULD_NOT_LEAK: process.env.SECRET_SHOULD_NOT_LEAK
   }
 }) + '\\n');
 `);
   fs.chmodSync(script, 0o755);
   return script;
+}
+
+function writeCcsiloVariant(root, name, wrapperPath, overrides = {}) {
+  const variantRoot = path.join(root, 'Library', 'Application Support', 'ccsilo', 'variants', name);
+  const configDir = overrides.configDir || path.join(variantRoot, 'config');
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.mkdirSync(path.dirname(wrapperPath), { recursive: true });
+  writeJson(path.join(variantRoot, 'variant.json'), {
+    schemaVersion: 1,
+    id: name,
+    paths: {
+      root: variantRoot,
+      configDir,
+      wrapper: wrapperPath,
+    },
+    env: {
+      ANTHROPIC_BASE_URL: 'https://openrouter.ai/api',
+      ANTHROPIC_MODEL: 'openrouter/owl-alpha',
+      ...(overrides.env || {}),
+    },
+    credential: {
+      mode: 'env',
+      source: 'OPENROUTER_API_KEY',
+      targets: ['ANTHROPIC_AUTH_TOKEN'],
+      ...(overrides.credential || {}),
+    },
+  });
+  return { variantRoot, configDir, wrapper: wrapperPath };
 }
 
 function enableStrictContext(workspace, budgets = {}) {
@@ -1240,6 +1274,8 @@ describe('clean-room run command', () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /selected unit-example-flow/);
+    assert.match(result.stdout, /schema dir:/);
+    assert.match(result.stdout, /bundled generated CLI schemas/);
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'clean-room-result.json')), false);
   });
@@ -1383,6 +1419,21 @@ describe('clean-room run command', () => {
 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /task manifest must be under contaminated artifact root/);
+    assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
+  });
+
+  test('rejects conflicting root-level and contaminated task manifests', () => {
+    const workspace = baseWorkspace('clean-room-run-manifest-drift');
+    const rootManifest = path.join(workspace.root, 'task-manifest.json');
+    const manifest = readJson(workspace.manifestPath);
+    manifest.preflight_goal_sha256 = '0'.repeat(64);
+    writeJson(rootManifest, manifest);
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /root-level task-manifest\.json conflicts with contaminated artifact manifest/);
+    assert.match(result.stderr, new RegExp(escapeRegExp(rootManifest)));
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'controller-run-ledger.json')), false);
   });
 
@@ -1851,6 +1902,65 @@ describe('clean-room run command', () => {
     assert.equal(calls[0].env.CLAUDE_CONFIG_DIR, workspace.root);
   });
 
+  test('built-in Claude agent runtime preserves wrapper auth env only', () => {
+    const workspace = baseWorkspace('clean-room-run-claude-wrapper-env');
+    const capturePath = path.join(workspace.root, 'claude-calls.jsonl');
+    const claude = writeClaudeAgentCaptureScript(workspace.root, capturePath);
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--agent-runtime',
+      'claude',
+      '--agent-config-dir',
+      workspace.root,
+      '--once',
+    ], ROOT, {
+      CLEAN_ROOM_CLAUDE_EXECUTABLE: claude,
+      OPENROUTER_API_KEY: 'or-test-key',
+      ANTHROPIC_AUTH_TOKEN: 'anthropic-test-token',
+      ANTHROPIC_API_KEY: 'anthropic-api-key',
+      SECRET_SHOULD_NOT_LEAK: 'do-not-copy',
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readJsonLines(capturePath);
+    assert.equal(calls[0].env.OPENROUTER_API_KEY, 'or-test-key');
+    assert.equal(calls[0].env.ANTHROPIC_AUTH_TOKEN, 'anthropic-test-token');
+    assert.equal(calls[0].env.ANTHROPIC_API_KEY, 'anthropic-api-key');
+    assert.equal(calls[0].env.SECRET_SHOULD_NOT_LEAK, undefined);
+  });
+
+  test('built-in Claude agent runtime accepts ccsilo shortcut', () => {
+    const root = tempDir('clean-room-run-ccsilo');
+    const workspace = baseWorkspace('clean-room-run-ccsilo-workspace');
+    const capturePath = path.join(workspace.root, 'claude-calls.jsonl');
+    const wrapper = writeClaudeAgentCaptureScript(workspace.root, capturePath);
+    const variant = writeCcsiloVariant(root, 'openrouter', wrapper);
+
+    const result = runCli([
+      'run',
+      '--task-manifest',
+      workspace.manifestPath,
+      '--agent-runtime',
+      'claude',
+      '--ccsilo',
+      'openrouter',
+      '--once',
+    ], ROOT, {
+      HOME: root,
+      OPENROUTER_API_KEY: 'or-test-key',
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readJsonLines(capturePath);
+    assert.equal(calls[0].env.CLAUDE_CONFIG_DIR, variant.configDir);
+    assert.equal(calls[0].env.OPENROUTER_API_KEY, 'or-test-key');
+    assert.equal(calls[0].env.ANTHROPIC_BASE_URL, 'https://openrouter.ai/api');
+    assert.equal(calls[0].env.ANTHROPIC_MODEL, 'openrouter/owl-alpha');
+  });
+
   test('validates clean polish review stage order', () => {
     const workspace = baseWorkspace('clean-room-run-agent4-order');
     const config = commandConfig(path.join(workspace.root, 'commands.json'), [
@@ -1950,6 +2060,12 @@ describe('clean-room run command', () => {
         name: 'malformed-200',
         output: 'API Error: API returned an empty or malformed response (HTTP 200), check for a proxy or gateway intercepting the request\n',
         expected: /Claude provider returned an empty or malformed HTTP 200 response/,
+      },
+      {
+        name: 'openrouter-missing-key',
+        output: '/Users/example/.local/bin/openrouter: line 98: OPENROUTER_API_KEY: Set OPENROUTER_API_KEY for variant openrouter\n',
+        expected: /OpenRouter wrapper credentials are unavailable/,
+        forbidden: /sk-or-v1-/,
       },
     ];
 

@@ -91,6 +91,9 @@ def artifact_kind(path: Path, data: dict) -> str | None:
     name = path.name.removesuffix(".json")
     if name in SCHEMA_BY_ARTIFACT:
         return name
+    for kind in sorted(SCHEMA_BY_ARTIFACT, key=len, reverse=True):
+        if name.startswith(f"{kind}-"):
+            return kind
     if "spec_id" in data:
         return "behavior-spec"
     if "config_id" in data and "artifact_base_root" in data:
@@ -128,9 +131,6 @@ def artifact_kind(path: Path, data: dict) -> str | None:
             return "coverage-ledger"
     if data.get("from_domain") == "contaminated" and data.get("to_domain") == "clean" and "artifacts" in data:
         return "handoff-package"
-    for kind in SCHEMA_BY_ARTIFACT:
-        if kind in name:
-            return kind
     return None
 
 
@@ -1091,7 +1091,11 @@ def main() -> int:
         if run_completion_guard:
             extend_errors(errors, completion_guard_errors(path, kind, data))
         if errors:
-            print(f"clean-room schema check failed for {describe_path(path)}:", file=sys.stderr)
+            print(
+                f"clean-room schema check failed for {describe_path(path)} "
+                f"(schema kind: {kind}, schema: {SCHEMA_BY_ARTIFACT[kind]}):",
+                file=sys.stderr,
+            )
             for error in errors[:MAX_REPORTED_ERRORS]:
                 print(f"  {redact_text(error)}", file=sys.stderr)
             if len(errors) > MAX_REPORTED_ERRORS:

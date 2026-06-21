@@ -137,6 +137,26 @@ describe('clean-room schema hook policy', () => {
     assert.ok(result.stderr.includes(REPAIR_HINT));
   });
 
+  test('schema hook infers suffixed implementation report filenames before generic report bodies', () => {
+    const root = tempDir('clean-room-schema-report-kind');
+    const env = policyEnv(root, 'clean-qa-editor');
+    const clean = env.CLEAN_ROOM_CLEAN_ROOTS;
+    const filePath = path.join(clean, 'implementation-report-unit-02.json');
+    fs.writeFileSync(filePath, JSON.stringify({
+      report_id: 'implementation-report-unit-02',
+      task_id: 'task-example',
+    }));
+
+    const result = runHook('validate-json-schema.py', {
+      tool_name: 'Write',
+      tool_input: { file_path: filePath },
+    }, env);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /schema kind: implementation-report/);
+    assert.match(result.stderr, /missing required field 'implementer_role'/);
+    assert.doesNotMatch(result.stderr, /missing required field 'reviewer_role'/);
+  });
+
   test('post-write schema hook reports missing and unreadable artifacts without traceback', () => {
     const root = tempDir('clean-room-schema-fs-errors');
     const env = policyEnv(root, 'clean-architect');

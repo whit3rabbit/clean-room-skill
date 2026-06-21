@@ -2047,6 +2047,7 @@ describe('clean-room-skill installer', () => {
       assert.match(content, /Do not search plugin cache paths for schema files/, relPath);
       assert.match(content, /do not pass `--schema-dir \/dev\/null`/, relPath);
       assert.match(content, /must not perform Agent 1, Agent 2, Agent 3, or Agent 4 work/, relPath);
+      assert.match(content, /Do not edit `task-manifest\.json` unit statuses in the main conversation/, relPath);
       assert.match(content, /Do not ask to continue while/, relPath);
       assert.match(content, /Claude role-agent dispatch unavailable/, relPath);
     }
@@ -2082,6 +2083,8 @@ describe('clean-room-skill installer', () => {
     const init = fs.readFileSync(path.join(ROOT, 'skills', 'init', 'SKILL.md'), 'utf8');
     assert.match(init, /\.clean-room\/local-state\.json/);
     assert.match(init, /For new clean-room runs, create bootstrap paths with the binary first/);
+    assert.match(init, /The safest path for canonical artifacts is the generated CLI schema\/template path/);
+    assert.match(init, /Do not hand-write `task-manifest\.json` or `clean-run-context\.json` from scratch/);
     assert.match(init, /pass `--project <name>`/);
     assert.match(init, /pass `--new-project`/);
     assert.match(init, /Use `--single-task` only when the user explicitly asks/);
@@ -2098,6 +2101,14 @@ describe('clean-room-skill installer', () => {
     assert.match(preflight, /Use `clean-room-skill init` or `npx clean-room-skill@latest init` to create bootstrap scaffolds/);
     assert.match(preflight, /Project layout is canonical/);
     assert.match(preflight, /Do not accept hand-created folders as a bootstrap substitute/);
+    assert.match(preflight, /Preflight stops after a canonical `preflight-goal\.json` is created or validated/);
+    assert.match(preflight, /Do not create behavior specs, handoff packages, skeleton manifests, implementation plans, coverage ledgers, or clean-run-context artifacts during preflight/);
+    assert.match(preflight, /The safest path is `clean-room-skill preflight --template` for drafts and `clean-room-skill preflight --input` for completed contracts/);
+
+    const preflightReference = fs.readFileSync(path.join(ROOT, 'skills', 'clean-room', 'references', 'PREFLIGHT.md'), 'utf8');
+    assert.match(preflightReference, /Preflight stops after a canonical `preflight-goal\.json` is created or validated/);
+    assert.match(preflightReference, /Do not create behavior specs, handoff packages, skeleton manifests, implementation plans, coverage ledgers, or clean-run-context artifacts during preflight/);
+    assert.match(preflightReference, /The safest path is `clean-room-skill preflight --template` for drafts and `clean-room-skill preflight --input` for completed contracts/);
   });
 
   test('role agents document Claude Code tool parameter contract', () => {
@@ -2142,6 +2153,16 @@ describe('clean-room-skill installer', () => {
       assert.match(content, /clean-room-skill artifact validate --path <path>/, fileName);
       assert.match(content, /Do not hand-write missing canonical JSON artifacts from scratch/, fileName);
     }
+  });
+
+  test('clean architect prompts require architecture ownership for every planned path', () => {
+    const claudePrompt = fs.readFileSync(path.join(ROOT, 'agents', 'clean-architect.md'), 'utf8');
+    assert.match(claudePrompt, /Before finalizing `implementation-plan\.json`, compare every `target_paths`, `test_paths`, and `planned_refactors` path against `skeleton-manifest\.json` `owned_path_prefixes`/);
+    assert.match(claudePrompt, /If a work item touches a root package or build config such as `Cargo\.toml`, `package\.json`, `pyproject\.toml`, `go\.mod`, or build config files/);
+
+    const codexPrompt = fs.readFileSync(path.join(ROOT, 'examples', 'codex', '.codex', 'agents', 'clean-architect.toml'), 'utf8');
+    assert.match(codexPrompt, /Before finalizing implementation-plan\.json, compare every target_paths, test_paths, and planned_refactors path against skeleton-manifest\.json owned_path_prefixes/);
+    assert.match(codexPrompt, /If a work item touches a root package or build config such as Cargo\.toml, package\.json, pyproject\.toml, go\.mod, or build config files/);
   });
 
   test('bundled skills satisfy OpenCode frontmatter requirements', () => {

@@ -9,6 +9,8 @@ disable-model-invocation: true
 
 Create or validate `preflight-goal.json` before active clean-room artifacts start.
 
+Preflight stops after a canonical `preflight-goal.json` is created or validated. Do not create behavior specs, handoff packages, skeleton manifests, implementation plans, coverage ledgers, or clean-run-context artifacts during preflight.
+
 Use the canonical `clean-room` workflow and read `skills/clean-room/references/PREFLIGHT.md` when collecting missing goal details. Preserve the clean-room boundary: `preflight-goal.json` is a controller/contaminated-side artifact and must not be placed in clean-role readable roots.
 
 If the user provides output from CLI `clean-room-skill init` (or `npx clean-room-skill@latest init` if the binary is not available), check the generated bootstrap scaffold before creating or copying `preflight-goal.json`: `clean-room-bootstrap.json`, `contaminated/`, `clean/`, the implementation root, `quarantine/`, target repo `.clean-room/README.md`, `.clean-room/.gitignore`, and `.clean-room/local-state.json` must exist and agree. In the project layout the task root sits at `<base>/<project>/tasks/<task-id>/`, the implementation root is the shared project-level `implementation/`, and `clean-room-project.json` must exist at the project root. Treat target-repo `.clean-room/tasks/` as noncanonical unless explicitly configured; active artifacts belong in the external task root. Treat that scaffold as convenience output only; it is not an active `preflight-goal.json`, `init-config.json`, `task-manifest.json`, or `clean-run-context.json`.
@@ -51,6 +53,8 @@ Do not infer end goal, target language, runtime, framework, package manager, tes
 Use `clean-room-skill init` or `npx clean-room-skill@latest init` to create bootstrap scaffolds before this step. Project layout is canonical: `~/Documents/CleanRoom/<project>/tasks/<task-id>/` holds per-task `contaminated/`, `clean/`, and `quarantine/`, while `~/Documents/CleanRoom/<project>/implementation/` is shared by every task in that project. Do not accept hand-created folders as a bootstrap substitute.
 
 Use the preflight CLI (`clean-room-skill` if installed, or `npx clean-room-skill@latest` as fallback) only for template creation or validation/copying:
+
+The safest path is `clean-room-skill preflight --template` for drafts and `clean-room-skill preflight --input` for completed contracts.
 
 ```bash
 clean-room-skill preflight --template --output ~/Documents/CleanRoom/task-xxxxxxxx/contaminated/preflight-goal.json

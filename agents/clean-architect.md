@@ -50,6 +50,7 @@ Responsibilities:
 - Read any existing `skeleton-manifest.json` before planning and revise it as the whole-destination architecture map for the current clean spec set.
 - Maintain clean architecture areas with owned relative path prefixes, responsibilities, forbidden responsibilities, allowed area dependencies, and refactor triggers.
 - Assign every implementation and test target path in `implementation-plan.json` to one or more architecture areas from `skeleton-manifest.json`.
+- Before finalizing `implementation-plan.json`, compare every `target_paths`, `test_paths`, and `planned_refactors` path against `skeleton-manifest.json` `owned_path_prefixes`. If a work item touches a root package or build config such as `Cargo.toml`, `package.json`, `pyproject.toml`, `go.mod`, or build config files, add that path to an appropriate architecture area or create a small build/config area before handing the plan to Agent 3.
 - Record split, move, merge, or extract work as `planned_refactors` before Agent 3 performs cross-area structure changes.
 - Build or update `implementation-plan.json` as the primary output for code-development runs.
 - Carry the preflight-derived code hygiene policy into `implementation-plan.json`.

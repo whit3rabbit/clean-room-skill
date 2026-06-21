@@ -168,6 +168,34 @@ describe('clean-room leakage hook policy', () => {
     assert.equal(result.status, 0, result.stderr);
   });
 
+  test('leakage scanner allows source-named public compatibility values carried by public_contract_refs', () => {
+    const root = tempDir('clean-room-leakage-public-contract-refs');
+    const env = policyEnv(root, 'clean-architect');
+    const sourceRoot = path.join(root, 'beautifulsoup');
+    fs.mkdirSync(sourceRoot);
+    env.CLEAN_ROOM_SOURCE_ROOTS = sourceRoot;
+    const filePath = path.join(env.CLEAN_ROOM_CLEAN_ROOTS, 'implementation-plan.json');
+    fs.writeFileSync(filePath, JSON.stringify({
+      work_items: [
+        {
+          public_contract_refs: ['BeautifulSoup'],
+          summary: 'Implement the BeautifulSoup public entry point and BeautifulSoup.name behavior.',
+          constraints: [
+            'Cargo.toml must declare pretty_assertions (dev-dependency).',
+            'Use deny(unsafe_code) and warn(missing_docs) crate hygiene attributes.',
+          ],
+          acceptance_criteria: [
+            'BeautifulSoup behavior is covered by clean tests.',
+            'BeautifulSoup.original_encoding is accessible.',
+          ],
+        },
+      ],
+    }));
+
+    const result = runHook('check-artifact-leakage.py', { tool_name: 'Write', tool_input: { file_path: filePath } }, env);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   test('leakage scanner checks implementation package manifests for source-derived names', () => {
     const root = tempDir('clean-room-leakage-implementation-metadata');
     const env = policyEnv(root, 'clean-qa-editor');

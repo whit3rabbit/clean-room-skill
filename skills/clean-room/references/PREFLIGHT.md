@@ -2,6 +2,10 @@
 
 Preflight owns intent. Agent 0 owns orchestration. Later roles execute the recorded goal contract instead of deciding what the destination should become.
 
+Preflight stops after a canonical `preflight-goal.json` is created or validated. Do not create behavior specs, handoff packages, skeleton manifests, implementation plans, coverage ledgers, or clean-run-context artifacts during preflight.
+
+The safest path is `clean-room-skill preflight --template` for drafts and `clean-room-skill preflight --input` for completed contracts. Use generated CLI templates and schema validation instead of hand-writing canonical artifacts from scratch.
+
 ## Required Questions
 
 Ask only enough to fill `preflight-goal.json`:

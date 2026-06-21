@@ -19,6 +19,8 @@ Do not infer the user's end goal or target stack from the source repository. A s
 
 Keep `preflight-goal.json` in the controller/contaminated artifact domain. Clean roles receive only the clean-safe `goal_contract` subset, `code_hygiene_policy`, and optional Agent 4 local commit policy through `clean-run-context.json`.
 
+The safest path for canonical artifacts is the generated CLI schema/template path. Use `clean-room-skill preflight --template` or `clean-room-skill preflight --input` for preflight, and use `clean-room-skill artifact template --kind <kind> --output <path>` plus `clean-room-skill artifact validate --path <path>` for other canonical artifacts. Do not hand-write `task-manifest.json` or `clean-run-context.json` from scratch; start from CLI generators, CLI templates, or existing schema-valid artifacts.
+
 Use the canonical `clean-room` skill workflow and references in this plugin. Preserve the clean-room boundary, role separation, artifact schemas, leakage rules, implementation-root rules, and hook expectations.
 
 For new clean-room runs, create bootstrap paths with the binary first: run `clean-room-skill init`, or `npx clean-room-skill@latest init` if the binary is unavailable. Do not create project or task folders with manual `mkdir`, and do not hand-write `clean-room-bootstrap.json`, `clean-room-project.json`, `.clean-room/local-state.json`, or repo stubs. If the user names a project, pass `--project <name>`. If no project is named and no valid `.clean-room/local-state.json` points to an existing project, pass `--new-project` so the binary creates a neutral `proj-xxxxxxxx` project. Use `--single-task` only when the user explicitly asks for legacy flat single-task compatibility.
