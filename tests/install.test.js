@@ -1769,7 +1769,11 @@ describe('clean-room-skill installer', () => {
     assert.deepEqual(managedHookMatchers(hooksJson, 'PostToolUse'), [
       'Write|Edit|MultiEdit|NotebookEdit|apply_patch',
     ]);
-    assert.match(postWriteHookCommand(hooksJson), /--check validate-handoff-package\.py/);
+    const postWriteCommand = postWriteHookCommand(hooksJson);
+    assert.match(
+      postWriteCommand,
+      /--check validate-json-schema\.py --check check-artifact-leakage\.py --check validate-handoff-package\.py/
+    );
   });
 
   test('installs Claude plugin, hooks, manifest, and preserves user settings hooks', () => {

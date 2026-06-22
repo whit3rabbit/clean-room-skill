@@ -49,7 +49,7 @@ For OpenCode, the installer writes a generated local plugin at `<targetRoot>/plu
 | `PreToolUse` | <code>Bash&#124;Shell&#124;PowerShell&#124;Monitor&#124;exec_command&#124;shell_command&#124;write_stdin</code> | `require-clean-room-env.py`, `deny-clean-room-shell.py` |
 | `PreToolUse` | <code>Read&#124;Glob&#124;Grep&#124;LS&#124;LSP&#124;NotebookRead&#124;view_image&#124;list_dir&#124;ListMcpResourcesTool&#124;ReadMcpResourceTool&#124;ListMcpResourceTemplatesTool&#124;list_mcp_resources&#124;list_mcp_resource_templates&#124;read_mcp_resource</code> | `require-clean-room-env.py`, `deny-clean-source-read.py` |
 | `PreToolUse` | <code>Write&#124;Edit&#124;MultiEdit&#124;NotebookEdit&#124;apply_patch</code> | `require-clean-room-env.py`, `deny-contaminated-clean-write.py` |
-| `PostToolUse` | <code>Write&#124;Edit&#124;MultiEdit&#124;NotebookEdit&#124;apply_patch</code> | `require-clean-room-env.py`, `check-artifact-leakage.py`, `validate-json-schema.py`, `validate-handoff-package.py` |
+| `PostToolUse` | <code>Write&#124;Edit&#124;MultiEdit&#124;NotebookEdit&#124;apply_patch</code> | `require-clean-room-env.py`, `validate-json-schema.py`, `check-artifact-leakage.py`, `validate-handoff-package.py` |
 
 Matcher names only matter if the host runtime emits the corresponding hook event. A host tool that reads files without a hook event is not protected by listing its name here.
 
