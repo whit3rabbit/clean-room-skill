@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.3] - 2026-06-22
+
+### Changed
+
+- CI and npm publish workflows now run on self-hosted runners.
+
+### Fixed
+
+- Post-write hooks now validate JSON schema before leakage scanning so malformed artifacts fail with deterministic schema diagnostics.
+- `clean-room-skill doctor` preserves required hook execution environment variables on self-hosted Linux runners and reports child hook signals instead of silent wrapped exit codes.
+
 ## [0.6.2] - 2026-06-22
 
 ### Added
