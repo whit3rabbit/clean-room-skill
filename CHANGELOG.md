@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- CI and npm publish workflows now run on self-hosted runners.
+- CI checks now run on self-hosted runners while npm publishing stays on GitHub-hosted runners for trusted publishing provenance.
 
 ### Fixed
 

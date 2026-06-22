@@ -16,7 +16,7 @@ concurrency:
 jobs:
   publish:
     name: Publish to npm
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
