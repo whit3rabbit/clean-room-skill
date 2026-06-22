@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -64,6 +65,14 @@ def resolve_check(script_dir: Path, check: str) -> Path:
     return resolved
 
 
+def signal_name(returncode: int) -> str:
+    signal_number = -returncode
+    try:
+        return signal.Signals(signal_number).name
+    except ValueError:
+        return f"signal {signal_number}"
+
+
 def main() -> int:
     args = parse_args()
     if not should_enforce(args.mode):
@@ -111,6 +120,12 @@ def main() -> int:
             print(f"clean-room hook check timed out after {timeout}s: {script.name}", file=sys.stderr)
             return 1
         if result.returncode != 0:
+            if result.returncode < 0:
+                print(
+                    f"clean-room hook check terminated by {signal_name(result.returncode)}: {script.name}",
+                    file=sys.stderr,
+                )
+                return 1
             return result.returncode
     return 0
 
