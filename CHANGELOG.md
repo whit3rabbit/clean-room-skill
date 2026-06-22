@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.4] - 2026-06-22
+
+### Fixed
+
+- Restored npm publishing to GitHub-hosted runners because npm trusted publishing provenance rejects self-hosted runners.
+
 ## [0.6.3] - 2026-06-22
 
 ### Changed
