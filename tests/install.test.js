@@ -2050,6 +2050,8 @@ describe('clean-room-skill installer', () => {
       assert.match(content, /Do not edit `task-manifest\.json` unit statuses in the main conversation/, relPath);
       assert.match(content, /Do not ask to continue while/, relPath);
       assert.match(content, /Claude role-agent dispatch unavailable/, relPath);
+      assert.match(content, /--ccsilo \[variant\]/, relPath);
+      assert.match(content, /Never write `ANTHROPIC_AUTH_TOKEN` or API keys/, relPath);
     }
   });
 
@@ -2065,6 +2067,7 @@ describe('clean-room-skill installer', () => {
     assert.match(cleanRoom, /clean-room-skill --ccsilo \[variant\]/);
     assert.match(cleanRoom, /CLAUDE_CONFIG_DIR` under a ccsilo/);
     assert.match(cleanRoom, /other wrapper\/API-key harnesses/);
+    assert.match(cleanRoom, /Never write `ANTHROPIC_AUTH_TOKEN` or API keys/);
     assert.match(cleanRoom, /Claude `\/login` applies only to OAuth-backed Claude sessions/);
 
     const resume = fs.readFileSync(path.join(ROOT, 'skills', 'resume-cr', 'SKILL.md'), 'utf8');

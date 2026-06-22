@@ -16,7 +16,7 @@ concurrency:
 jobs:
   test:
     name: Node ${{ matrix.node-version }}
-    runs-on: macos-latest
+    runs-on: self-hosted
     strategy:
       fail-fast: false
       matrix:

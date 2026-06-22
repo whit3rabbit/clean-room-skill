@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.6.2] - 2026-06-21
+## [0.6.2] - 2026-06-22
 
 ### Added
 
@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Clean artifact leakage scanning now honors public API names referenced through `public_contract_refs` and avoids treating prose parentheticals as source-like calls.
 - `clean-room-skill run` now fails closed when a root-level `task-manifest.json` conflicts with the active contaminated artifact manifest.
 - OpenRouter wrapper failures now surface as credential diagnostics without leaking keys, and dry-run output identifies the bundled generated CLI schema source.
+- ccsilo/OpenRouter runner guidance now explicitly uses `--ccsilo [variant]` and forbids writing API tokens into ccsilo or Claude settings files.
 
 ## [0.6.1] - 2026-06-18
 

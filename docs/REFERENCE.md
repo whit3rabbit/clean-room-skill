@@ -276,7 +276,7 @@ Options:
 | `--schema-dir <path>` | Override bundled schema directory. |
 | `--python <path>` | Python executable for validation hooks; default is `python3`. |
 
-For ccsilo or other Claude wrappers, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper` before `clean-room-skill run`. Pair it with `--agent-config-dir <path>` so the built-in Claude adapter uses the same silo config; for example, an OpenRouter silo should point at the `openrouter` wrapper command.
+For ccsilo Claude wrappers, prefer `clean-room-skill run --task-manifest <path> --ccsilo [variant]`. The shortcut selects the wrapper, config dir, and required credential environment together. For other Claude wrappers, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper` before `clean-room-skill run` and pair it with `--agent-config-dir <path>`. Never persist `ANTHROPIC_AUTH_TOKEN` or API keys into ccsilo or Claude settings files.
 
 The task manifest must already include preflight references, the required handoff sequence, unattended controller policy, finite iteration bounds, `loop_context.foundation_unit_ref`, and `loop_context.approved_scope_refs`.
 

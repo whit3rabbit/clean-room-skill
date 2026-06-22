@@ -133,6 +133,7 @@ When running unattended/resume, launch:
 clean-room-skill run --task-manifest <task-root>/contaminated/task-manifest.json --ccsilo openrouter
 
 Do not use plain claude, do not search plugin cache paths, and do not pass --schema-dir. Use bundled generated CLI schemas.
+Never set ANTHROPIC_AUTH_TOKEN or API keys in ccsilo settings.json, .claude.json, or any settings file.
 ```
 
 If the agent is already running inside that ccsilo session, the run command may omit the variant name:
@@ -168,7 +169,7 @@ clean-room-skill run \
   --max-iterations 3
 ```
 
-For CCSILO, prefer the `--ccsilo [variant]` shortcut from the collapsible section above. For other Claude wrappers, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper` and pass the wrapper config with `--agent-config-dir`. For example, an OpenRouter silo uses the `openrouter` wrapper path, not a separate `claude` command.
+For CCSILO, prefer the `--ccsilo [variant]` shortcut from the collapsible section above. For other Claude wrappers, set `CLEAN_ROOM_CLAUDE_EXECUTABLE=/absolute/path/to/wrapper` and pass the wrapper config with `--agent-config-dir`. For example, an OpenRouter silo uses the `openrouter` wrapper path, not a separate `claude` command. Never persist `ANTHROPIC_AUTH_TOKEN` or API keys into ccsilo or Claude settings files.
 
 The `run` command is not the normal starting point. It executes one bounded inner clean-room loop after the outer controller has created approved durable artifacts.
 

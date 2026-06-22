@@ -2049,6 +2049,7 @@ describe('clean-room run command', () => {
         name: 'auth',
         output: 'Not logged in · Please run /login\n',
         expected: /Claude auth is unavailable for the configured agent harness/,
+        required: [/--ccsilo \[variant\]/, /Never write ANTHROPIC_AUTH_TOKEN or API keys/],
         forbidden: /Run \/login/,
       },
       {
@@ -2065,6 +2066,7 @@ describe('clean-room run command', () => {
         name: 'openrouter-missing-key',
         output: '/Users/example/.local/bin/openrouter: line 98: OPENROUTER_API_KEY: Set OPENROUTER_API_KEY for variant openrouter\n',
         expected: /OpenRouter wrapper credentials are unavailable/,
+        required: [/--ccsilo \[variant\]/, /never write ANTHROPIC_AUTH_TOKEN or API keys/],
         forbidden: /sk-or-v1-/,
       },
     ];
@@ -2086,10 +2088,18 @@ describe('clean-room run command', () => {
       assert.equal(result.status, 0, result.stderr);
       assert.match(result.stdout, /contaminated-manager-prepare failed:/);
       assert.match(result.stdout, item.expected);
+      if (item.required) {
+        for (const required of item.required) assert.match(result.stdout, required);
+      }
       if (item.forbidden) assert.doesNotMatch(result.stdout, item.forbidden);
       const runResult = readJson(path.join(workspace.contaminated, 'clean-room-result.json'));
       assert.equal(runResult.result, 'spec-slice-blocked');
       assert.match(runResult.abstract_delta_tickets[0].summary, item.expected);
+      if (item.required) {
+        for (const required of item.required) {
+          assert.match(runResult.abstract_delta_tickets[0].summary, required);
+        }
+      }
       if (item.forbidden) assert.doesNotMatch(runResult.abstract_delta_tickets[0].summary, item.forbidden);
     }
   });
