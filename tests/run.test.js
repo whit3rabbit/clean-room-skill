@@ -1918,17 +1918,17 @@ describe('clean-room run command', () => {
       '--once',
     ], ROOT, {
       CLEAN_ROOM_CLAUDE_EXECUTABLE: claude,
-      OPENROUTER_API_KEY: 'or-test-key',
-      ANTHROPIC_AUTH_TOKEN: 'anthropic-test-token',
-      ANTHROPIC_API_KEY: 'anthropic-api-key',
+      OPENROUTER_API_KEY: 'example-openrouter-key',
+      ANTHROPIC_AUTH_TOKEN: 'example-anthropic-token',
+      ANTHROPIC_API_KEY: 'example-anthropic-key',
       SECRET_SHOULD_NOT_LEAK: 'do-not-copy',
     });
 
     assert.equal(result.status, 0, result.stderr);
     const calls = readJsonLines(capturePath);
-    assert.equal(calls[0].env.OPENROUTER_API_KEY, 'or-test-key');
-    assert.equal(calls[0].env.ANTHROPIC_AUTH_TOKEN, 'anthropic-test-token');
-    assert.equal(calls[0].env.ANTHROPIC_API_KEY, 'anthropic-api-key');
+    assert.equal(calls[0].env.OPENROUTER_API_KEY, 'example-openrouter-key');
+    assert.equal(calls[0].env.ANTHROPIC_AUTH_TOKEN, 'example-anthropic-token');
+    assert.equal(calls[0].env.ANTHROPIC_API_KEY, 'example-anthropic-key');
     assert.equal(calls[0].env.SECRET_SHOULD_NOT_LEAK, undefined);
   });
 

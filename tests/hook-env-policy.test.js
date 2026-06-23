@@ -212,7 +212,7 @@ describe('clean-room environment hook policy', () => {
     const source = path.join(root, 'projects', 'private-payments-processor');
     const contaminated = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'contaminated');
     const clean = path.join(root, 'Documents', 'CleanRoom', 'task-8af2', 'clean');
-    const implementation = path.join(root, 'Documents', 'CleanRoom', 'task-payments-implementation');
+    const implementation = path.join(root, 'Documents', 'CleanRoom', 'job-payments-implementation');
     const allowed = path.join(root, 'allowed');
     mkdirs(source, contaminated, clean, implementation, allowed);
 

@@ -1,0 +1,6 @@
+[scanner]
+ignore_paths = [
+  ".synrepo/**",
+  ".syntext/**",
+  "tests/**"
+]
