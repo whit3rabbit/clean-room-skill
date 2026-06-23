@@ -7,6 +7,7 @@
   },
   "homepage": "https://github.com/whit3rabbit/clean-room-skill",
   "repository": "https://github.com/whit3rabbit/clean-room-skill",
+  "license": "MIT",
   "keywords": [
     "clean-room",
     "specification",
@@ -30,6 +31,7 @@
       "Review these clean-room spec artifacts for leakage, coverage gaps, and schema conformance.",
       "Organize these behavioral specs into a clean skeleton manifest."
     ],
-    "brandColor": "#0F766E"
+    "brandColor": "#0F766E",
+    "composerIcon": "./assets/icon.svg"
   }
 }

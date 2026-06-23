@@ -1420,11 +1420,11 @@ describe('clean-room-skill installer', () => {
     const root = tempDir('clean-room-preflight-bootstrap-input-mismatch');
     const targetDir = path.join(root, 'repo');
     const artifactBase = path.join(root, 'artifacts');
-    const taskRoot = path.join(artifactBase, 'task-bootstrap-input-mismatch');
+    const taskRoot = path.join(artifactBase, 'case-bootstrap-input-mismatch');
     const input = path.join(ROOT, 'skills', 'clean-room', 'examples', 'contaminated-side', 'preflight-goal.json');
     fs.mkdirSync(targetDir, { recursive: true });
 
-    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'task-bootstrap-input-mismatch', '--single-task']);
+    const init = runInstall(['init', '--target-dir', targetDir, '--artifact-base', artifactBase, '--task-id', 'case-bootstrap-input-mismatch', '--single-task']);
     assert.equal(init.status, 0, init.stderr);
 
     const result = runInstall(['preflight', '--input', input, '--bootstrap', taskRoot]);

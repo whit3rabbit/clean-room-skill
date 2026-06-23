@@ -4,7 +4,7 @@ description: Use for authorized clean-room, reverse-engineering, source-to-imple
 compatibility: Designed for Claude Code, Codex, and Antigravity. Requires separate contaminated and clean workspaces or profiles for real clean-room use.
 metadata:
   phase: clean-implementation
-  legal_posture: risk-reduction-not-legal-advice
+  legal_posture: risk_reduction_not_legal_advice
 ---
 
 # Clean Room
