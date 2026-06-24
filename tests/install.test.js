@@ -2132,6 +2132,9 @@ describe('clean-room-skill installer', () => {
       const content = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
       assert.match(content, /`Read` uses `file_path`/, relPath);
       assert.match(content, /`Write` uses `file_path` and `content`/, relPath);
+      assert.match(content, /`Edit` uses `file_path`, `old_string`, and `new_string`/, relPath);
+      assert.match(content, /read the file first and make `old_string` an exact current substring/, relPath);
+      assert.match(content, /`MultiEdit` uses `file_path` and `edits` entries/, relPath);
       assert.match(content, /`Bash` uses `command` only/, relPath);
     }
   });
@@ -2920,6 +2923,13 @@ describe('clean-room-skill installer', () => {
     assert.match(result.stdout, /clean-room doctor passed for opencode/);
     assert.match(result.stdout, /clean-room OpenCode plugin coverage:/);
     assert.match(result.stdout, /tool\.execute\.before/);
+  });
+
+  test('doctor help exits before hook validation', () => {
+    const result = runInstall(['doctor', '--help']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Usage: clean-room-skill doctor --runtime <runtime>/);
+    assert.match(result.stdout, /--ccsilo \[variant\]/);
   });
 
   test('doctor rejects Claude installs without plugin role agents', () => {

@@ -154,6 +154,8 @@ describe('clean-room schema hook policy', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /schema kind: implementation-report/);
     assert.match(result.stderr, /missing required field 'implementer_role'/);
+    assert.match(result.stderr, /Safest option: use the generated CLI schema\/template path/);
+    assert.match(result.stderr, /clean-room-skill artifact template --kind implementation-report --output <path>/);
     assert.doesNotMatch(result.stderr, /missing required field 'reviewer_role'/);
   });
 

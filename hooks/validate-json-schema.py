@@ -76,6 +76,11 @@ MAX_COMPLETION_ARTIFACT_SCAN = 500
 MAX_REPORTED_ERRORS = 20
 MAX_VALIDATION_ERRORS = MAX_REPORTED_ERRORS + 1
 REPAIR_HINT = "Fix or update the JSON artifact to satisfy the reported schema errors, then write it again."
+SPECIAL_CREATION_HINTS = {
+    "preflight-goal": "clean-room-skill preflight --template --output <path>",
+    "source-index": "python3 skills/clean-room/scripts/build_source_index.py ...",
+    "visual-index": "python3 skills/clean-room/scripts/build_visual_index.py ...",
+}
 
 
 def schema_dir() -> Path:
@@ -819,8 +824,19 @@ def is_clean_room_task_manifest_schema(schema: dict[str, Any]) -> bool:
     return isinstance(properties, dict) and "handoff_sequence" in properties and "agent_pipeline" in properties
 
 
-def print_repair_hint() -> None:
+def creation_hint(kind: str | None) -> str:
+    if not kind:
+        return "clean-room-skill artifact kinds"
+    return SPECIAL_CREATION_HINTS.get(kind, f"clean-room-skill artifact template --kind {kind} --output <path>")
+
+
+def print_repair_hint(kind: str | None = None) -> None:
     print(REPAIR_HINT, file=sys.stderr)
+    print(
+        "Safest option: use the generated CLI schema/template path, "
+        f"{creation_hint(kind)}, then validate the edited artifact.",
+        file=sys.stderr,
+    )
 
 
 def add_error(errors: list[str], message: str) -> None:
@@ -1069,7 +1085,7 @@ def main() -> int:
                 f"clean-room schema check failed for {describe_path(path)}: {kind}.json is not a clean-role artifact",
                 file=sys.stderr,
             )
-            print_repair_hint()
+            print_repair_hint(kind)
             return 1
         schema_path = schema_dir() / SCHEMA_BY_ARTIFACT[kind]
         schema_text, schema_read_error = read_artifact_text(schema_path, "schema artifact")
@@ -1100,7 +1116,7 @@ def main() -> int:
                 print(f"  {redact_text(error)}", file=sys.stderr)
             if len(errors) > MAX_REPORTED_ERRORS:
                 print(f"  ... validation stopped after {MAX_REPORTED_ERRORS} error(s)", file=sys.stderr)
-            print_repair_hint()
+            print_repair_hint(kind)
             return 1
     return 0
 

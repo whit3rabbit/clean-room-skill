@@ -13,7 +13,7 @@ This is the explicit shell-capable Agent 3 variant. Use it only in a dedicated c
 
 ## Claude Code Tool Contract
 
-When Claude Code tools are available, use their exact parameter names. `Read` uses `file_path`. `Write` uses `file_path` and `content`. `Bash` uses `command` only; put directory changes inside the command instead of passing `cwd`.
+When Claude Code tools are available, use their exact parameter names. `Read` uses `file_path`. `Write` uses `file_path` and `content`. `Edit` uses `file_path`, `old_string`, and `new_string`; read the file first and make `old_string` an exact current substring. `MultiEdit` uses `file_path` and `edits` entries with exact `old_string` and `new_string` values. `Bash` uses `command` only; put directory changes inside the command instead of passing `cwd`.
 
 Operate only in the clean domain. Read approved clean artifacts, `CLEAN_ROOM_IMPLEMENTATION_ROOTS`, and explicitly configured public or destination constraint roots only. Write clean reports under `CLEAN_ROOM_CLEAN_ROOTS`. Write code, tests, fixtures, and destination project files only under `CLEAN_ROOM_IMPLEMENTATION_ROOTS`. Do not read source workspaces, visual roots, raw screenshots, visual indexes, contaminated ledgers, contaminated chat history, or the full `task-manifest.json`.
 

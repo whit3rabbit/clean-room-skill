@@ -1746,6 +1746,28 @@ describe('clean-room run command', () => {
     assert.equal(fs.existsSync(path.join(workspace.contaminated, 'clean-room-result.json')), false);
   });
 
+  test('reports a directory shadowing a terminal clean artifact distinctly from missing', () => {
+    const workspace = baseWorkspace('clean-room-run-complete-terminal-artifact-dir-shadow');
+    writeCoverage(workspace.contaminated, 'covered');
+    writeJson(path.join(workspace.clean, 'behavior-spec.json'), validBehaviorSpec());
+    writeCleanRunContext(workspace);
+    writeArchitectureArtifacts(workspace);
+    writeHandoffPackage(workspace, ['clean-run-context.json', 'behavior-spec.json']);
+    // Replace the plan file with an empty directory at the resolved path: the exact
+    // trap that read as "missing" and drove the patch/rerun loop.
+    fs.rmSync(path.join(workspace.clean, 'implementation-plan.json'));
+    fs.mkdirSync(path.join(workspace.clean, 'implementation-plan.json'));
+
+    const result = runCli(['run', '--task-manifest', workspace.manifestPath, '--dry-run']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /found a directory/);
+    assert.match(result.stderr, /implementation-plan\.json/);
+    // Aggregated: the still-missing report and qc artifacts are listed in the same error.
+    assert.match(result.stderr, /implementation-report\.json/);
+    assert.match(result.stderr, /qc-report\.json/);
+  });
+
   test('rejects mismatched preflight goal hash', () => {
     const workspace = baseWorkspace('clean-room-run-preflight-hash');
     fs.writeFileSync(path.join(workspace.contaminated, 'preflight-goal.json'), '{"goal_id":"changed"}\n');

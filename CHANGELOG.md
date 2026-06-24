@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.5] - 2026-06-24
+
+### Added
+
+- `clean-room-skill doctor --help`/`-h` prints usage and exits before hook validation.
+- JSON schema validation repair output now suggests the kind-specific `clean-room-skill artifact template` (or builder script) command for creating a valid artifact.
+
+### Changed
+
+- Clean and contaminated role-agent prompts now document `Edit` and `MultiEdit` exact parameter names alongside `Read`, `Write`, and `Bash`.
+- `clean-room-skill run` completion now aggregates every unmet terminal clean artifact into one error instead of failing one missing artifact per run, and reports a directory found where a file is expected (for example an empty `implementation-plan/` directory shadowing `implementation-plan.json`) distinctly from a missing artifact. This prevents a gate-by-gate retry loop when role agents under-produce artifacts.
+
 ## [0.6.4] - 2026-06-22
 
 ### Fixed
