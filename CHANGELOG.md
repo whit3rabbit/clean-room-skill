@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.6] - 2026-07-18
+
+### Changed
+
+- Bumped `actions/checkout` from 6.0.3 to 7.0.0.
+- Bumped `actions/setup-node` from 6.4.0 to 7.0.0.
+- Bumped `actions/setup-python` from 6.2.0 to 6.3.0.
+- Bumped `hashgraph-online/ai-plugin-scanner-action` from 1.2.268 to 1.2.514.
+- Bumped `react` from 19.2.6 to 19.2.7 (lockfile only, within existing range).
+- Bumped `ink` from 7.0.3 to 7.1.0 (lockfile only, within existing range).
+
 ## [0.6.5] - 2026-06-24
 
 ### Added
