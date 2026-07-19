@@ -3510,4 +3510,32 @@ describe('clean-room-skill installer', () => {
     });
     assert.notEqual(result.status, 0);
   });
+
+  test('claude installs the dynamic workflow js locally alongside its front-door; global and other runtimes do not', () => {
+    const { buildDesiredFiles } = require('../lib/install-artifacts.cjs');
+    // local ships the workflow AND its front-door command wrapper (from skills/clean-room-loop)
+    const local = [...buildDesiredFiles('claude', 'safe', 'local').keys()];
+    assert.ok(
+      local.includes('workflows/clean-room-loop.js'),
+      `claude local should install workflows/clean-room-loop.js, got ${JSON.stringify(local.filter((f) => f.includes('workflows')))}`,
+    );
+    assert.ok(local.includes('commands/clean-room/clean-room-loop.md'));
+    // global is local-only for the front-door command wrapper, so the workflow is local-only too:
+    // a global workflow with no launchable front-door would bypass the skill's confirmation gate.
+    const global = [...buildDesiredFiles('claude', 'safe', 'global').keys()];
+    assert.equal(
+      global.filter((f) => f.startsWith('workflows/')).length,
+      0,
+      `claude global must not install a triggerless dynamic workflow, got ${JSON.stringify(global.filter((f) => f.startsWith('workflows/')))}`,
+    );
+    // dynamic workflows are a Claude Code feature only
+    for (const runtime of ['codex', 'opencode', 'pi']) {
+      const files = [...buildDesiredFiles(runtime, 'safe', 'local').keys()];
+      assert.equal(
+        files.filter((f) => f.startsWith('workflows/')).length,
+        0,
+        `${runtime} must not install dynamic workflows`,
+      );
+    }
+  });
 });

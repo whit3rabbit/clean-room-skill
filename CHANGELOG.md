@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-07-19
+
+### Added
+
+- Claude Code dynamic workflow install: the installer copies `workflows/*.js` into project-local `.claude/workflows/`, wired to the Claude Code runtime only (no other runtime ships a `Workflow()` engine). A new `workflows` artifact kind ships in the npm package.
+- `clean-room-loop` skill: a Claude Code front door that launches the `clean-room-loop` dynamic workflow, running the unattended clean-room loop with in-session subagents (no per-token `claude -p` cost) and gating every wall crossing with the real leakage CLI. The front door initializes a project-local install when the current project lacks the workflow.
+
+### Changed
+
+- Skills now express a role-execution preference ladder: in-harness fresh-context roles first (the dynamic workflow on Claude Code, fresh subagent/skill sessions on other harnesses), with the durable runner's external process dispatch as a last resort. `--agent-runtime claude` (spawns `claude -p`, Claude-only, per-token) is the last option; non-Claude runtimes drive the runner with `run --agent-commands <adapter>`.
+- Documented dynamic-workflow install and run in `README.md` and the repo guide.
+
 ## [0.6.6] - 2026-07-18
 
 ### Changed

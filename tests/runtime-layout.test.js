@@ -96,7 +96,7 @@ describe('runtime layout', () => {
     }
 
     const claude = resolveRuntimeLayout('claude', 'local', { cwd, env: {}, homeDir: '/Users/tester' });
-    assert.deepEqual(kindLabels(claude), ['commands:commands/clean-room', 'agents:agents', 'hooks:hooks/clean-room']);
+    assert.deepEqual(kindLabels(claude), ['commands:commands/clean-room', 'agents:agents', 'workflows:workflows', 'hooks:hooks/clean-room']);
   });
 
   test('config-dir overrides runtime-specific roots', () => {

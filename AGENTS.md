@@ -11,6 +11,7 @@
 - This repo installs clean-room skills, role agents, hooks, schemas, examples, and optional verification templates for multiple agent runtimes.
 - Installer runtime flags: Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, Kilo, Cursor, GitHub Copilot, Windsurf, Augment, Trae, Qwen Code, Hermes Agent, and CodeBuddy.
 - Hook registration is verified for Codex, Claude Code, and OpenCode. Other runtime layouts are best-effort installs unless code and tests prove otherwise.
+- Dynamic workflows (`workflows/*.js` -> `.claude/workflows/`) are Claude Code only and local-scope only, installed alongside their `/clean-room:<name>` front-door command wrapper. No other runtime ships a `Workflow()` engine; global installs stay hooks-only, so a triggerless global workflow is never shipped.
 - The workflow creates clean behavioral spec packages and clean implementation outputs. It does not generate replacement code directly from source.
 - Full docs: [README.md](README.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/REFERENCE.md](docs/REFERENCE.md).
 
@@ -172,7 +173,8 @@ Ask before changing:
 - `preflight`: create or review the required `preflight-goal.json` before source discovery or controller execution.
 - `init`: record durable run preferences, separated roots, schema profile, model policy, and clean-safe/contaminated-only rules.
 - `attended`: start with `controller_policy.mode` fixed to `attended`.
-- `unattended`: start with bounded unattended defaults and `loop_context` for one approved spec slice. In Claude Code, prefer the durable runner with `--agent-runtime claude` when a valid unattended manifest can continue.
+- `unattended`: start with bounded unattended defaults and `loop_context` for one approved spec slice. Runs on every runtime. Role execution preference: (1) in-harness fresh-context roles with no external spawn (Claude Code: the cost-free `clean-room-loop` dynamic workflow; other harnesses: fresh in-harness subagent/skill sessions); (2) durable runner external dispatch as last resort or when the OS-enforced wall is required: `run --agent-commands <adapter>` on Codex/Pi/non-Claude runtimes, `--agent-runtime claude` (spawns `claude -p`, Claude only, per-token) last. Never pass `--agent-runtime claude` on a non-Claude runtime.
+- `clean-room-loop`: Claude Code only dynamic-workflow front door. Runs the unattended loop with in-session subagents (no `claude -p` per-token cost), kicked off via `Workflow({ name: "clean-room-loop", args })`. The workflow installs project-local to `.claude/workflows/`; if the current project lacks it, the front door initializes a project-local install (`clean-room-skill --claude --local --yes`) before launching. Cost-free POC path with context-level separation, weaker than the enforced `run --agent-runtime claude` wall. Only this shortcut is Claude-specific; the other clean-room skills run on every supported runtime.
 - `resume-cr`: continue from existing durable artifacts.
 - `start-over`: archive or quarantine current artifacts without deletion, then restart with a fresh `task_id`.
 - `refocus`: audit current artifacts against declared scope without expanding scope.
