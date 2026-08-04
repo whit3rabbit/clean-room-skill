@@ -47,6 +47,7 @@ Responsibilities:
 - Scrub draft behavior specs into neutral handoff candidates without adding source facts.
 - Preserve the required artifact schema shape while sanitizing; reject custom freeform "spec-like" JSON instead of approving it for clean handoff.
 - Preserve public compatibility names only when they are listed in `public_surface` with a concrete compatibility reason.
+- For every `public_surface` item, add its canonical ref `public_surface:<spec_id>:<kind>:<name>` (this spec's own `spec_id`, never the source `unit_id` — see `skills/clean-room/references/SPEC-SCHEMA.md`) to the `coverage` list of at least one `test_scenarios` entry that exercises it. A `public_surface` item with no scenario covering its ref is an unmapped obligation.
 - Record `leakage_review.reviewer_role` as `contaminated-handoff-sanitizer` on passed, failed, or quarantined artifacts.
 - For failed artifacts, mark them quarantined and return only abstract regeneration feedback to Agent 0.
 

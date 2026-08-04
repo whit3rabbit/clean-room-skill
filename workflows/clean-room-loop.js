@@ -158,7 +158,7 @@ const RESULT_SCHEMA = {
   type: 'object', additionalProperties: false,
   required: ['result', 'summary'],
   properties: {
-    result: { type: 'string' },   // e.g. spec-slice-complete, coverage-complete, contamination-suspected, unit-blocked
+    result: { type: 'string' },   // clean-room-result.schema.json enum: spec-slice-complete, spec-slice-blocked, spec-delta-required, contamination-suspected, iteration-limit-reached, no-progress-detected
     resultPath: { type: 'string' },
     summary: { type: 'string' },
   },
@@ -283,7 +283,14 @@ const analyzePrompt = (unitId, kind) =>
   `contaminated ledgers, NOT copied source.\n` +
   `1. \`${R.cli} artifact template --kind behavior-spec --output '${R.contaminatedRoot}/draft-behavior-spec-${unitId}.json' --force\`.\n` +
   `2. Fill it for this unit. Convert any observed source tests into clean equal-output test_scenarios (no copied test structure).\n` +
-  `3. Validate: \`${R.cli} artifact validate --path '${R.contaminatedRoot}/draft-behavior-spec-${unitId}.json'${schemaFlag(R)}\`. Fix until it passes.\n\n` +
+  `3. For every evidence_ref you cite, add a matching entry to a PER-UNIT evidence fragment (this unit runs in parallel with ` +
+  `others, so never touch a shared evidence-ledger.json directly): \`${R.cli} artifact template --kind evidence-ledger --output ` +
+  `'${R.contaminatedRoot}/evidence-ledger-${unitId}.json' --force\`, then fill its entries with source_unit_ref "${unitId}" ` +
+  `(this unit, not another one) and an evidence_id for each entry matching the evidence_ref the draft spec cites — a spec ` +
+  `evidence_ref like "evidence-ledger:${unitId}-item-003" refers to the entry whose evidence_id is "${unitId}-item-003". ` +
+  `PREFIX every evidence_id with "${unitId}-" (e.g. "${unitId}-item-001") — other units run in parallel and number their own ` +
+  `entries the same way; an unprefixed id can collide with theirs and silently drop entries when fragments are merged.\n` +
+  `4. Validate: \`${R.cli} artifact validate --path '${R.contaminatedRoot}/draft-behavior-spec-${unitId}.json' --path '${R.contaminatedRoot}/evidence-ledger-${unitId}.json'${schemaFlag(R)}\`. Fix until it passes.\n\n` +
   NEUTRALITY + '\n' +
   `You draft only; you do NOT approve your own work for handoff. Return unitId + draftSpecPath.`
 
@@ -298,6 +305,20 @@ const behaviorSpecs = (await parallel(
       { label: `analyze:${uid}`, phase: 'Analyze', model: 'sonnet', schema: UNIT_SPEC_SCHEMA })),
 )).filter(Boolean).filter((s) => s.ok && s.draftSpecPath)
 const draftSpecs = [foundationSpec, ...behaviorSpecs]
+
+// Deterministic merge of the per-unit evidence fragments (each Analyze agent wrote its own file to avoid a
+// parallel-write race on one shared ledger). Runs sequentially, once, after all Analyze agents finish.
+const evidenceMerge = await agent(
+  `Deterministic step. Merge per-unit evidence-ledger fragments into one canonical ledger. Run:\n` +
+  `  ${R.cli} artifact template --kind evidence-ledger --output '${R.contaminatedRoot}/evidence-ledger.json' --force\n` +
+  `Then, for each of these unit ids, if '${R.contaminatedRoot}/evidence-ledger-<unitId>.json' exists, read its entries and append ` +
+  `them into '${R.contaminatedRoot}/evidence-ledger.json' (dedupe by entry id; keep every entry's own source_unit_ref unchanged): ` +
+  `${JSON.stringify(draftSpecs.map((d) => d.unitId))}.\n` +
+  `Validate: \`${R.cli} artifact validate --path '${R.contaminatedRoot}/evidence-ledger.json'${schemaFlag(R)}\`. Fix until it passes.\n` +
+  `Return ok + a one-line summary + the artifact path.`,
+  { label: 'evidence-merge', phase: 'Analyze', model: 'sonnet', schema: REPORT_SCHEMA },
+)
+if (!evidenceMerge?.ok) return { error: 'evidence-ledger merge failed', detail: evidenceMerge?.error, roots: R, manifest: M.manifestPath }
 
 // ===========================================================================
 // Phases 4+5 — Sanitize (Agent 1.5, source-denied) then the LEAKAGE GATE (independent CLI, real hooks).
@@ -316,7 +337,12 @@ async function sanitizeAndGate(draft) {
       `1. Copy the draft to '${R.contaminatedRoot}/approved-behavior-spec-${draft.unitId}.json' and REMOVE all identifying ` +
       `material: source paths, import/export listings, private identifiers, distinctive strings, copied comments, raw diffs, ` +
       `source excerpts, and source-shaped pseudocode. Keep a public compatibility name ONLY with a concrete recorded reason. ` +
-      `Set leakage_review.reviewer_role = "contaminated-handoff-sanitizer".\n` +
+      `Set leakage_review.reviewer_role = "contaminated-handoff-sanitizer". Give this approved spec's own \`spec_id\` field a ` +
+      `stable value now if the draft did not already set one (e.g. "spec-${draft.unitId}-contract") — everything below joins ` +
+      `against THIS spec_id, never against the unit id "${draft.unitId}" alone. For every \`public_surface\` item, add its ` +
+      `canonical ref \`public_surface:<spec_id>:<kind>:<name>\` (using this spec's own spec_id you just set, not the unit id) to ` +
+      `the \`coverage\` array of at least one \`test_scenarios\` entry that exercises it. A public_surface item with no scenario ` +
+      `covering its ref is an unmapped obligation and will fail the completion gate later.\n` +
       `2. Build the handoff: \`${R.cli} artifact template --kind handoff-package --output ` +
       `'${R.contaminatedRoot}/handoff-package-${draft.unitId}.json' --force\`, then fill it to reference the approved spec ` +
       `with correct sha256 checksums and no contaminated paths.\n` +
@@ -355,7 +381,7 @@ if (!approved.length) {
 }
 const foundationApproved = approved.some((a) => a.unitId === M.foundationUnitId)
 if (!foundationApproved) {
-  return { result: 'unit-blocked', summary: 'foundation unit did not clear the leakage gate; behavior slices cannot proceed', roots: R }
+  return { result: 'spec-slice-blocked', summary: 'foundation unit did not clear the leakage gate; behavior slices cannot proceed', roots: R }
 }
 
 // ===========================================================================
@@ -380,27 +406,60 @@ if (!handoff?.ok) return { error: 'clean handoff failed', detail: handoff?.error
 
 // ===========================================================================
 // Phase 7 — Plan (Agent 2 clean-architect, source-denied, opus). Writes plan, NO code.
+// Bounded retry: a deterministic `artifact check-coverage` pass after each attempt catches
+// a spec_id/unit_id ref mismatch here, before Implement spends tokens writing code against
+// an obligation that can never join.
 // ===========================================================================
-phase('Plan')
-const plan = await agent(
-  `You are Agent 2, the clean architect. ${CLEAN_DENY}\n\n` +
-  `Inputs (clean only): '${R.cleanRoot}/clean-run-context.json', the approved behavior specs + handoff packages under ` +
-  `'${R.cleanRoot}', and the clean destination foundation under '${R.implementationRoot}' (read-only). You may run ` +
-  `\`${R.cli} artifact template|validate\` via Bash but you MUST NOT read source or write code.\n\n` +
-  `TASK: produce the clean plan.\n` +
-  `1. skeleton-manifest.json — the destination architecture map: architecture areas with owned_path_prefixes, ` +
-  `responsibilities, forbidden responsibilities, allowed dependencies, refactor triggers. Template + fill under '${R.cleanRoot}'.\n` +
-  `2. implementation-plan.json — map approved specs to relative destination target_paths + test_paths + work items + ` +
-  `argv-array verification commands + risks + acceptance criteria + public_contract_refs + code_hygiene_policy (from clean-run-context). ` +
-  `Every target/test path must belong to a skeleton area. Do NOT choose dependencies by copying source manifests. Mark work BLOCKED ` +
-  `instead of guessing when specs are ambiguous.\n` +
-  `3. Validate both: \`${envPrefix(R, 'clean-architect')}${R.cli} artifact validate --task-manifest '${M.manifestPath}' ` +
-  `--role clean-architect --path '${R.cleanRoot}/skeleton-manifest.json' --path '${R.cleanRoot}/implementation-plan.json'${schemaFlag(R)}\`. Fix until it passes.\n\n` +
-  NEUTRALITY + '\n' +
-  `Return ok + summary + artifact paths.`,
-  { label: 'plan', phase: 'Plan', model: 'opus', schema: REPORT_SCHEMA },
-)
-if (!plan?.ok) return { error: 'clean planning failed', detail: plan?.error, roots: R }
+const MAX_PLAN_TRIES = 2
+const specFlags = approved.map((a) => `--spec '${a.approvedSpecPath}'`).join(' ')
+let plan = null
+let planFeedback = ''
+for (let attempt = 1; attempt <= MAX_PLAN_TRIES; attempt += 1) {
+  phase('Plan')
+  plan = await agent(
+    `You are Agent 2, the clean architect. ${CLEAN_DENY}\n\n` +
+    `Inputs (clean only): '${R.cleanRoot}/clean-run-context.json', the approved behavior specs + handoff packages under ` +
+    `'${R.cleanRoot}', and the clean destination foundation under '${R.implementationRoot}' (read-only). You may run ` +
+    `\`${R.cli} artifact template|validate\` via Bash but you MUST NOT read source or write code.\n\n` +
+    `TASK: produce the clean plan.\n` +
+    `1. skeleton-manifest.json — the destination architecture map: architecture areas with owned_path_prefixes, ` +
+    `responsibilities, forbidden responsibilities, allowed dependencies, refactor triggers. Template + fill under '${R.cleanRoot}'.\n` +
+    `2. implementation-plan.json — map approved specs to relative destination target_paths + test_paths + work items + ` +
+    `argv-array verification commands + risks + acceptance criteria + public_contract_refs + code_hygiene_policy (from clean-run-context). ` +
+    `Every target/test path must belong to a skeleton area. Do NOT choose dependencies by copying source manifests. Mark work BLOCKED ` +
+    `instead of guessing when specs are ambiguous. Build every public_contract_refs entry as the exact canonical ref ` +
+    `\`public_surface:<spec_id>:<kind>:<name>\`, copying \`<spec_id>\` byte-for-byte from that approved spec's own \`spec_id\` field ` +
+    `(never the source unit id) — this must match the ref the spec itself lists in its \`test_scenarios[].coverage\`, or the ` +
+    `obligation will not join and the unit cannot be marked covered later. Every work item you create must end up recorded as ` +
+    `completed or blocked in Agent 3's terminal report; do not leave one unscheduled with no blocked entry.\n` +
+    `3. Validate both: \`${envPrefix(R, 'clean-architect')}${R.cli} artifact validate --task-manifest '${M.manifestPath}' ` +
+    `--role clean-architect --path '${R.cleanRoot}/skeleton-manifest.json' --path '${R.cleanRoot}/implementation-plan.json'${schemaFlag(R)}\`. Fix until it passes.\n\n` +
+    (planFeedback ? `4. PRIOR COVERAGE-JOIN FAILURE — fix specifically: ${planFeedback}\n\n` : '') +
+    NEUTRALITY + '\n' +
+    `Return ok + summary + artifact paths.`,
+    { label: `plan:${attempt}`, phase: 'Plan', model: 'opus', schema: REPORT_SCHEMA },
+  )
+  if (!plan?.ok) return { error: 'clean planning failed', detail: plan?.error, roots: R }
+
+  const coverageCheck = await agent(
+    `CLI-gated step: the command below is deterministic, but pass/fail here is this agent's report of running it, not a ` +
+    `captured exit code. Check that implementation-plan.json's public_contract_refs actually join to each approved ` +
+    `spec's public_surface obligations, before any code gets written. Run:\n` +
+    `  ${R.cli} artifact check-coverage ${specFlags} --plan '${R.cleanRoot}/implementation-plan.json'${schemaFlag(R)}\n` +
+    `Report pass=true only if that command exits 0. On failure, put its exact stderr text in detail verbatim (it names ` +
+    `the precise missing ref).`,
+    { label: `plan-coverage-check:${attempt}`, phase: 'Plan', model: 'haiku', schema: GATE_SCHEMA },
+  )
+  if (coverageCheck?.pass) break
+  planFeedback = coverageCheck?.detail ?? 'coverage check failed without detail'
+  if (attempt === MAX_PLAN_TRIES) {
+    return {
+      result: 'spec-delta-required',
+      summary: `implementation-plan public_surface join failed after ${MAX_PLAN_TRIES} attempts: ${planFeedback}`,
+      roots: R, manifest: M.manifestPath,
+    }
+  }
+}
 
 // ===========================================================================
 // Phase 8 — Implement + QC (Agent 3 clean-qa-editor). Writes code+tests under the implementation root.
@@ -416,8 +475,13 @@ const impl = await agent(
   `(file line caps, split strategy, forbidden patterns).\n` +
   `2. Run the plan's argv-array verification commands with cwd under '${R.implementationRoot}' (e.g. the test command). Record ` +
   `pass/fail. Record any code-hygiene violations as "code-hygiene" findings in qc-report.json.\n` +
-  `3. Template + fill '${R.cleanRoot}/implementation-report.json' and '${R.cleanRoot}/qc-report.json', then validate both: ` +
-  `\`${envPrefix(R, 'clean-qa-editor')}${R.cli} artifact validate --task-manifest '${M.manifestPath}' --role clean-qa-editor ` +
+  `3. Template + fill '${R.cleanRoot}/implementation-report.json' and '${R.cleanRoot}/qc-report.json'. Every single work item from ` +
+  `implementation-plan.json must end up in exactly one of completed_work_items or blocked_work_items — none may be silently ` +
+  `omitted; if you did not schedule one, put it in blocked_work_items with a reason. qc-report.json coverage_status reflects ` +
+  `test/code coverage only: do NOT withhold "complete" waiting on a durable evidence-ledger entry — evidence-ledger.json is ` +
+  `contaminated-side and you are source-denied, so you cannot see it and must not gate on it; that check belongs to Agent 0 in ` +
+  `the later Verify phase, not to you.\n` +
+  `4. Validate both: \`${envPrefix(R, 'clean-qa-editor')}${R.cli} artifact validate --task-manifest '${M.manifestPath}' --role clean-qa-editor ` +
   `--path '${R.cleanRoot}/implementation-report.json' --path '${R.cleanRoot}/qc-report.json'${schemaFlag(R)}\`. Fix until it passes.\n\n` +
   NEUTRALITY + '\n' +
   `Emit ONE terminal report. Return ok + summary + artifact paths.`,
@@ -449,23 +513,66 @@ if (!polish?.ok) return { error: 'clean polish failed', detail: polish?.error, r
 
 // ===========================================================================
 // Phase 10 — Coverage verify (Agent 0, contaminated, opus) + completion GATE.
+// Ledger authoring, the gate check, and the terminal result are THREE separate
+// agent() calls (workflow-script-controlled retries, like the Plan phase above) —
+// the gate is the wall crossing; it is NEVER self-validated, including here.
 // ===========================================================================
+const MAX_VERIFY_TRIES = 2
+const coverageLedgerPath = `${R.contaminatedRoot}/coverage-ledger.json`
+let verifyFeedback = ''
+let verifyGatePass = false
+for (let attempt = 1; attempt <= MAX_VERIFY_TRIES; attempt += 1) {
+  phase('Verify')
+  const ledger = await agent(
+    `You are Agent 0 again, the contaminated manager-verifier, verifying coverage. Contaminated domain: you MAY read the ` +
+    `source ${JSON.stringify(G.sourceRoots)}, the contaminated ledgers under '${R.contaminatedRoot}', and the TERMINAL clean reports ` +
+    `under '${R.cleanRoot}' (implementation-report, qc-report, polish-report, approved specs, implementation-plan). Write ONLY under '${R.contaminatedRoot}'.\n\n` +
+    `TASK: write/update '${coverageLedgerPath}' ONLY. A separate independent agent gates it after you — do not run or reason about ` +
+    `that check yourself, and do NOT write clean-room-result.json in this step.\n` +
+    `1. Template + fill it: mark each approved-scope unit covered ONLY when a matching clean behavior spec, plan mappings, a ` +
+    `terminal implementation report, a passed QC report, valid evidence refs, and required public-surface mappings all exist. ` +
+    `For the evidence-refs check, read '${R.contaminatedRoot}/evidence-ledger.json' directly (you are contaminated-side and can ` +
+    `see it); this is the only role that checks evidence-ledger completeness, so do not expect qc-report.json to have done it. ` +
+    `Leave unresolved high-priority discovery_leads blocking.\n` +
+    (verifyFeedback
+      ? `2. PRIOR GATE FAILURE — the independent checker rejected your last ledger for this exact reason; downgrade the named ` +
+        `unit's coverage_state to "gap" or "blocked" (never "covered") and record the message as a coverage_gaps or ` +
+        `abstract_delta_ticket entry: ${verifyFeedback}\n`
+      : '') +
+    `Validate: \`${R.cli} artifact validate --path '${coverageLedgerPath}'${schemaFlag(R)}\`. Fix until it passes.\n\n` +
+    `Return ok + summary + the artifact path.`,
+    { label: `verify-ledger:${attempt}`, phase: 'Verify', model: 'opus', schema: REPORT_SCHEMA },
+  )
+  if (!ledger?.ok) return { error: 'coverage-ledger authoring failed', detail: ledger?.error, roots: R, manifest: M.manifestPath }
+
+  const gate = await agent(
+    `Independent completion GATE, run by an agent that did not author the ledger it is checking. Run ONLY this command and ` +
+    `report the result — do not reinterpret or second-guess it. No claude -p. This is the exact logic the real enforced runner ` +
+    `uses for this same gate:\n` +
+    `  ${R.cli} artifact check-coverage --task-manifest '${M.manifestPath}' --coverage-ledger '${coverageLedgerPath}'${schemaFlag(R)}\n` +
+    `pass=true ONLY if it exits 0. On failure, put its exact stderr text in detail verbatim (it names the precise unit/ref/evidence problem).`,
+    { label: `verify-gate:${attempt}`, phase: 'Verify', model: 'haiku', schema: GATE_SCHEMA },
+  )
+  if (gate?.pass) { verifyGatePass = true; break }
+  verifyFeedback = gate?.detail ?? 'coverage gate failed without detail'
+}
+
 phase('Verify')
 const verify = await agent(
-  `You are Agent 0 again, the contaminated manager-verifier, in the completion gate. Contaminated domain: you MAY read the ` +
-  `source ${JSON.stringify(G.sourceRoots)}, the contaminated ledgers under '${R.contaminatedRoot}', and the TERMINAL clean reports ` +
-  `under '${R.cleanRoot}' (implementation-report, qc-report, polish-report, approved specs, implementation-plan). Write ONLY under '${R.contaminatedRoot}'.\n\n` +
-  `TASK: verify clean coverage against the authorized source scope, then write the terminal result.\n` +
-  `1. Template + fill '${R.contaminatedRoot}/coverage-ledger.json': mark each approved-scope unit covered ONLY when a matching clean ` +
-  `behavior spec, plan mappings, a terminal implementation report, a passed QC report, valid evidence refs, and required ` +
-  `public-surface mappings all exist. Leave unresolved high-priority discovery_leads blocking.\n` +
-  `2. Template + fill '${R.contaminatedRoot}/clean-room-result.json' with a result of: "coverage-complete" or "spec-slice-complete" ` +
-  `if the gate is met; otherwise "unit-blocked" or "spec-delta-required". Completion is DENY-BY-DEFAULT: a completion claim must be ` +
-  `backed by the durable canonical artifacts above, not a synthetic summary.\n` +
-  `3. Validate: \`${R.cli} artifact validate --path '${R.contaminatedRoot}/coverage-ledger.json' --path ` +
+  `You are Agent 0 again, the contaminated manager-verifier, writing the terminal result. Contaminated domain: you MAY read the ` +
+  `source ${JSON.stringify(G.sourceRoots)} and the contaminated ledgers under '${R.contaminatedRoot}'. Write ONLY under '${R.contaminatedRoot}'.\n\n` +
+  `An independent agent already ran the completion gate against '${coverageLedgerPath}' and ` +
+  `${verifyGatePass ? 'it PASSED.' : `it did NOT pass within ${MAX_VERIFY_TRIES} attempts (last failure detail: ${verifyFeedback}).`}\n\n` +
+  `TASK: template + fill '${R.contaminatedRoot}/clean-room-result.json'. Use ONLY these result values (clean-room-result.schema.json's ` +
+  `enum has no others): "spec-slice-complete" when the gate above passed and every approved-scope unit's coverage_state is ` +
+  `"covered"; "spec-slice-blocked" when a unit genuinely cannot proceed (e.g. contamination or a missing prerequisite); ` +
+  `"spec-delta-required" when the gate did not pass, or specs, the plan, or reports need edits; "contamination-suspected"; ` +
+  `"iteration-limit-reached"; or "no-progress-detected". Completion is DENY-BY-DEFAULT: a completion claim must be backed by the ` +
+  `durable canonical artifacts above, not a synthetic summary.\n` +
+  `Validate: \`${R.cli} artifact validate --path '${coverageLedgerPath}' --path ` +
   `'${R.contaminatedRoot}/clean-room-result.json'${schemaFlag(R)}\` (the schema hook rejects unbacked completion claims). Fix until it passes.\n\n` +
   `Return result (the result string), resultPath, and a plain-language summary.`,
-  { label: 'verify', phase: 'Verify', model: 'opus', schema: RESULT_SCHEMA },
+  { label: 'verify-result', phase: 'Verify', model: 'opus', schema: RESULT_SCHEMA },
 )
 
 // ===========================================================================

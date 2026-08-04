@@ -598,6 +598,12 @@ function writeQcReport(clean, reviewedAt) {
 function validBehaviorSpec(overrides = {}) {
   return {
     ...readJson(BEHAVIOR_SPEC_FIXTURE),
+    // The fixture's public_surface carries a coverage ref baked to its own
+    // spec_id (spec-example-flow). Callers that want to exercise a real
+    // public_surface obligation set it explicitly via overrides (see
+    // writePublicCommandCompletionArtifacts); everyone else gets a spec with
+    // no completion-gating obligations, matching pre-fixture behavior.
+    public_surface: [],
     ...overrides,
   };
 }
