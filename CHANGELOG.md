@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.0] - 2026-08-04
+
+### Added
+
+- `clean-room-skill artifact check-coverage`: checks that a behavior spec's `public_surface` obligations join to an implementation plan's `public_contract_refs` (post-Plan mode) or that a `coverage-ledger.json` is internally consistent against a task manifest (post-Verify mode, the same logic the enforced runner uses). Catches a `spec_id`/`unit_id` ref mismatch before code is written instead of at final verification.
+- `clean-room-skill artifact public-surface-ref`: prints the canonical `public_surface:<spec_id>:<kind>:<name>` ref for a spec, reading `spec_id` from the spec file itself so agents stop hand-typing it.
+- `clean-room-loop` workflow: Plan and Verify phases now gate on `artifact check-coverage` via a bounded retry loop, run by an independent agent that did not author the artifact being checked.
+
+### Fixed
+
+- `clean-room-loop` workflow's Verify phase no longer self-validates its own completion gate; ledger authoring, the gate check, and the terminal result are now three separate agent calls.
+- `artifact check-coverage` no longer silently no-ops on a missing `--spec`/`--plan` path, and its `--task-manifest` mode now also runs the foundation-coverage gate, matching the real runner.
+- Evidence-ledger fragments from parallel behavior units in `clean-room-loop` no longer collide on `evidence_id` during merge.
+
 ## [0.7.0] - 2026-07-19
 
 ### Added
